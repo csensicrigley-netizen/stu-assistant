@@ -370,7 +370,8 @@ export function useStore(): Store {
 
 /** Navigation actions any screen may trigger. */
 export interface ShellActions {
-  go: (tab: "today" | "week" | "study" | "campus" | "me") => void;
+  // 与 TabBar 的 TabKey 对齐；import 是课表页的子页面，不是底栏一格。
+  go: (tab: "today" | "plan" | "week" | "study" | "campus" | "me" | "import" | "medbind") => void;
   connect: () => void;
 }
 

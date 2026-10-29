@@ -6,10 +6,10 @@
       name="viewport"
       content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=5"
     />
-    <meta name="theme-color" content="#f9f6f1" />
+    <meta name="theme-color" content="#fff0f1" />
     <meta name="color-scheme" content="light dark" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="STU 助手" />
     <meta name="description" content="下一节课在哪，作业几点截止。教务、MySTU 和学校通知收在一处，按教务处官方作息计算每节课的时间。" />
     <link rel="icon" href="./icon.svg" type="image/svg+xml" />
@@ -17,6 +17,31 @@
     <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
     <link rel="preload" href="./fonts/schibsted-grotesk-latin-400-700.woff2" as="font" type="font/woff2" crossorigin />
     <title>STU 事项助手</title>
+    <!--
+      首帧底色先铺上：Android WebView 在 CSS 到位之前是白的（窗口底色），
+      深色主题下会看到一下白闪；反过来窗口底色若是黑的，上下两条系统栏
+      区域就是黑边。这里跟着 data-theme 直接给 html/body 上纸色，
+      系统栏压上来的时候透过去的是这张纸，不是黑。
+    -->
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: #fff0f1;
+      }
+      html[data-theme="dark"],
+      html[data-theme="dark"] body {
+        background: #1f161e;
+      }
+      html[data-palette="classic"],
+      html[data-palette="classic"] body {
+        background: #f9f6f1;
+      }
+      html[data-theme="dark"][data-palette="classic"],
+      html[data-theme="dark"][data-palette="classic"] body {
+        background: #0b0e14;
+      }
+    </style>
     <script>
       // Theme + palette before first paint: no flash of the wrong background.
       try {
@@ -32,7 +57,7 @@
           .querySelector('meta[name="theme-color"]')
           .setAttribute(
             "content",
-            pal === "classic" ? (dark ? "#0b0e14" : "#f9f6f1") : dark ? "#1b1518" : "#fffbfb",
+            pal === "classic" ? (dark ? "#0b0e14" : "#f9f6f1") : dark ? "#1f161e" : "#fff0f1",
           );
       } catch (e) {}
     </script>

@@ -171,17 +171,24 @@ svg {
   width: 100%;
   max-width: var(--page-max);
   margin: 0 auto;
-  padding: calc(var(--safe-t) + var(--s-6)) var(--gutter)
-    calc(var(--tabbar-h) + var(--safe-b) + var(--s-10));
+  /* 顶：状态栏高度 + 20；底：标签栏 + 手势条 + 32。
+     横向取「页面留白」和「安全区 + 12」里大的那个 —— 横屏刘海机也不贴边。 */
+  padding-top: calc(var(--safe-t) + var(--s-5));
+  padding-bottom: calc(var(--tabbar-h) + var(--safe-b) + var(--s-8));
+  padding-left: max(var(--gutter), calc(var(--safe-l) + 12px));
+  padding-right: max(var(--gutter), calc(var(--safe-r) + 12px));
 }
 
+/* 页面级的纵向节奏只有一个来源：tokens 里的 --rhythm-*。
+   以前这里是 24 / 32 两档混着用，于是"今天"和"我的"看起来像两个 App。 */
 .page > * + * {
-  margin-top: var(--s-6);
+  margin-top: var(--rhythm-page);
 }
 
 .page > .sec + .sec,
-.page > div + .sec {
-  margin-top: var(--s-8);
+.page > div + .sec,
+.page > section + .sec {
+  margin-top: var(--rhythm-sec);
 }
 
 /* ------------------------------------------------------------------ head */
@@ -198,18 +205,18 @@ svg {
 }
 
 .head__eyebrow {
-  font-size: var(--fs-13);
+  font-size: var(--fs-12);
   font-weight: 600;
   color: var(--ink-3);
-  letter-spacing: 0.02em;
-  margin-bottom: var(--s-1);
+  letter-spacing: 0.04em;
+  margin-bottom: 2px;
 }
 
 .head__title {
   font-size: var(--fs-30);
   line-height: var(--lh-tight);
   font-weight: 700;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
 }
 
 .head__aside {
@@ -218,8 +225,8 @@ svg {
 }
 
 .head__sub {
-  margin-top: var(--s-2);
-  font-size: var(--fs-14);
+  margin-top: 6px;
+  font-size: var(--fs-13);
   color: var(--ink-2);
 }
 
@@ -266,28 +273,36 @@ svg {
 
 /* ------------------------------------------------------------- sections */
 
+/* 板块头：视觉上只占 32px，但「全部作业」这类链接仍保留 44px 触摸目标
+   （用负 margin 让它凸出去，不吃版面）。密集列表页一屏能多出两组。 */
 .sec__head {
   display: flex;
   align-items: center;
   gap: var(--s-2);
-  min-height: 44px;
-  margin-bottom: var(--s-2);
+  min-height: 32px;
+  margin: -2px 0 calc(var(--rhythm-head) - 2px);
+}
+
+.sec__head .link-btn {
+  margin: -6px 0;
 }
 
 .sec__title {
   font-size: var(--fs-18);
   line-height: var(--lh-head);
   font-weight: 700;
+  letter-spacing: -0.01em;
 }
 
 .sec__title-num {
   font-weight: 500;
   color: var(--ink-3);
   margin-left: 4px;
+  font-size: var(--fs-14);
 }
 
 .sec__note {
-  font-size: var(--fs-13);
+  font-size: var(--fs-12);
   color: var(--ink-3);
   display: inline-flex;
   align-items: center;
@@ -295,6 +310,7 @@ svg {
 
 .sec__head .link-btn {
   margin-left: auto;
+  font-size: var(--fs-13);
 }
 
 .link-btn {
@@ -311,6 +327,13 @@ svg {
   opacity: 0.6;
 }
 
+/* 不可用的文字按钮要看得出来不可用（「今天」在已经处于今天时就是这种） */
+.link-btn:disabled {
+  color: var(--ink-3);
+  opacity: 0.65;
+  cursor: default;
+}
+
 .group-label {
   font-size: var(--fs-12);
   font-weight: 600;
@@ -321,6 +344,13 @@ svg {
 
 /* ---------------------------------------------------------------- card */
 
+/*
+ * 圆角只有三档，跟"这块东西多大"绑定，不跟页面绑定：
+ *   行 / 列表项  → --r-md  (14)
+ *   容器 / 卡片  → --r-lg  (20)
+ *   首屏 / 弹层  → --r-xl  (28)
+ * 之前行也是 20，于是密一点的行会显得"胖"，跟卡片分不出层级。
+ */
 .card {
   background: var(--surface);
   border: 1px solid var(--line);
@@ -337,7 +367,7 @@ svg {
 
 .list {
   display: grid;
-  gap: var(--s-2);
+  gap: var(--rhythm-item);
 }
 
 /* ---------------------------------------------------------------- tags */
@@ -424,6 +454,53 @@ svg {
   color: var(--ink-inverse);
 }
 
+/* 日期胶囊（每日计划用）：两行「周三 / 28」，选中态是一块跟着走的底板，
+   底板用 layoutId 共享布局动画，和底栏、分段控件同一个 PILL 档位。 */
+.chip--day {
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0;
+  min-width: 46px;
+  padding: 0 8px;
+  border-radius: var(--r-md);
+  background: transparent;
+}
+
+.chip--day.is-on {
+  background: transparent;
+  border-color: transparent;
+  color: var(--ink-inverse);
+}
+
+.chip__pill {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: var(--r-md);
+  background: var(--ink);
+}
+
+.chip--day__w,
+.chip--day__d {
+  position: relative;
+  display: block;
+  text-align: center;
+  line-height: 1.15;
+}
+
+.chip--day__d {
+  font-size: var(--fs-11);
+  font-weight: 600;
+  opacity: 0.66;
+}
+
+.chip--day.is-on .chip--day__d {
+  opacity: 0.82;
+}
+
 /* -------------------------------------------------------------- buttons */
 
 .btn {
@@ -448,6 +525,14 @@ svg {
 
 .btn:disabled {
   opacity: 0.55;
+}
+
+/* 主按钮禁用时不要只降透明度：一块半透明的紫仍然像"可以点"。
+   直接退成中性底色，一眼就知道还差一步。 */
+.btn--primary:disabled {
+  background: var(--surface-3);
+  color: var(--ink-3);
+  opacity: 1;
 }
 
 .btn--sm {
@@ -546,7 +631,8 @@ svg {
 .seg__btn {
   position: relative;
   min-height: 44px;
-  border-radius: 10px;
+  /* 药丸 = 轨道圆角 - 轨道内边距，视觉上才严丝合缝 */
+  border-radius: calc(var(--r-md) - 4px);
   font-size: var(--fs-14);
   font-weight: 600;
   color: var(--ink-2);
@@ -561,7 +647,7 @@ svg {
 .seg__pill {
   position: absolute;
   inset: 0;
-  border-radius: 10px;
+  border-radius: calc(var(--r-md) - 4px);
   background: var(--surface);
   box-shadow: var(--shadow-1);
 }
@@ -603,11 +689,25 @@ svg {
   right: 0;
   bottom: 0;
   z-index: 30;
-  padding-bottom: var(--safe-b);
+  /* 手势条高度由 --safe-b 给；给一个 6px 下限，别让标签贴着返回条 */
+  padding-bottom: max(var(--safe-b), 6px);
   background: var(--bar-bg);
   border-top: 1px solid var(--line);
-  backdrop-filter: saturate(1.6) blur(20px);
-  -webkit-backdrop-filter: saturate(1.6) blur(20px);
+  /*
+   * 这条 fixed 的磨砂是全 App 唯一一处「每帧都要重算」的属性：底下的内容
+   * 每滚一像素，这一条就要重新采样一次。半径是主要成本，20px 与 14px 的观感
+   * 差别几乎看不出来，但 GPU 的采样量差一截，所以压到 14px。透明度的账在
+   * tokens.css 的 --bar-bg 里一起调：底更实一点，需要模糊掉的细节就少一点。
+   * 不支持 backdrop-filter 的 WebView 直接退到不透明底，别留一层半透明糊。
+   */
+  backdrop-filter: saturate(1.5) blur(14px);
+  -webkit-backdrop-filter: saturate(1.5) blur(14px);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .tabbar {
+    background: var(--surface);
+  }
 }
 
 .tabbar__row {
@@ -615,8 +715,10 @@ svg {
   margin: 0 auto;
   height: var(--tabbar-h);
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  padding: 0 6px;
+  /* 六个格子就是六格。这里以前写死 repeat(5, 1fr)，而 TABS 有六项，
+     第六个（我的）被挤到第二行、被 64px 的高度裁掉一半 —— 底栏常年缺一格。 */
+  grid-template-columns: repeat(6, 1fr);
+  padding: 0 4px;
 }
 
 .tabbar__btn {
@@ -624,7 +726,7 @@ svg {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 3px;
+  gap: 2px;
   min-width: 44px;
   color: var(--ink-3);
   transition: color var(--t-fast) var(--ease-std);
@@ -638,8 +740,8 @@ svg {
   position: relative;
   display: grid;
   place-items: center;
-  width: 56px;
-  height: 30px;
+  width: 46px;
+  height: 28px;
 }
 
 .tabbar__icon > svg {
@@ -663,10 +765,10 @@ svg {
 
 .tabbar__badge {
   position: absolute;
-  top: -2px;
-  left: 34px;
-  min-width: 17px;
-  height: 17px;
+  top: -3px;
+  left: calc(50% + 7px);
+  min-width: 16px;
+  height: 16px;
   padding: 0 4px;
   border-radius: var(--r-full);
   background: var(--cinnabar-ink);
@@ -674,7 +776,7 @@ svg {
   font-family: var(--font-num);
   font-size: 10px;
   font-weight: 700;
-  line-height: 17px;
+  line-height: 16px;
   text-align: center;
   box-shadow: 0 0 0 2px var(--surface);
 }
@@ -688,7 +790,324 @@ svg {
   font-size: var(--fs-11);
   font-weight: 600;
   line-height: 1;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.01em;
+}
+
+/* ---------------------------------------------------------------- steps */
+/*
+ * 四步流程的步骤条：底轨 + 一格跟着走的药丸（layoutId 共享布局）。
+ * 之前是四条各自换 background 的小竖条，看不出"走到第几步"，
+ * 也看不出"正在往前还是在往回"。
+ */
+.steps {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 6px;
+  padding: 4px;
+  border-radius: var(--r-full);
+  background: var(--surface-2);
+  list-style: none;
+  margin: 0;
+}
+
+.steps__item {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 32px;
+  border-radius: var(--r-full);
+  font-size: var(--fs-11);
+  font-weight: 600;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
+.steps__item.is-on {
+  color: var(--ink);
+}
+
+.steps__item.is-done {
+  color: var(--ink-2);
+}
+
+.steps__pill {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: var(--r-full);
+  background: var(--surface);
+  box-shadow: var(--shadow-1);
+}
+
+.steps__num {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--surface-3);
+  color: var(--ink-2);
+  font-family: var(--font-num);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.steps__item.is-on .steps__num {
+  background: var(--sea);
+  color: var(--sea-ink);
+}
+
+.steps__item.is-done .steps__num {
+  background: var(--leaf-soft);
+  color: var(--leaf);
+}
+
+/* --------------------------------------------------------------- choice */
+/* 可选卡片（选校区、选方式这种"下一步由你定"的项） */
+.choice {
+  position: relative;
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  padding: var(--s-4);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  text-align: left;
+  transition: transform var(--t-fast) var(--ease-std), background var(--t-fast) var(--ease-std),
+    border-color var(--t-fast) var(--ease-std);
+}
+
+.choice:active {
+  transform: scale(0.99);
+}
+
+.choice.is-on {
+  background: var(--sea-soft);
+  border-color: color-mix(in oklch, var(--sea) 45%, var(--line));
+}
+
+.choice__head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  flex-wrap: wrap;
+}
+
+.choice__title {
+  font-size: var(--fs-16);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.choice__note {
+  font-size: var(--fs-13);
+  line-height: 1.55;
+  color: var(--ink-2);
+}
+
+/* --------------------------------------------------------------- grid 7 */
+/* 导入预览的 7×13 周视图：一格一课，颜色直接取 --h 的课程色 */
+.grid7 {
+  display: grid;
+  grid-template-columns: 22px repeat(7, minmax(0, 1fr));
+  gap: 3px;
+  font-size: var(--fs-11);
+}
+
+.grid7__head {
+  text-align: center;
+  color: var(--ink-3);
+  padding-bottom: 2px;
+}
+
+.grid7__code {
+  color: var(--ink-3);
+  text-align: right;
+  padding-right: 2px;
+  line-height: 18px;
+}
+
+.grid7__cell {
+  height: 18px;
+  border-radius: 5px;
+  background: var(--surface-2);
+}
+
+.grid7__cell.is-on {
+  background: var(--course-mid);
+  border: 1px solid var(--course-mark);
+}
+
+/* ------------------------------------------------------- 以下为本轮新增原语
+
+   都是"现有类名体系里缺的那一格"，不是另一套设计语言：
+   输入区的高度变体、代码块、错误清单、两列行、几个小图标姿态。 */
+
+.mt-3 {
+  margin-top: var(--s-3);
+}
+
+/* 12px 两列行（时间 / 数量这种成对字段）；子项等宽且允许收缩 */
+.row-2 {
+  display: flex;
+  gap: var(--s-3);
+}
+
+.row-2 > * {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.row-actions > .field {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* 多行输入：把 .input 的 50px 最小高度放开，行高按正文走。
+   选择器写成 .input.input--* 是为了压过后面那条 .input{min-height:50px} ——
+   同权重看先后，这条在文件里更靠前，单写 .input--area 会被吃掉。 */
+.input.input--area {
+  min-height: 84px;
+  padding: 12px var(--s-4);
+  line-height: 1.65;
+  resize: vertical;
+}
+
+.input.input--tall {
+  min-height: 190px;
+  font-family: var(--font-ui);
+}
+
+/* 说明里的示例代码块（导入页三种格式） */
+.pre {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  color: var(--ink-2);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: var(--fs-12);
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-x: auto;
+}
+
+/* 解析失败的逐条清单：红字、限宽、行间留 4px */
+.err-list {
+  display: grid;
+  gap: 4px;
+  font-size: var(--fs-13);
+  line-height: 1.6;
+  color: var(--cinnabar-ink);
+}
+
+.field__label--bad {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--cinnabar-ink);
+}
+
+/* 积分板里的小单位 / 长文本变体 */
+.scoreboard__u {
+  margin-left: 2px;
+  font-size: var(--fs-12);
+  font-weight: 500;
+  color: var(--ink-3);
+}
+
+.scoreboard__v--sm {
+  font-size: var(--fs-18);
+}
+
+/* 选项卡片右上角的前进箭头 */
+.choice__go {
+  margin-left: auto;
+  color: var(--ink-3);
+}
+
+/* 「加一条」前的那个 ＋ ：和 15px 文案同基线，不靠 font-size 硬顶 */
+.btn__plus {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  font-size: 15px;
+  line-height: 1;
+}
+
+/* 竖排省略号 */
+.dots {
+  font-size: 17px;
+  line-height: 1;
+  letter-spacing: 1px;
+}
+
+/* 任务行右侧那一列（时间 / 优先级点 / 操作） */
+.task__side {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* 用 chevron 当上下箭头：只转 90°，笔画粗细跟全站一致 */
+.rot-up {
+  transform: rotate(90deg);
+}
+
+.rot-down {
+  transform: rotate(-90deg);
+}
+
+/* 每日计划的日期条：左边可横滑，右边一个「今天」 */
+.plan-days {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+
+.plan-days__scroll {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 横滑条在别处是"出血"到页面边缘的（.chips--scroll 的负 margin），
+   但这里右边还站着一个「今天」按钮，负 margin 会让两块叠在一起。
+   在日期条里把它收平，切割线就是自己的边界。 */
+.plan-days .chips--scroll {
+  margin: 0;
+  padding: 0;
+  scroll-padding: 0;
+}
+
+.plan-days .chips {
+  gap: 6px;
+}
+
+.plan-days__today {
+  flex: none;
+  padding-left: 8px;
+}
+
+/* 手工录入里已添加的草稿条目 */
+.draft {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-2);
+}
+
+.draft__main {
+  flex: 1;
+  min-width: 0;
+}
+
+.draft__title {
+  font-weight: 600;
 }
 
 /* ------------------------------------------------------------- footnote */
@@ -817,9 +1236,9 @@ svg {
   display: flex;
   align-items: center;
   gap: var(--s-3);
-  min-height: 60px;
-  padding: var(--s-3) var(--s-4);
-  border-radius: var(--r-lg);
+  min-height: 56px;
+  padding: 10px var(--s-4);
+  border-radius: var(--r-md);
   background: var(--surface);
   border: 1px solid var(--line);
 }
@@ -913,9 +1332,9 @@ svg {
   --h: 252;
   position: relative;
   display: grid;
-  gap: 6px;
+  gap: 4px;
   width: 100%;
-  padding: var(--s-5) var(--s-5) var(--s-6);
+  padding: var(--s-4) var(--s-5) var(--s-5);
   border-radius: var(--r-xl);
   background:
     radial-gradient(120% 90% at 100% 0%, var(--course-soft), transparent 60%),
@@ -925,6 +1344,49 @@ svg {
   overflow: hidden;
   text-align: left;
   transition: transform var(--t-fast) var(--ease-std);
+}
+
+/*
+ * 开场动效层压在文字下面。
+ * 它原来 z-index:2、文字是 auto，于是动效播放的那几秒里，
+ * 课名和时间被半透明的"书页/气泡"盖住——第一眼看到的是糊的。
+ * 现在：动效在下（1），卡片自己的每一块内容都在上（3），动画只是底纹。
+ */
+.now > *:not(.fx-layer) {
+  position: relative;
+  z-index: 3;
+}
+
+/*
+ * 「涨水」那条动效的水是写死的蓝（#5aa9dd）：一张暖粉 / 香芋的课程卡被它灌满，
+ * 整块变成别人的蓝，压在下面的备注文字也读不清。
+ * 解法不是把动画删掉，而是给它隔一层"纸"：
+ *   1) 动效层降到 50%，水本身先退一半；
+ *   2) 再叠一层卡片纸色的薄膜（.now::before，z-index 2 = 动效之上、文字之下），
+ *      把蓝压成"透过纸看到的水"，深浅跟着当前主题走；
+ *   3) 薄膜底下再带一点课程色（--course-mark），水就成了这张卡的水。
+ */
+.now:has(.fx-layer--water) .fx-layer {
+  opacity: 0.5;
+}
+
+.now:has(.fx-layer--water)::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in oklch, var(--surface) 68%, transparent) 0%,
+      color-mix(in oklch, var(--surface) 34%, transparent) 100%
+    ),
+    linear-gradient(
+      180deg,
+      transparent 30%,
+      color-mix(in oklch, var(--course-mark) 16%, transparent) 100%
+    );
 }
 
 .now--rest {
@@ -1193,8 +1655,8 @@ svg {
 .agenda__card {
   display: grid;
   gap: 2px;
-  min-height: 60px;
-  padding: var(--s-3) var(--s-4) var(--s-3) calc(var(--s-4) + 4px);
+  min-height: 58px;
+  padding: 10px var(--s-4) 10px calc(var(--s-4) + 4px);
   border-radius: var(--r-md);
   background: var(--surface);
   border: 1px solid var(--line);
@@ -1408,6 +1870,8 @@ svg {
 }
 
 .spectrum__row {
+  position: relative;
+  isolation: isolate;
   min-height: 46px;
   width: 100%;
   border-radius: var(--r-md);
@@ -1415,6 +1879,15 @@ svg {
 }
 
 .spectrum__row.is-on {
+  background: transparent;
+}
+
+/* 选中态是一块共享布局动画的底板：换一天时它自己滑过去，不重画 */
+.spectrum__pill {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: var(--r-md);
   background: var(--sea-soft);
 }
 
@@ -1490,9 +1963,9 @@ svg {
   align-items: center;
   gap: var(--s-3);
   width: 100%;
-  min-height: 76px;
-  padding: var(--s-3) var(--s-3) var(--s-3) var(--s-4);
-  border-radius: var(--r-lg);
+  min-height: 72px;
+  padding: 10px var(--s-3) 10px var(--s-4);
+  border-radius: var(--r-md);
   background: var(--surface);
   border: 1px solid var(--line);
   position: relative;
@@ -1800,7 +2273,7 @@ svg {
   font-size: var(--fs-14);
   font-weight: 600;
   color: var(--ink-2);
-  margin-bottom: var(--s-2);
+  margin-bottom: var(--rhythm-item);
 }
 
 .disclosure svg {
@@ -1816,8 +2289,9 @@ svg {
   grid-template-columns: 44px 1fr auto;
   align-items: center;
   column-gap: var(--s-2);
-  padding: var(--s-2) var(--s-3) var(--s-2) var(--s-1);
-  border-radius: var(--r-lg);
+  min-height: 56px;
+  padding: 4px var(--s-3) 4px 2px;
+  border-radius: var(--r-md);
   background: var(--surface);
   border: 1px solid var(--line);
   overflow: hidden;
@@ -1975,8 +2449,8 @@ svg {
   grid-template-columns: 52px 1fr auto;
   align-items: center;
   gap: var(--s-3);
-  padding: var(--s-3) var(--s-4) var(--s-3) var(--s-3);
-  border-radius: var(--r-lg);
+  padding: 10px var(--s-4) 10px 10px;
+  border-radius: var(--r-md);
   background: var(--surface);
   border: 1px solid var(--line);
 }
@@ -2128,9 +2602,9 @@ svg {
   display: flex;
   align-items: center;
   gap: var(--s-3);
-  min-height: 64px;
-  padding: var(--s-3) var(--s-4);
-  border-radius: var(--r-lg);
+  min-height: 60px;
+  padding: 10px var(--s-4);
+  border-radius: var(--r-md);
   background: var(--surface);
   border: 1px solid var(--line);
 }
@@ -2322,13 +2796,31 @@ svg {
   gap: var(--s-2);
 }
 
+/* 骨架条：一层斜向高光横扫，只用 transform。
+   原来是 background-position 动画 —— 每帧重新铺一遍渐变（paint），
+   列表一进骨架屏，滚动就跟着抖。 */
 .sk {
+  position: relative;
   display: block;
   height: 76px;
   border-radius: var(--r-lg);
-  background: linear-gradient(90deg, var(--surface-2), var(--surface-3), var(--surface-2));
-  background-size: 200% 100%;
-  animation: shimmer 1.4s linear infinite;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.sk::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, var(--surface-3), transparent);
+  transform: translateX(-100%);
+  animation: sk-sweep 1.4s var(--ease-std) infinite;
+}
+
+@keyframes sk-sweep {
+  to {
+    transform: translateX(100%);
+  }
 }
 
 .places {
@@ -2957,7 +3449,7 @@ svg {
   min-height: 100dvh;
   display: grid;
   place-items: center;
-  padding: calc(var(--safe-t) + var(--s-8)) var(--gutter) calc(var(--safe-b) + var(--s-8));
+  padding: calc(var(--safe-t) + var(--s-10)) var(--gutter) calc(var(--safe-b) + var(--s-8));
   background:
     radial-gradient(80% 50% at 100% 0%, var(--sea-soft), transparent 70%),
     radial-gradient(60% 40% at 0% 100%, var(--amber-soft), transparent 70%),
@@ -2975,11 +3467,11 @@ svg {
 }
 
 .welcome__title {
-  margin-top: var(--s-8);
+  margin-top: var(--s-6);
   font-size: 2rem;
-  line-height: 1.28;
+  line-height: 1.26;
   font-weight: 700;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.015em;
 }
 
 .welcome__title--sm {
@@ -2989,7 +3481,8 @@ svg {
 
 .welcome__lead {
   margin-top: var(--s-3);
-  font-size: var(--fs-16);
+  font-size: var(--fs-15);
+  line-height: 1.65;
   color: var(--ink-2);
 }
 
@@ -3001,20 +3494,23 @@ svg {
 
 .welcome__points li {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--s-3);
-  font-size: var(--fs-15, 0.9375rem);
+  font-size: var(--fs-15);
+  line-height: 1.55;
   color: var(--ink);
 }
 
+/* 图标顶在第一行字上：文案换行时不能垂直居中，否则图标会掉到两行中间。 */
 .welcome__points svg {
   color: var(--sea);
+  margin-top: 2px;
 }
 
 .welcome__actions {
   display: grid;
   gap: var(--s-3);
-  margin-top: var(--s-10);
+  margin-top: var(--s-8);
 }
 
 /* 记住学校密码的勾选项：一行小字 + 方框，不抢注意力 */
@@ -3320,16 +3816,18 @@ p.hint {
 }
 
 .pill-btn .pill {
-  transition: transform var(--t-fast) var(--ease-std), filter var(--t-fast) var(--ease-std);
+  transition: transform var(--t-fast) var(--ease-std), opacity var(--t-fast) var(--ease-std);
 }
 
 .pill-btn:active .pill {
   transform: scale(0.96);
 }
 
+/* hover 只挪 1px、不碰 filter：brightness() 每次都要重新合成整块，
+   一个鼠标划过就掉帧。位移是免费的。 */
 @media (hover: hover) {
   .pill-btn:hover .pill {
-    filter: brightness(0.97);
+    transform: translateY(-1px);
   }
 }
 
@@ -3599,7 +4097,7 @@ p.hint {
 .split__main,
 .split__side {
   display: grid;
-  gap: var(--s-8);
+  gap: var(--rhythm-sec);
   align-content: start;
   min-width: 0;
 }
@@ -4046,7 +4544,9 @@ html {
   font-weight: 500;
 }
 /* ------------------------------------------------------------------ 果冻手感
-   卡片与按钮的按压用弹簧而不是线性过渡：按下略缩、回弹略过冲，像捏一下再弹回。 */
+   卡片与按钮的按压用弹簧而不是线性过渡：按下略缩、回弹略过冲，像捏一下再弹回。
+   这里**只**过渡 transform 与背景色。原来还带一条 box-shadow 过渡 —— 阴影不是
+   合成层属性，每帧都要重绘一整块，正是 120Hz 上掉帧的那一刀，删掉。 */
 .card,
 .now,
 .download,
@@ -4055,7 +4555,6 @@ html {
 .btn {
   transition:
     transform 260ms cubic-bezier(0.34, 1.56, 0.64, 1),
-    box-shadow 260ms cubic-bezier(0.34, 1.56, 0.64, 1),
     background-color 200ms ease;
 }
 
@@ -4213,26 +4712,25 @@ html {
 }
 
 .bus__skel-row {
+  position: relative;
   height: 66px;
   border-radius: var(--r-lg);
-  background: linear-gradient(
-    100deg,
-    var(--surface) 30%,
-    color-mix(in oklch, var(--surface) 60%, var(--sea-soft)) 50%,
-    var(--surface) 70%
-  );
-  background-size: 220% 100%;
-  animation: busShimmer 1.4s linear infinite;
+  background: var(--surface);
+  overflow: hidden;
 }
 
-@keyframes busShimmer {
-  0% { background-position: 130% 0; }
-  100% { background-position: -30% 0; }
+.bus__skel-row::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, color-mix(in oklch, var(--surface) 55%, var(--sea-soft)), transparent);
+  transform: translateX(-100%);
+  animation: sk-sweep 1.4s linear infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .bus__row.is-now .bus__eta b,
-  .bus__skel-row {
+  .bus__skel-row::after {
     animation: none;
   }
 }
@@ -4351,12 +4849,15 @@ html {
   transition: background var(--t-base) var(--ease-out);
 }
 
-/* 列表项：让浏览器把它们放进各自合成层，滚动时不整页重绘 */
-.card,
-.list > *,
-.sec > * {
-  transform: translateZ(0);
-}
+/*
+ * 这里原来给 .card / .list > * / .sec > * 全都加了 transform: translateZ(0)，
+ * 想"让每个卡片各自成层，滚动时别整页重绘"。实测方向反了：
+ * 课表一页二十几张卡、学业一页几十行，等于一次要维护几十个合成层，
+ * 中低端安卓机的 GPU 内存和合成开销一下上去，滚动反而更容易掉帧。
+ *
+ * 现在只保留页面级那一层（.page 的 will-change），卡片靠浏览器自己判断；
+ * 真正参与动画的元素由 motion 在动画期间自动提升，动画结束自动归还。
+ */
 
 /* 更新提示条滑上来时也不硬 */
 @keyframes jelly-rise {
@@ -4408,7 +4909,8 @@ html {
 .fx-layer {
   position: absolute;
   inset: 0;
-  z-index: 2;
+  /* 1 = 文字下面、卡片背景上面。见 .now > *:not(.fx-layer) 的说明。 */
+  z-index: 1;
   pointer-events: none;
   border-radius: inherit;
   overflow: hidden;
@@ -5021,21 +5523,31 @@ html {
   inset: 0;
 }
 
-/* 卡窜出去的那几秒，板块上的真字先让位，否则"卡"和"字"会叠在一起 */
+/* 时间卡被"叼走"的那几段，真字要不要让位？
+   规则是：**只有真正挡字的东西出现时才让位**。
+   0–42%：小卡从文字下面飞出去绕圈，它是缩小版、还压在真字下面，读得清，不让位。
+   47–86%：书（2.23s 落位、2.67s 翻开）成了主体 —— 那块是 preserve-3d 的 3D 子树，
+           z-index 拦不住它，必然压在文字上，这一段真字必须退场，否则"浦山-E305"
+           会被紫卡劈成两半。
+   91%+：卡被吐回来落位（4.27s），真字同时回来。
+   原来是从 10% 一直藏到 84%：进页面四秒半卡片是空的，像没渲染完。 */
 .now:has(.fx-layer--orbit) .now__time,
-.now:has(.fx-layer--orbit) .now__title {
+.now:has(.fx-layer--orbit) .now__title,
+.now:has(.fx-layer--orbit) .now__place,
+.now:has(.fx-layer--orbit) .now__meta {
   animation: fx-plate-out 4.85s ease-in-out both;
 }
 
 @keyframes fx-plate-out {
   0%,
-  3% {
+  42% {
     opacity: 1;
   }
-  10%,
-  84% {
+  47%,
+  90% {
     opacity: 0;
   }
+  95%,
   100% {
     opacity: 1;
   }
@@ -5144,7 +5656,10 @@ html {
   }
 }
 
-/* 半径锚点：先收回中心（0），再甩到 106px 的半径上 */
+/* 半径锚点：先收回中心（0），再甩到 76px 的半径上。
+   原来是 106–114px：在 390px 宽的手机上，卡的右边缘会被 .now 的 overflow:hidden
+   切掉一条 —— 飞出去的一半是"被裁掉"的，不像飞走，像坏了。
+   76px 让整块卡在框内绕，画面是"卡在里面翻"，而不是"卡飞出门"。 */
 .fx-orbit__arm {
   position: absolute;
   inset: 0;
@@ -5158,19 +5673,19 @@ html {
     transform: translate3d(0, 0, 0);
   }
   15% {
-    transform: translate3d(114px, 0, 26px) rotateZ(-5deg);
+    transform: translate3d(84px, 0, 18px) rotateZ(-5deg);
   }
   18% {
-    transform: translate3d(103px, 0, 22px) rotateZ(-1deg);
+    transform: translate3d(74px, 0, 15px) rotateZ(-1deg);
   }
   21% {
-    transform: translate3d(107px, 0, 24px) rotateZ(2deg);
+    transform: translate3d(78px, 0, 16px) rotateZ(2deg);
   }
   34% {
-    transform: translate3d(106px, 0, -22px) rotateZ(3.5deg);
+    transform: translate3d(76px, 0, -14px) rotateZ(3.5deg);
   }
   54% {
-    transform: translate3d(106px, 0, 26px) rotateZ(-2.5deg);
+    transform: translate3d(76px, 0, 18px) rotateZ(-2.5deg);
   }
   58%,
   100% {
@@ -5183,8 +5698,8 @@ html {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 132px;
-  height: 50px;
+  width: 128px;
+  height: 48px;
   transform-style: preserve-3d;
   transform: translate3d(-50%, -50%, 0) translate3d(-72px, -20px, 0) scale(1);
   opacity: 0;
@@ -5262,15 +5777,15 @@ html {
     transform: translate3d(-50%, -50%, 0) translate3d(-72px, -22px, 0) scale(1.055, 0.955);
   }
   92% {
-    opacity: 1;
+    opacity: 0.85;
     transform: translate3d(-50%, -50%, 0) translate3d(-72px, -19.4px, 0) scale(0.972, 1.028);
   }
   95% {
-    opacity: 1;
+    opacity: 0.3;
     transform: translate3d(-50%, -50%, 0) translate3d(-72px, -20px, 0) scale(1.008, 0.994);
   }
   97% {
-    opacity: 1;
+    opacity: 0;
     transform: translate3d(-50%, -50%, 0) translate3d(-72px, -20px, 0) scale(1);
   }
   100% {
@@ -5291,23 +5806,48 @@ html {
 }
 
 .fx-chip__face--front {
-  background: linear-gradient(168deg, #ffffff 0%, #f5f8ff 44%, #dfe7ff 100%);
+  background: linear-gradient(
+    168deg,
+    var(--surface) 0%,
+    color-mix(in oklch, var(--surface) 72%, var(--sea-soft)) 52%,
+    var(--sea-soft) 100%
+  );
   box-shadow:
-    inset 0 1.5px 0 rgba(255, 255, 255, 0.95),
-    inset 0 9px 16px -10px rgba(66, 86, 170, 0.42),
-    inset 0 -8px 14px -8px rgba(52, 68, 150, 0.38),
-    inset 0 0 0 1px rgba(122, 142, 205, 0.28),
-    0 12px 18px -12px rgba(44, 60, 128, 0.6);
+    inset 0 1.5px 0 oklch(100% 0 0 / 0.9),
+    inset 0 9px 16px -10px color-mix(in oklch, var(--sea) 26%, transparent),
+    inset 0 -8px 14px -8px color-mix(in oklch, var(--sea) 20%, transparent),
+    inset 0 0 0 1px color-mix(in oklch, var(--sea) 22%, transparent),
+    0 12px 18px -12px var(--scrim);
+}
+
+/*
+ * 卡面配色跟主题令牌走，不再写死 #fff / #6a4fc4：
+ * 写死的话暗色主题下这张卡是一块惨白的板子（比卡片本身还亮），
+ * 换成海蓝配色时又是另一套紫 —— 一动就露馅。现在四套主题都对。
+ */
+.fx-chip__face--front {
+  background: linear-gradient(
+    168deg,
+    var(--surface) 0%,
+    color-mix(in oklch, var(--surface) 72%, var(--sea-soft)) 52%,
+    var(--sea-soft) 100%
+  );
+  box-shadow:
+    inset 0 1.5px 0 oklch(100% 0 0 / 0.9),
+    inset 0 9px 16px -10px color-mix(in oklch, var(--sea) 26%, transparent),
+    inset 0 -8px 14px -8px color-mix(in oklch, var(--sea) 20%, transparent),
+    inset 0 0 0 1px color-mix(in oklch, var(--sea) 22%, transparent),
+    0 12px 18px -12px var(--scrim);
 }
 
 .fx-chip__num {
   display: block;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 700;
   letter-spacing: -0.2px;
   font-variant-numeric: tabular-nums;
   line-height: 1.1;
-  color: #2b3358;
+  color: var(--ink);
 }
 
 .fx-chip__ttl {
@@ -5316,13 +5856,13 @@ html {
   font-style: normal;
   line-height: 1.2;
   letter-spacing: 0.02em;
-  color: rgba(64, 74, 120, 0.66);
+  color: var(--ink-2);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-/* 卡背：翻过来看到的更深一面 */
+/* 卡背：翻过来看到的更深一面 —— 用「海」色的深阶，正面/背面是同一族的明暗 */
 .fx-chip__face--front {
   animation: fx-face-front 4.85s linear both;
 }
@@ -5331,12 +5871,17 @@ html {
   transform: rotateY(180deg);
   animation: fx-face-back 4.85s linear both;
   background:
-    radial-gradient(120% 90% at 30% 0%, rgba(182, 160, 255, 0.55), transparent 62%),
-    linear-gradient(158deg, #6a4fc4 0%, #4a3196 46%, #2f1d63 100%);
+    radial-gradient(120% 90% at 30% 0%, color-mix(in oklch, var(--sea) 42%, transparent), transparent 62%),
+    linear-gradient(
+      158deg,
+      color-mix(in oklch, var(--sea) 88%, var(--ink)) 0%,
+      var(--sea) 52%,
+      color-mix(in oklch, var(--sea) 70%, var(--ink)) 100%
+    );
   box-shadow:
-    inset 0 1.5px 0 rgba(214, 200, 255, 0.4),
-    inset 0 0 0 1px rgba(180, 160, 255, 0.22),
-    0 12px 18px -12px rgba(28, 16, 70, 0.62);
+    inset 0 1.5px 0 oklch(100% 0 0 / 0.28),
+    inset 0 0 0 1px oklch(100% 0 0 / 0.14),
+    0 12px 18px -12px var(--scrim);
 }
 
 .fx-chip__bar {
@@ -5345,12 +5890,12 @@ html {
   width: 62%;
   margin: 3px 0;
   border-radius: 2px;
-  background: rgba(226, 214, 255, 0.5);
+  background: color-mix(in oklch, var(--sea-ink) 55%, transparent);
 }
 
 .fx-chip__bar--short {
   width: 36%;
-  background: rgba(226, 214, 255, 0.32);
+  background: color-mix(in oklch, var(--sea-ink) 32%, transparent);
 }
 
 /* 卡面翻转：不依赖 backface-visibility（Chrome 在多层 3D 里会失效），
@@ -6562,7 +7107,8 @@ html {
   content: "";
   position: absolute;
   inset: -45% -65%;
-  z-index: 3;
+  /* 2：压在动效层上面、文字下面。放在 3 会把彩虹光糊在标题上。 */
+  z-index: 2;
   pointer-events: none;
   background: linear-gradient(
     104deg,
@@ -6790,4 +7336,56 @@ html {
   margin: 6px 0 0;
   font-size: var(--fs-12);
   line-height: 1.5;
+}
+
+/* ------------------------------------------------------------ 医学院教务绑定 */
+
+/* 一行「✓ 已经连上了」这种带图标的标题行 */
+.row-lead {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  font-size: var(--fs-16);
+  color: var(--ink);
+}
+
+.row-lead svg {
+  color: var(--leaf);
+}
+
+/*
+ * 验证码图片按钮。图片是服务端直出的 120x40 JPEG，宽度不定，
+ * 所以按钮只给最小尺寸，让图片自己撑开 —— 固定宽高会把字切掉。
+ */
+.med-cap {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  min-width: 128px;
+  min-height: 48px;
+  padding: 2px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  cursor: pointer;
+  transition: transform var(--t-fast) var(--ease-std), border-color var(--t-fast) var(--ease-std);
+}
+
+.med-cap:active {
+  transform: scale(0.98);
+}
+
+.med-cap img {
+  display: block;
+  height: 40px;
+  width: auto;
+  border-radius: calc(var(--r-md) - 2px);
+  /* 验证码是浅底深字，暗色主题下给一点点提亮，别糊成一块 */
+  background: #fff;
+}
+
+.med-cap__ph {
+  padding: 0 var(--s-3);
+  font-size: var(--fs-12);
+  color: var(--ink-3);
 }

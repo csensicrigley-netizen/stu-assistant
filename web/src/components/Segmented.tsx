@@ -1,9 +1,13 @@
 import { useId } from "react";
 import { motion } from "motion/react";
+import { PILL } from "../lib/motion";
 
 /**
  * A segmented control. It switches a view in place, so it is a radio group,
  * not a tab list: arrow keys move, the pill follows with a spring.
+ *
+ * 药丸用的是共享布局动画（layoutId + PILL），和底栏、导入步骤条同一档参数 ——
+ * 全站"选中态在动"这件事只有一种手感。
  */
 export function Segmented<T extends string>({
   value,
@@ -42,13 +46,7 @@ export function Segmented<T extends string>({
             className={`seg__btn${on ? " is-on" : ""}`}
             onClick={() => onChange(o.key)}
           >
-            {on && (
-              <motion.span
-                className="seg__pill"
-                layoutId={`seg-${group}`}
-                transition={{ type: "spring", stiffness: 520, damping: 38 }}
-              />
-            )}
+            {on && <motion.span className="seg__pill" layoutId={`seg-${group}`} transition={PILL} />}
             <span className="seg__label">
               {o.label}
               {o.badge ? <span className="seg__badge">{o.badge}</span> : null}

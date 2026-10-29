@@ -92,6 +92,22 @@ async function main() {
     await shot(`${theme}-03-week`);
     await shot(`${theme}-03-week-full`, true);
 
+    // 计划：?tab=plan 能直达（TabKey 里有 plan）
+    await open(`${t}&now=2026-10-28T10:20&tab=plan`);
+    await shot(`${theme}-03b-plan`);
+    await shot(`${theme}-03b-plan-full`, true);
+
+    /*
+     * 导入：import 不在底栏 TABS 里，?tab=import 会被 initialTab() 挡掉，
+     * 所以必须走真实路径 —— 课表页 → 「手动导入课表」→ 选校区。
+     */
+    await open(`${t}&now=2026-10-28T10:20&tab=week`);
+    await click(".cta", "手动导入课表");
+    await shot(`${theme}-03c-import-school`);
+    await click(".choice", "医学院");
+    await sleep(500);
+    await shot(`${theme}-03d-import-method`);
+
     await open(`${t}&now=2026-10-28T10:20&tab=study`);
     await shot(`${theme}-04-study-tasks`, true);
     await click(".seg__btn", "考试");

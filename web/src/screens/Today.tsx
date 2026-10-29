@@ -10,7 +10,9 @@ import { HeroOverlay, useHeroEffect } from "../components/HeroFx";
 import { DayRibbon } from "../components/DayRibbon";
 import { CourseSheet } from "../components/CourseSheet";
 import { Icon } from "../components/Icon";
+import { Magnetic } from "../components/Magnetic";
 import { ModePill, Notice, PageHead, Section, rise } from "../components/Layout";
+import { GLIDE, JELLY_SOFT, TAP, stagger } from "../lib/motion";
 
 export function TodayScreen() {
   const store = useStore();
@@ -90,16 +92,20 @@ export function TodayScreen() {
 
           {store.sample && (
             <motion.div {...rise(1)}>
-              <button type="button" className="cta" onClick={connect}>
-                <span className="cta__icon" aria-hidden="true">
-                  <Icon name="shield" size={20} />
-                </span>
-                <span className="cta__text">
-                  <b>这是示例课表</b>
-                  <small>连接校园账号后，换成你自己的课表、作业和成绩</small>
-                </span>
-                <Icon name="chevron-right" size={18} />
-              </button>
+              {/* 引力吸附：鼠标靠近时整块向指针偏 3–4px，离开弹回。
+                  触屏与"减少动态效果"下自动关掉（见 components/Magnetic.tsx）。 */}
+              <Magnetic pull={0.55}>
+                <button type="button" className="cta" onClick={connect}>
+                  <span className="cta__icon" aria-hidden="true">
+                    <Icon name="shield" size={20} />
+                  </span>
+                  <span className="cta__text">
+                    <b>这是示例课表</b>
+                    <small>连接校园账号后，换成你自己的课表、作业和成绩</small>
+                  </span>
+                  <Icon name="chevron-right" size={18} />
+                </button>
+              </Magnetic>
             </motion.div>
           )}
 
@@ -112,18 +118,22 @@ export function TodayScreen() {
                 <ol className="agenda" aria-label="今天的课和空档">
                   {[...blocks.map((b) => ({ at: b.startMin, b })), ...gaps.map((g) => ({ at: g.startMin, g }))]
                     .sort((x, y) => x.at - y.at)
-                    .map((row) =>
+                    .map((row, i) =>
                       "b" in row && row.b ? (
-                        <li key={row.b.key}>
+                        <motion.li key={row.b.key} {...rise(i, { y: 8, scale: 0.995 })}>
                           <AgendaBlock block={row.b} nowMin={now.minutes} onOpen={setOpen} />
-                        </li>
+                        </motion.li>
                       ) : "g" in row && row.g ? (
-                        <li key={`g${row.g.start}`} className="agenda__gap">
+                        <motion.li
+                          key={`g${row.g.start}`}
+                          className="agenda__gap"
+                          {...rise(i, { y: 6, scale: 1 })}
+                        >
                           <span className="agenda__time num">{row.g.start}</span>
                           <span className="agenda__gaptext">
                             {row.g.label} <b>{spanText(row.g.span)}</b>
                           </span>
-                        </li>
+                        </motion.li>
                       ) : null,
                     )}
                 </ol>
@@ -146,8 +156,8 @@ export function TodayScreen() {
                 </p>
               ) : (
                 <ul className="list">
-                  {tasks.map(({ t, bucket }) => (
-                    <li key={t.id} className="row-item">
+                  {tasks.map(({ t, bucket }, i) => (
+                    <motion.li key={t.id} className="row-item" {...rise(i, { y: 6, scale: 1 })}>
                       <span className={`due-dot due-dot--${bucket}`} aria-hidden="true" />
                       <span className="row-item__main">
                         <span className="row-item__title">{t.title}</span>
@@ -156,7 +166,7 @@ export function TodayScreen() {
                         </span>
                       </span>
                       <span className={`row-item__side due due--${bucket}`}>{dueText(t.dueMs!, now.ms)}</span>
-                    </li>
+                    </motion.li>
                   ))}
                 </ul>
               )}
@@ -167,8 +177,12 @@ export function TodayScreen() {
             <motion.div {...rise(4)}>
               <Section title="校历" action={{ label: "查看校历", onClick: () => go("campus") }}>
                 <div className="milestones">
-                  {milestones.map((m) => (
-                    <div key={m.label + m.from} className={`milestone milestone--${m.kind}${m.days <= 0 ? " is-now" : ""}`}>
+                  {milestones.map((m, i) => (
+                    <motion.div
+                      key={m.label + m.from}
+                      className={`milestone milestone--${m.kind}${m.days <= 0 ? " is-now" : ""}`}
+                      {...rise(i, { y: 6, scale: 0.99 })}
+                    >
                       <span className="milestone__days num">{m.days <= 0 ? "进行中" : m.days}</span>
                       <span className="milestone__unit">{m.days <= 0 ? "" : "天后"}</span>
                       <span className="milestone__label">{m.label}</span>
@@ -176,7 +190,7 @@ export function TodayScreen() {
                         {monthDayCn(m.from)}
                         {m.to !== m.from && ` – ${monthDayCn(m.to)}`}
                       </span>
-                    </div>
+                    </motion.div>
                   ))}
                 </div>
               </Section>
@@ -187,8 +201,8 @@ export function TodayScreen() {
             <motion.div {...rise(5)}>
               <Section title="新通知" action={{ label: "全部通知", onClick: () => go("campus") }}>
                 <ul className="list">
-                  {notices.map((n) => (
-                    <li key={n.id}>
+                  {notices.map((n, i) => (
+                    <motion.li key={n.id} {...rise(i, { y: 6, scale: 1 })}>
                       <a className="row-item row-item--link" href={n.url ?? undefined} target="_blank" rel="noreferrer noopener">
                         <span className="row-item__main">
                           <span className="row-item__title row-item__title--2">{n.title}</span>
@@ -200,7 +214,7 @@ export function TodayScreen() {
                         </span>
                         <Icon name="external" size={16} className="row-item__chev" />
                       </a>
-                    </li>
+                    </motion.li>
                   ))}
                 </ul>
               </Section>
@@ -235,6 +249,7 @@ function dueText(dueMs: number, nowMs: number): string {
 
 function FirstSync() {
   const store = useStore();
+  const shell = useShell();
   const busy = store.syncing || store.loading;
   return (
     <section className="now now--rest now--wait" aria-live="polite">
@@ -255,7 +270,22 @@ function FirstSync() {
           <Icon name="refresh" size={16} /> 再同步一次
         </button>
       )}
-      {busy && (
+              {!busy && (
+          <>
+            <p className="now__meta" style={{ marginTop: 14 }}>
+              医学院的同学：教务系统和主校区不是一套，主同步拿不到课表，走下面这条路。
+            </p>
+            <div className="row-actions" style={{ marginTop: 8 }}>
+              <button type="button" className="btn btn--primary btn--sm" onClick={() => shell.go("medbind")}>
+                <Icon name="shield" size={16} /> 连医学院教务
+              </button>
+              <button type="button" className="btn btn--ghost btn--sm" onClick={() => shell.go("import")}>
+                <Icon name="spark" size={16} /> 手动导入课表
+              </button>
+            </div>
+          </>
+        )}
+{busy && (
         <span className="now__bar now__bar--indeterminate" aria-hidden="true">
           <span />
         </span>
@@ -309,6 +339,15 @@ function NowCard({
       prev && prev.location && block.location && prev.location !== block.location && block.startMin - prev.endMin <= 30;
     const left = current ? block.endMin - nowMin : block.startMin - nowMin;
     const progress = current ? (nowMin - block.startMin) / block.span : 0;
+    /*
+     * 大卡片自己的进场也按层排：状态 → 时间 → 课名 → 地点 → 备注。
+     * 位移只有 6px：这块东西够大，动多了就是在晃。
+     */
+    const line = (i: number) => ({
+      initial: { opacity: 0, y: 6 },
+      animate: { opacity: 1, y: 0 },
+      transition: { ...JELLY_SOFT, delay: stagger(i) },
+    });
     return (
       <motion.button
         type="button"
@@ -316,39 +355,45 @@ function NowCard({
         style={{ "--h": block.course.hue } as React.CSSProperties}
         onClick={() => onOpen(block)}
         whileTap={{ scale: 0.955 }}
-        whileHover={{ scale: 1.008 }}
-        transition={{ type: "spring", stiffness: 320, damping: 18, mass: 0.75 }}
+        whileHover={{ scale: 1.006 }}
+        transition={TAP}
         aria-label={`${current ? "正在上课" : "下一节"}：${block.course.title}，${block.start} 到 ${block.end}，${block.location || "地点未标注"}`}
       >
         <HeroOverlay effect={effect} time={`${block.start}–${block.end}`} title={block.course.title} />
-        <span className="now__state">
+        <motion.span className="now__state" {...line(0)}>
           <span className={`now__pulse${current ? " is-live" : ""}`} aria-hidden="true" />
           {current ? `正在上课 · 还剩 ${spanText(left)}` : `下一节 · ${left <= 0 ? "马上开始" : `还有 ${spanText(left)}`}`}
-        </span>
-        <span className="now__time num">
+        </motion.span>
+        <motion.span className="now__time num" {...line(1)}>
           {block.start}
           <span className="now__dash">–</span>
           {block.end}
-        </span>
-        <span className="now__title">{block.course.title}</span>
-        <span className="now__place">
+        </motion.span>
+        <motion.span className="now__title" {...line(2)}>
+          {block.course.title}
+        </motion.span>
+        <motion.span className="now__place" {...line(3)}>
           <Icon name="pin" size={18} />
           <span>{block.location || "教务未标注地点"}</span>
-        </span>
-        <span className="now__meta">
+        </motion.span>
+        <motion.span className="now__meta" {...line(4)}>
           {block.teacher && `${block.teacher} · `}
           {periodsText(block.periods)} · {spanText(block.span)}
-        </span>
+        </motion.span>
         {moved && !current && (
-          <span className="now__hop">
+          <motion.span className="now__hop" {...line(5)}>
             <Icon name="walk" size={16} />
             换教室：上一节在 {prev!.location}，课间 {spanText(block.startMin - prev!.endMin)}
-          </span>
+          </motion.span>
         )}
         {makeup && <span className="now__hop">{makeup}</span>}
         {current && (
           <span className="now__bar" aria-hidden="true">
-            <span style={{ transform: `scaleX(${Math.min(1, Math.max(0, progress))})` }} />
+            <motion.span
+              initial={{ scaleX: 0 }}
+              animate={{ scaleX: Math.min(1, Math.max(0, progress)) }}
+              transition={{ ...GLIDE, delay: 0.18 }}
+            />
           </span>
         )}
       </motion.button>

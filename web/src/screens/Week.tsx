@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { useStore } from "../lib/store";
+import { useShell, useStore } from "../lib/store";
 import { addDaysIso, monthDaySlash, spanText, useNow, WEEKDAY_SHORT, weekdayCn } from "../lib/clock";
 import { currentOrNextTerm, dateOf, mondayOf, phaseOf, termPosition } from "../lib/calendar";
 import { planFor } from "../lib/plan";
@@ -8,10 +8,13 @@ import { gapsBetween, minutesOf, periodsText, type Block } from "../lib/timetabl
 import { DayRibbon } from "../components/DayRibbon";
 import { CourseSheet } from "../components/CourseSheet";
 import { Icon } from "../components/Icon";
+import { Magnetic } from "../components/Magnetic";
+import { PILL, rise } from "../lib/motion";
 import { Empty, ModePill, PageHead, Section } from "../components/Layout";
 
 export function WeekScreen() {
   const store = useStore();
+  const shell = useShell();
   const now = useNow(30_000);
   const pos = termPosition(now.date);
   const term = pos?.term ?? currentOrNextTerm(now.date);
@@ -50,6 +53,16 @@ export function WeekScreen() {
           {store.syncing || store.loading
             ? "第一次同步通常要半分钟左右。"
             : "连接校园账号并同步后，这里会显示你每周的理论课。"}
+          {!store.syncing && !store.loading && (
+            <div className="row-actions" style={{ marginTop: 12 }}>
+              <button type="button" className="btn btn--primary btn--sm" onClick={() => shell.go("medbind")}>
+                <Icon name="shield" size={16} /> 连医学院教务
+              </button>
+              <button type="button" className="btn btn--ghost btn--sm" onClick={() => shell.go("import")}>
+                <Icon name="spark" size={16} /> 手动导入课表
+              </button>
+            </div>
+          )}
         </Empty>
       )}
 
@@ -125,6 +138,9 @@ export function WeekScreen() {
                 onClick={() => setDay(wd)}
                 aria-label={`${weekdayCn(wd)} ${monthDaySlash(p.date)}，${closed ? "停课" : mins ? `${p.blocks.length} 节，${spanText(mins)}` : "没有课"}`}
               >
+                {/* 选中底板是共享布局动画：换一天时它自己从上一条滑到下一条。
+                    layoutId 里带上周次，换周时它是"新出现"而不是横跨两张卡飞过去。 */}
+                {on && <motion.span className="spectrum__pill" layoutId={`week-day-${week}`} transition={PILL} />}
                 <span className="spectrum__day">
                   <b>{WEEKDAY_SHORT[i]}</b>
                   <span className="num">{Number(p.date.slice(8))}</span>
@@ -165,9 +181,9 @@ export function WeekScreen() {
           <ol className="daylist">
             {[...sel.blocks.map((b) => ({ at: b.startMin, b })), ...gaps.map((g) => ({ at: g.startMin, g }))]
               .sort((a, b) => a.at - b.at)
-              .map((row) =>
+              .map((row, i) =>
                 "b" in row && row.b ? (
-                  <li key={row.b.key}>
+                  <motion.li key={row.b.key} {...rise(i, { y: 8, scale: 0.995 })}>
                     <button
                       type="button"
                       className="lesson"
@@ -191,12 +207,12 @@ export function WeekScreen() {
                       </span>
                       <Icon name="chevron-right" size={18} className="lesson__chev" />
                     </button>
-                  </li>
+                  </motion.li>
                 ) : "g" in row && row.g ? (
-                  <li key={`g${row.g.start}`} className="daylist__gap">
+                  <motion.li key={`g${row.g.start}`} className="daylist__gap" {...rise(i, { y: 6, scale: 1 })}>
                     <span className="num">{row.g.start}</span>
                     {row.g.label} {spanText(row.g.span)}
-                  </li>
+                  </motion.li>
                 ) : null,
               )}
           </ol>
@@ -227,6 +243,40 @@ export function WeekScreen() {
           </div>
         </Section>
       )}
+
+      {/*
+        医学院：先给"自动同步"这条路（用教务账号连一次，之后课表自己来），
+        连不上再退回手动录入。所以这里是两块，不是一块——顺序也重要：
+        能自动的人不该被先塞一张表单。
+      */}
+      <Section title="医学院">
+        <div className="stack-2">
+          <Magnetic pull={0.5}>
+            <button type="button" className="cta" onClick={() => shell.go("medbind")}>
+              <span className="cta__icon" aria-hidden="true">
+                <Icon name="shield" size={20} />
+              </span>
+              <span className="cta__text">
+                <b>用医学院教务账号自动同步</b>
+                <small>连一次，课表成绩考试都自己来；密码只用一次，不保存</small>
+              </span>
+              <Icon name="chevron-right" size={18} />
+            </button>
+          </Magnetic>
+          <Magnetic pull={0.5}>
+            <button type="button" className="cta" onClick={() => shell.go("import")}>
+              <span className="cta__icon" aria-hidden="true">
+                <Icon name="spark" size={20} />
+              </span>
+              <span className="cta__text">
+                <b>手动导入课表</b>
+                <small>不想连账号，或者那边密码改过：粘文字、导 CSV 或一条条加</small>
+              </span>
+              <Icon name="chevron-right" size={18} />
+            </button>
+          </Magnetic>
+        </div>
+      </Section>
 
       <p className="footnote">
         <Icon name="info" size={14} />

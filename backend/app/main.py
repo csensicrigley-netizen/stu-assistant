@@ -11,7 +11,7 @@ import logging
 import time
 from typing import Any
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, field_validator
 
@@ -818,6 +818,283 @@ def meta_version(name: str | None = Query(default=None), code: int | None = Quer
         "update": hint,
         "outdated": hint is not None,
     }
+
+
+# --------------------------------------------------------------------------
+# 每日计划（用户自己写的待办，不是学校来的 task）
+# --------------------------------------------------------------------------
+
+class PlanIn(BaseModel):
+    # 这里只做类型声明，长度/范围一律交给 plan.normalize_fields：
+    # pydantic 的约束会先返回 422（英文、字段级），前端拿到的错误没法用；
+    # 统一走 normalize_fields 才能给出「标题不能为空」这种中文可操作提示。
+    date: str | None = None
+    title: str | None = None
+    note: str = ""
+    start: str | None = None
+    end: str | None = None
+    priority: int = 0
+    sort: int | None = None
+
+
+class PlanPatchIn(BaseModel):
+    date: str | None = None
+    title: str | None = None
+    note: str | None = None
+    start: str | None = None
+    end: str | None = None
+    priority: int | None = None
+    sort: int | None = None
+
+
+class PlanToggleIn(BaseModel):
+    done: bool
+
+
+class PlanReorderIn(BaseModel):
+    date: str = Field(min_length=10, max_length=10)
+    ids: list[str] = Field(default_factory=list, max_length=500)
+
+
+@app.get("/v1/plan")
+def plan_list(start: str | None = Query(default=None),
+              end: str | None = Query(default=None),
+              include_done: bool = Query(default=True),
+              uid: str = Depends(current_user)) -> dict:
+    from . import plan as planlib
+
+    db = DB(settings.db_path)
+    items = db.plan_list(uid, start=start, end=end, include_done=include_done)
+    # 概览要覆盖全部日期（逾期项可能在所选区间之外），所以第二次不带过滤
+    return {"items": items, "summary": planlib.day_summary(db.plan_list(uid), planlib.today_local())}
+
+
+@app.post("/v1/plan/reorder")
+def plan_reorder(body: PlanReorderIn, uid: str = Depends(current_user)) -> dict:
+    # 注意：必须挂在 /v1/plan/{plan_id} 之前，否则 "reorder" 会被当成 id
+    from . import plan as planlib
+
+    try:
+        planlib.normalize_fields({"date": body.date}, partial=True)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from None
+    moved = DB(settings.db_path).plan_reorder(uid, body.date, body.ids)
+    return {"ok": True, "moved": moved}
+
+
+@app.post("/v1/plan")
+def plan_create(body: PlanIn, uid: str = Depends(current_user)) -> dict:
+    from . import plan as planlib
+
+    try:
+        fields = planlib.normalize_fields(body.model_dump(exclude_none=True), partial=False)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from None
+    return DB(settings.db_path).plan_create(uid, fields)
+
+
+@app.patch("/v1/plan/{plan_id}")
+def plan_update(plan_id: str, body: PlanPatchIn, uid: str = Depends(current_user)) -> dict:
+    from . import plan as planlib
+
+    try:
+        fields = planlib.normalize_fields(body.model_dump(exclude_none=True), partial=True)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from None
+    row = DB(settings.db_path).plan_update(uid, plan_id, fields)
+    if row is None:
+        raise HTTPException(404, "plan_not_found")
+    return row
+
+
+@app.delete("/v1/plan/{plan_id}")
+def plan_delete(plan_id: str, uid: str = Depends(current_user)) -> dict:
+    if not DB(settings.db_path).plan_delete(uid, plan_id):
+        raise HTTPException(404, "plan_not_found")
+    return {"ok": True}
+
+
+@app.post("/v1/plan/{plan_id}/toggle")
+def plan_toggle(plan_id: str, body: PlanToggleIn, uid: str = Depends(current_user)) -> dict:
+    row = DB(settings.db_path).plan_toggle(uid, plan_id, body.done)
+    if row is None:
+        raise HTTPException(404, "plan_not_found")
+    return row
+
+
+# --------------------------------------------------------------------------
+# 课表导入（手动录入 / 粘贴 / CSV）——医学院教务系统不通，自己录
+#
+# 设计：
+#   * 解析是纯函数（timetable_import.parse_paste / parse_csv），不落库；
+#   * 保存前再校验一遍（validate_doc），前端预览和后端落库用同一套规则；
+#   * 落库同时写 manual_timetables 和 items 镜像，于是 GET /v1/timetable
+#     拿到的和自动同步的完全同形，Week / Today 不用改一行。
+# --------------------------------------------------------------------------
+
+@app.post("/v1/timetable/import/parse")
+def timetable_import_parse(body: dict, uid: str = Depends(current_user)) -> dict:
+    from . import timetable_import as imp
+
+    return imp.parse_body(body)
+
+
+@app.post("/v1/timetable/import/save")
+def timetable_import_save(body: dict, uid: str = Depends(current_user)) -> dict:
+    from . import timetable_import as imp
+
+    return imp.save_body(DB(settings.db_path), uid, body)
+
+
+@app.get("/v1/timetable/import/template")
+def timetable_import_template(uid: str = Depends(current_user)) -> Response:
+    from . import timetable_import as imp
+
+    # template_csv() 自带 BOM，Excel 才会认 UTF-8；这里原样发出去，别二次编码。
+    return Response(
+        content=imp.template_csv(),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="timetable-template.csv"'},
+    )
+
+
+@app.get("/v1/timetable/manual")
+def timetable_manual_get(semester: str = Query(default=""),
+                         uid: str = Depends(current_user)) -> dict:
+    from . import timetable_import as imp
+
+    return imp.load_body(DB(settings.db_path), uid, semester)
+
+
+@app.delete("/v1/timetable/manual")
+def timetable_manual_delete(semester: str = Query(default=""),
+                            uid: str = Depends(current_user)) -> dict:
+    from . import timetable_import as imp
+
+    if not semester:
+        raise HTTPException(400, "请先指定学期")
+    return imp.delete_body(DB(settings.db_path), uid, semester)
+
+
+# --------------------------------------------------------------------------
+# 医学院教务（强智「教学服务平台」，jwgl.med.stu.edu.cn）
+#
+# 和主校区完全是两回事：那边是正方 + HTML 抓取，这边是 JSON API + token 头，
+# 而且登录强制图形验证码。所以流程是「取图 → 人看图打字 → 换 token」，
+# 密码只在换 token 那一次用掉，落库的只有 token。
+# --------------------------------------------------------------------------
+
+class MedLoginIn(BaseModel):
+    # mode: sso（默认，走学校统一认证，学生平时用的那组账号密码，无验证码）
+    #       local（教务本地口令，需要图形验证码）
+    mode: str = "sso"
+    username: str = ""
+    password: str = ""
+    verify_code: str = ""
+    yzm_code: str = ""
+
+
+class MedSyncIn(BaseModel):
+    # 医学院接口不返回学期号，只能由调用方告诉我们「这一份算哪个学期」。
+    semester: str = ""
+
+
+def _med_semester_fallback() -> str:
+    """按日期推一个学期号：9–1 月算 X-(X+1)-1，2–8 月算 (X-1)-X-2。"""
+    today = time.localtime()
+    year, month = today.tm_year, today.tm_mon
+    if month >= 9:
+        return f"{year}-{year + 1}-1"
+    if month == 1:
+        return f"{year - 1}-{year}-1"
+    return f"{year - 1}-{year}-2"
+
+
+@app.get("/v1/med/captcha")
+def med_captcha(uid: str = Depends(current_user)) -> dict:
+    from . import med_jw as medlib
+
+    try:
+        return medlib.captcha_image(medlib.new_yzm_code())
+    except medlib.MedError:
+        raise HTTPException(502, "med_unreachable") from None
+
+
+@app.post("/v1/med/login")
+def med_login(body: MedLoginIn, uid: str = Depends(current_user)) -> dict:
+    from . import med_jw as medlib
+
+    if not body.username.strip() or not body.password:
+        raise HTTPException(400, "账号和密码都要填。")
+    local = body.mode.strip().lower() == "local"
+    try:
+        if local:
+            res = medlib.login(
+                body.username.strip(), body.password, body.verify_code, body.yzm_code
+            )
+        else:
+            res = medlib.cas_login(body.username.strip(), body.password)
+    except medlib.MedError as exc:
+        raise HTTPException(502, str(exc)) from None
+
+    if not res.get("ok"):
+        # 验证码错、口令错都会走到这里；文案已经翻成中文了
+        raise HTTPException(400, res.get("error") or "医学院没给出原因，稍后再试。")
+
+    token = str(res.get("token") or "")
+    if not token:
+        raise HTTPException(400, "医学院没有返回登录凭证，稍后再试。")
+    user = res.get("user") or {}
+    name = str(user.get("userxm") or "")
+    DB(settings.db_path).med_session_save(
+        uid, username=body.username.strip(), name=name, token=token
+    )
+    return {"ok": True, "name": name}
+
+
+@app.get("/v1/med/status")
+def med_status(uid: str = Depends(current_user)) -> dict:
+    row = DB(settings.db_path).med_session_get(uid)
+    if row is None:
+        return {"linked": False, "username": "", "name": "", "updated_at": None}
+    return {
+        "linked": True,
+        "username": row["username"],
+        "name": row["name"],
+        "updated_at": row["updated_at"],
+    }
+
+
+@app.post("/v1/med/sync")
+def med_sync(body: MedSyncIn, uid: str = Depends(current_user)) -> dict:
+    from . import med_jw as medlib
+    from . import timetable_import as imp
+
+    db = DB(settings.db_path)
+    row = db.med_session_get(uid)
+    if row is None:
+        raise HTTPException(400, "not_linked")
+
+    semester = body.semester.strip() or _med_semester_fallback()
+    try:
+        doc = medlib.fetch_timetable(row["token"], semester=semester)
+    except medlib.MedError as exc:
+        # 凭证过期就把那份 token 清掉，前端会提示重新连一次
+        code = str(getattr(exc, "code", "") or "")
+        if code in {"med_expired", "unauthorized", "401"}:
+            db.med_session_delete(uid)
+            raise HTTPException(400, "med_expired") from None
+        raise HTTPException(502, str(exc)) from None
+
+    # 落库走手动课表同一条路：写 manual_timetables + items 镜像，
+    # 于是 GET /v1/timetable 拿到的和自动同步的完全同形，前端一行不用改。
+    imp.save_manual(db, uid, semester, doc, school="med", note="医学院自动同步")
+    return medlib.sync_result(doc)
+
+
+@app.delete("/v1/med/session")
+def med_unlink(uid: str = Depends(current_user)) -> dict:
+    return {"ok": DB(settings.db_path).med_session_delete(uid)}
 
 
 @app.api_route("/v1/{rest:path}", methods=["GET", "POST", "DELETE"], include_in_schema=False)

@@ -5,6 +5,7 @@ import { daysUntil, monthDayCn, monthDaySlash, moment, spanText, useNow, weekday
 import { dueBucket, EXAM_SESSIONS, SOURCE_NAME, summarize, type DueBucket, type Task } from "../lib/records";
 import { Segmented } from "../components/Segmented";
 import { Icon } from "../components/Icon";
+import { OUT, SETTLE, STEP, STEP_IN } from "../lib/motion";
 import { Empty, ModePill, PageHead, Section } from "../components/Layout";
 
 type View = "tasks" | "exams" | "grades";
@@ -59,8 +60,8 @@ export function StudyScreen() {
           key={view}
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -4 }}
-          transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+          exit={{ opacity: 0, y: -4, transition: OUT }}
+          transition={STEP_IN}
         >
           {view === "tasks" && <Tasks nowMs={now.ms} />}
           {view === "exams" && <Exams nowMs={now.ms} />}
@@ -121,8 +122,8 @@ function Tasks({ nowMs }: { nowMs: number }) {
         <Section key={g.key} title={g.label} note={`${g.items.length} 项`}>
           <ul className="list">
             <AnimatePresence initial={false}>
-              {g.items.map((t) => (
-                <TaskRow key={t.id} task={t} nowMs={nowMs} bucket={g.key} />
+              {g.items.map((t, i) => (
+                <TaskRow key={t.id} task={t} nowMs={nowMs} bucket={g.key} index={i} />
               ))}
             </AnimatePresence>
           </ul>
@@ -155,16 +156,33 @@ function Tasks({ nowMs }: { nowMs: number }) {
   );
 }
 
-function TaskRow({ task, nowMs, bucket, done = false }: { task: Task; nowMs: number; bucket: DueBucket; done?: boolean }) {
+function TaskRow({
+  task,
+  nowMs,
+  bucket,
+  done = false,
+  index = 0,
+}: {
+  task: Task;
+  nowMs: number;
+  bucket: DueBucket;
+  done?: boolean;
+  index?: number;
+}) {
   const { toggleDone } = useStore();
   const left = leftText(task, nowMs);
   return (
     <motion.li
-      layout
-      initial={{ opacity: 0, height: 0 }}
-      animate={{ opacity: 1, height: "auto" }}
-      exit={{ opacity: 0, height: 0 }}
-      transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+      /*
+       * 之前这里是 height: 0 → auto 的进出场：高度动画每帧都要重新布局，
+       * 一屏十条作业时勾一个完成，整页都在重排。现在只动 transform/opacity，
+       * 位置变化交给 layout（motion 用 translate 做，不触发 layout）。
+       */
+      layout="position"
+      initial={{ opacity: 0, y: 10, scale: 0.99 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -6, scale: 0.99, transition: OUT }}
+      transition={{ ...SETTLE, delay: Math.min(index, 8) * STEP }}
       className={`task${done ? " is-done" : ""}`}
     >
       <button

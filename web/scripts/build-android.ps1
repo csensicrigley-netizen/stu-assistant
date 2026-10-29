@@ -17,8 +17,7 @@ param([string]$Server = "")
 $ErrorActionPreference = "Stop"
 $web = (Resolve-Path "$PSScriptRoot\..").Path
 $root = (Resolve-Path "$web\..").Path
-# JDK 21 由使用者自己的环境提供：设 JAVA_HOME，或让 Android Studio 带进来
-if (-not $env:JAVA_HOME) { throw "请先设置 JAVA_HOME 指向 JDK 21" }
+$env:JAVA_HOME = "C:\Users\Administrator\AppData\Local\REAStarter\tools\jdk-21.0.12.1+1"
 $env:ANDROID_HOME = "$env:LOCALAPPDATA\Android\Sdk"
 $env:Path = "$env:JAVA_HOME\bin;$env:Path"
 

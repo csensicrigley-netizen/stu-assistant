@@ -6,7 +6,7 @@
  *     app, then sends the App to the background (never kills it);
  *   - status bar icons follow the App's light / dark theme.
  */
-import { SystemBars, SystemBarsStyle } from "@capacitor/core";
+import { registerPlugin, SystemBars, SystemBarsStyle } from "@capacitor/core";
 import { App as CapApp } from "@capacitor/app";
 import { IS_NATIVE } from "./api";
 
@@ -53,4 +53,22 @@ export function setStatusBarDark(dark: boolean): void {
   if (!IS_NATIVE) return;
   // "Dark" = light icons for a dark background, and the other way round
   safely(() => SystemBars.setStyle({ style: dark ? SystemBarsStyle.Dark : SystemBarsStyle.Light }));
+}
+
+/** 我们的原生插件实例（LiveWindow 里顺带挂了 setChrome）。 */
+let liveWindow: { setChrome?: (o: { dark: boolean }) => Promise<unknown> } | null = null;
+
+/**
+ * 告诉原生「页面现在实际是深色还是浅色」，让它把系统区涂成同色的纸。
+ *
+ * 为什么必须由页面来说：主题可以在页内被强制成浅色，而系统是深色。
+ * 原生照着系统猜，就会把上下两条系统栏涂成近黑——那就是黑边。
+ * 这条调用在浏览器里是空操作，插件没装也不抛错。
+ */
+export function setNativeChrome(dark: boolean): void {
+  if (!IS_NATIVE) return;
+  safely(() => {
+    liveWindow ??= registerPlugin<{ setChrome?: (o: { dark: boolean }) => Promise<unknown> }>("LiveWindow");
+    void liveWindow.setChrome?.({ dark });
+  });
 }

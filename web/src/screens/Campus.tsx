@@ -26,6 +26,7 @@ import { SOURCE_NAME } from "../lib/records";
 import { Segmented } from "../components/Segmented";
 import { Icon } from "../components/Icon";
 import { BusBoard } from "../components/BusBoard";
+import { rise } from "../lib/motion";
 import { Empty, ModePill, PageHead, Section } from "../components/Layout";
 
 type View = "notices" | "life" | "calendar";
@@ -111,11 +112,11 @@ function Notices() {
       <Section title="今日冷知识" note={facts.length ? `${facts.length} 条` : "每天 5 条"}>
         {facts.length > 0 ? (
           <ul className="list">
-            {facts.map((f) => (
-              <li key={f.index} className="notice" style={{ cursor: "default" }}>
+            {facts.map((f, i) => (
+              <motion.li key={f.index} className="notice" {...rise(i, { y: 8, scale: 1 })}>
                 <span className="notice__src notice__src--oa">冷知识</span>
                 <span className="notice__title">{f.text}</span>
-              </li>
+              </motion.li>
             ))}
           </ul>
         ) : (
@@ -166,8 +167,8 @@ function Notices() {
         groups.map((g) => (
           <Section key={g.label} title={g.label} note={`${g.items.length} 条`}>
             <ul className="list">
-              {g.items.map((n) => (
-                <li key={n.id}>
+              {g.items.map((n, i) => (
+                <motion.li key={n.id} {...rise(i, { y: 8, scale: 1 })}>
                   <a className="notice" href={n.url ?? undefined} target="_blank" rel="noreferrer noopener">
                     <span className={`notice__src notice__src--${n.source}`}>{SOURCE_NAME[n.source] ?? n.source}</span>
                     <span className="notice__title">{n.title}</span>
@@ -177,7 +178,7 @@ function Notices() {
                     </span>
                     <Icon name="external" size={16} className="notice__go" />
                   </a>
-                </li>
+                </motion.li>
               ))}
             </ul>
           </Section>

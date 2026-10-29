@@ -3,14 +3,12 @@ import { useShell, useStore } from "../lib/store";
 import { agoText } from "../lib/clock";
 import { Icon } from "./Icon";
 
-/** Entrance motion for stacked sections; capped so long pages do not crawl in. */
-export function rise(i: number) {
-  return {
-    initial: { opacity: 0, y: 10 },
-    animate: { opacity: 1, y: 0 },
-    transition: { type: "spring" as const, stiffness: 240, damping: 24, mass: 0.9, delay: Math.min(i, 5) * 0.04 },
-  };
-}
+/**
+ * 进场编排只有一个出口：lib/motion.ts 的 rise()。
+ * 这里原来还留着一份自己的实现（y:10 / i*0.04），跟 motion.ts 那份不一致，
+ * 页面上就出现了两种"落位手感"。现在统一重导出，谁 import 都拿到同一套。
+ */
+export { rise } from "../lib/motion";
 
 export function PageHead({
   eyebrow,

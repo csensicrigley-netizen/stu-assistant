@@ -1,22 +1,51 @@
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import { SideNav, TabBar, TABS, type TabKey } from "./components/TabBar";
 import { TodayScreen } from "./screens/Today";
-import { WeekScreen } from "./screens/Week";
-import { StudyScreen } from "./screens/Study";
-import { CampusScreen } from "./screens/Campus";
-import { MeScreen } from "./screens/Me";
+/*
+ * 按页拆包：今天之外的四页都不是打开就要看的，跟着主包一起下等于让首屏
+ * 多背几十 KB 的解析时间。首帧之后立刻预取（见下面的 preload），所以点标签
+ * 时它们已经在缓存里，平时看不到切换等待。
+ */
+const PlanScreen = lazy(() => import("./screens/Plan").then((m) => ({ default: m.PlanScreen })));
+const WeekScreen = lazy(() => import("./screens/Week").then((m) => ({ default: m.WeekScreen })));
+const StudyScreen = lazy(() => import("./screens/Study").then((m) => ({ default: m.StudyScreen })));
+const CampusScreen = lazy(() => import("./screens/Campus").then((m) => ({ default: m.CampusScreen })));
+const MeScreen = lazy(() => import("./screens/Me").then((m) => ({ default: m.MeScreen })));
+const ImportScreen = lazy(() => import("./screens/Import").then((m) => ({ default: m.ImportScreen })));
+const MedBindScreen = lazy(() => import("./screens/MedBind").then((m) => ({ default: m.MedBindScreen })));
 import { Welcome, type Step } from "./screens/Welcome";
 import { UpdateBanner } from "./components/UpdateBanner";
 import { useTheme } from "./lib/useTheme";
 import { AUTH_LOST, getToken, setToken } from "./lib/api";
-import { pageMotion } from "./lib/motion";
+import { pageVariants } from "./lib/motion";
 import { initNative, onBack } from "./lib/native";
 
 import { PREVIEW_KEY, ShellCtx, StoreProvider, useStore } from "./lib/store";
 import { dueBucket } from "./lib/records";
 
 const KEYS = TABS.map((t) => t.key);
+
+/**
+ * 每张页面在"横向空间"里的位置。切页的方向感就是从这里来的：
+ * 往右走（下标变大）新页从右边进来，往左走反过来。
+ * import / medbind 都是课表的子页面，夹在 week 与 study 之间 —— 进它们算"往里走"，
+ * 而且两者互不重叠（2.4 / 2.6），从「导入」跳「连教务」也是一个方向感的位移。
+ */
+const ORDER: Record<TabKey, number> = {
+  today: 0,
+  plan: 1,
+  week: 2,
+  import: 2.4,
+  medbind: 2.6,
+  study: 3,
+  campus: 4,
+  me: 5,
+};
+
+function dirOf(from: TabKey, to: TabKey): 1 | -1 {
+  return ORDER[to] >= ORDER[from] ? 1 : -1;
+}
 
 function initialTab(): TabKey {
   try {
@@ -109,7 +138,12 @@ export default function App() {
 }
 
 function Shell({ onSignOut, onConnect }: { onSignOut: () => void; onConnect: () => void }) {
-  const [tab, setTab] = useState<TabKey>(initialTab);
+  /*
+   * 页面与方向放在同一份 state 里：setTab 与 dir 必须同一次提交，
+   * 否则退场那一帧会拿到上一次的方向，旧页会朝"进来的方向"退出去 —— 看起来像倒放。
+   */
+  const [nav, setNav] = useState<{ tab: TabKey; dir: 1 | -1 }>(() => ({ tab: initialTab(), dir: 1 }));
+  const tab = nav.tab;
   const [, startTab] = useTransition();
   const store = useStore();
 
@@ -118,20 +152,46 @@ function Shell({ onSignOut, onConnect }: { onSignOut: () => void; onConnect: () 
    * 渲染任务挤掉了。放进 startTransition，React 会让动画先走、列表慢慢补上，
    * 手指看到的就是丝滑的位移，而不是先定住再跳。
    */
-  const go = useCallback((next: TabKey) => {
-    if (next === tab) return;
-    startTab(() => setTab(next));
-  }, [tab]);
+  const go = useCallback(
+    (next: TabKey) => {
+      if (next === tab) return;
+      const dir = dirOf(tab, next);
+      startTab(() => setNav({ tab: next, dir }));
+    },
+    [tab],
+  );
 
   // a tab is a fresh context, not a continuation
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
   }, [tab]);
 
-  // Android back: any other tab steps back to 今天 before leaving the App
+  /*
+   * 首帧画完之后再把其余页面的 chunk 拉下来。放在 setTimeout 里而不是立刻
+   * import()，是为了不跟首屏抢网络和主线程：首屏先出来，剩下的趁人还在看
+   * 今天这一页的时候下完，点标签就不用等。
+   */
+  useEffect(() => {
+    const id = window.setTimeout(() => {
+      void import("./screens/Plan");
+      void import("./screens/Week");
+      void import("./screens/Study");
+      void import("./screens/Campus");
+      void import("./screens/Me");
+      void import("./screens/Import");
+      void import("./screens/MedBind");
+    }, 240);
+    return () => window.clearTimeout(id);
+  }, []);
+
+  // Android back: 子页面先回它的来处，其余页面回"今天"，只有"今天"才退出 App
   useEffect(
     () =>
       onBack(() => {
+        if (tab === "import" || tab === "medbind") {
+          go("week");
+          return true;
+        }
         if (tab === "today") return false;
         go("today");
         return true;
@@ -156,24 +216,50 @@ function Shell({ onSignOut, onConnect }: { onSignOut: () => void; onConnect: () 
         </a>
         <SideNav current={tab} onChange={go} badges={badges} />
         {/*
-          popLayout 而不是 wait：切页时旧页面立刻退场（120ms 纯透明度），
-          新页面同时用果冻弹簧落位。wait 会先等旧页退干净再让新页进，
+          popLayout 而不是 wait：切页时旧页面立刻退场（120ms 纯透明度 + 14px 反向位移），
+          新页面同时用弹簧从它那一侧落位。wait 会先等旧页退干净再让新页进，
           中间那一下空白就是手感"卡"的来源之一。
+
+          popLayout 还会把退场中的那一页从文档流里摘出去（position: absolute），
+          所以旧页不再参与布局计算，不会跟新页抢高度 —— 下面这个 key 变化时
+          页面高度变化再大，也不会看到"先塌一下再撑开"。
+
+          custom={nav.dir} 同时交给 AnimatePresence 与页面：退场动画用的是
+          "这一次切换的方向"，而不是旧页自己上次的方向。
         */}
-        <AnimatePresence mode="popLayout" initial={false}>
+        <AnimatePresence mode="popLayout" initial={false} custom={nav.dir}>
           <motion.main
             key={tab}
             id="main"
             className={`page page--${tab}`}
-            initial={pageMotion.initial}
-            animate={pageMotion.animate}
-            exit={pageMotion.exit}
+            custom={nav.dir}
+            variants={pageVariants}
+            initial="enter"
+            animate="center"
+            exit="exit"
           >
-            {tab === "today" && <TodayScreen />}
-            {tab === "week" && <WeekScreen />}
-            {tab === "study" && <StudyScreen />}
-            {tab === "campus" && <CampusScreen />}
-            {tab === "me" && <MeScreen onSignOut={onSignOut} />}
+            {/*
+              Suspense 放在 motion.main 里面：这样页面容器的弹簧照旧跑，
+              只是内容晚一两帧到。fallback 用等高骨架，避免落地时的高度跳变
+              ——跳变会被当成"卡"，比空白更难受。
+            */}
+            <Suspense
+              fallback={
+                <div className="stack-3" aria-hidden="true">
+                  <div className="sk" style={{ height: "18vh", borderRadius: "var(--r-xl)" }} />
+                  <div className="sk" style={{ height: "34vh", borderRadius: "var(--r-xl)" }} />
+                </div>
+              }
+            >
+              {tab === "today" && <TodayScreen />}
+              {tab === "plan" && <PlanScreen />}
+              {tab === "week" && <WeekScreen />}
+              {tab === "import" && <ImportScreen />}
+              {tab === "medbind" && <MedBindScreen />}
+              {tab === "study" && <StudyScreen />}
+              {tab === "campus" && <CampusScreen />}
+              {tab === "me" && <MeScreen onSignOut={onSignOut} />}
+            </Suspense>
           </motion.main>
         </AnimatePresence>
         <TabBar current={tab} onChange={go} badges={badges} />
