@@ -1,0 +1,173 @@
+{
+  "_comment": "合成样例：get_exams() 缓存查询的原始返回（store.py:189-196 + app.py:145-160），记录字段见 jw/schema.py:36-42、jw/parser.py:175-186。覆盖：① exam_time 为学校原文、不解析（合成测试样本格式为 '2026-11-01 09:00-11:00'，tests/fixtures/exams-current.html）；② 地点缺失：大学物理 location=''，seat_number=''；③ 同日两场：2027-01-12 线性代数第一场与数据结构第四场；④ 完全未公布：影视鉴赏 exam_time/location/exam_session 均为 ''（tests/test_jw_parser.py:313-319）；⑤ 长备注；⑥ 长课名。【形状推断】'2027年01月15日(星期五) 19:00--21:30' 这种中文写法源码与测试里都没有出现，是压力测试用的假设，目的是证明前端必须原样显示，待真实样本核对。exams 不进入 scopes（sync.py:6 COURSE_KINDS 不含 exam），所以 scopes 为 []。同一张表内所有记录的 key 集合相同；缺列时整批记录都没有该 key。",
+  "ok": true,
+  "items": [
+    {
+      "campus": "桑浦山校区",
+      "exam_campus": "桑浦山校区",
+      "exam_session": "第五场",
+      "course_code": "EN1003",
+      "title": "大学英语（三）",
+      "teacher": "陈语桐",
+      "exam_time": "2027年01月15日(星期五) 19:00--21:30",
+      "location": "D座 9-102",
+      "seat_number": "113",
+      "exam_id": "SYN-KS-0004",
+      "notes": "",
+      "jw_schema_version": 2,
+      "id": "jw:exam:1d1e0b520b9075f502a1dc84",
+      "kind": "exam",
+      "semester": "2026-2027-1",
+      "source": "jw",
+      "collected_at": "2026-10-28T01:55:12.398811+00:00"
+    },
+    {
+      "campus": "桑浦山校区",
+      "exam_campus": "桑浦山校区",
+      "exam_session": "第三场",
+      "course_code": "MX2026001",
+      "title": "马克思主义基本原理与当代中国社会发展前沿问题专题研讨（含社会实践环节）",
+      "teacher": "林知远",
+      "exam_time": "2027-01-18 13:30-15:30",
+      "location": "讲堂九",
+      "seat_number": "201",
+      "exam_id": "SYN-KS-0006",
+      "notes": "开卷考试；须携带学生证与身份证；迟到 15 分钟不得入场；考试结束前 30 分钟方可交卷离场；具体要求以考前一周学院通知为准（合成备注，用于测试长文本）",
+      "jw_schema_version": 2,
+      "id": "jw:exam:1eca7cc46e4f7e3486900af9",
+      "kind": "exam",
+      "semester": "2026-2027-1",
+      "source": "jw",
+      "collected_at": "2026-10-28T01:55:12.398811+00:00"
+    },
+    {
+      "campus": "桑浦山校区",
+      "exam_campus": "桑浦山校区",
+      "exam_session": "第二场",
+      "course_code": "PH1102",
+      "title": "大学物理（上）",
+      "teacher": "何以宁",
+      "exam_time": "2027-01-14 10:30-12:30",
+      "location": "",
+      "seat_number": "",
+      "exam_id": "SYN-KS-0003",
+      "notes": "考场另行通知（合成备注）",
+      "jw_schema_version": 2,
+      "id": "jw:exam:398cf3d23f790f9a5c7db771",
+      "kind": "exam",
+      "semester": "2026-2027-1",
+      "source": "jw",
+      "collected_at": "2026-10-28T01:55:12.398811+00:00"
+    },
+    {
+      "campus": "桑浦山校区",
+      "exam_campus": "",
+      "exam_session": "",
+      "course_code": "AR3001",
+      "title": "影视鉴赏与批评",
+      "teacher": "苏念白",
+      "exam_time": "",
+      "location": "",
+      "seat_number": "",
+      "exam_id": "",
+      "notes": "",
+      "jw_schema_version": 2,
+      "id": "jw:exam:a897715e4f6ebba4e68519de",
+      "kind": "exam",
+      "semester": "2026-2027-1",
+      "source": "jw",
+      "collected_at": "2026-10-28T01:55:12.398811+00:00"
+    },
+    {
+      "campus": "桑浦山校区",
+      "exam_campus": "桑浦山校区",
+      "exam_session": "第一场",
+      "course_code": "MA2201",
+      "title": "线性代数",
+      "teacher": "郑可言",
+      "exam_time": "2027-01-12 08:00-10:00",
+      "location": "E座 9-301",
+      "seat_number": "27",
+      "exam_id": "SYN-KS-0001",
+      "notes": "",
+      "jw_schema_version": 2,
+      "id": "jw:exam:e3d87bf008562ee5a99e1d8b",
+      "kind": "exam",
+      "semester": "2026-2027-1",
+      "source": "jw",
+      "collected_at": "2026-10-28T01:55:12.398811+00:00"
+    },
+    {
+      "campus": "桑浦山校区",
+      "exam_campus": "桑浦山校区",
+      "exam_session": "第四场",
+      "course_code": "CS2302",
+      "title": "数据结构与算法",
+      "teacher": "林知远",
+      "exam_time": "2027-01-12 16:00-18:00",
+      "location": "E座 9-412",
+      "seat_number": "08",
+      "exam_id": "SYN-KS-0002",
+      "notes": "允许携带一张 A4 手写资料（合成备注）",
+      "jw_schema_version": 2,
+      "id": "jw:exam:f12301fc2ba033b865084030",
+      "kind": "exam",
+      "semester": "2026-2027-1",
+      "source": "jw",
+      "collected_at": "2026-10-28T01:55:12.398811+00:00"
+    }
+  ],
+  "total_count": 6,
+  "offset": 0,
+  "has_more": false,
+  "cached": true,
+  "unavailable": [],
+  "unverified_count": 0,
+  "scopes": [],
+  "scan_capped": false,
+  "freshness": [
+    {
+      "source": "jw",
+      "attempted_at": "2026-10-28T01:55:12.402871+00:00",
+      "success_at": "2026-10-28T01:55:12.402905+00:00",
+      "status": "partial",
+      "saved": 47
+    },
+    {
+      "source": "mystu",
+      "attempted_at": "2026-10-28T01:50:03.120334+00:00",
+      "success_at": "2026-10-28T01:50:03.120351+00:00",
+      "status": "partial",
+      "saved": 41
+    },
+    {
+      "source": "oa",
+      "attempted_at": "2026-10-28T01:40:44.900112+00:00",
+      "success_at": "2026-10-27T13:02:10.551900+00:00",
+      "status": "oa_unavailable",
+      "saved": 0
+    },
+    {
+      "source": "public",
+      "attempted_at": "2026-10-28T01:41:20.004567+00:00",
+      "success_at": "2026-10-28T01:41:20.004589+00:00",
+      "status": "partial",
+      "saved": 61
+    },
+    {
+      "source": "yuketang",
+      "attempted_at": "2026-10-27T23:10:31.776100+00:00",
+      "success_at": "2026-10-27T23:10:31.776122+00:00",
+      "status": "partial",
+      "saved": 18
+    }
+  ],
+  "auth": [
+    {
+      "source": "jw",
+      "status": "session_saved",
+      "verified_live": false
+    }
+  ],
+  "content_trust": "untrusted_source_data"
+}

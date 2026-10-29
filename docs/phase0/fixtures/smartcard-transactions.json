@@ -1,0 +1,111 @@
+{
+  "_comment": "合成样例：get_campus_card_transactions('2026-10-01','2026-10-28') 的原始返回（smartcard/parser.py:309-321 加上 adapter.py:75-77）。覆盖：① 多类型流水：转账/消费/扣款/补助，保留学校分类，不能都当餐饮消费（server.py:322）；② amount 是带正负号的元字符串，balance 是交易后余额；③ status 有非'成功'的值（'冲正'）；④ complete=false：学校返回 3 页，只读第一页，status='partial'，pending 里有一条提示（parser.py:318-321）；⑤ occurred_at 由学校的 'YYYY/MM/DD HH:MM:SS' 转成 +08:00 ISO（parser.py:230-238）。学校表格里的姓名、操作员列已经丢弃。【形状推断】available_transaction_types 的 value（'0'..'4'）以及'冲正'这个状态值是虚构的。源码只要求恰好有一个label 为'全部'的选项（parser.py:194-198），待真实样本核对。金额、商户名均为虚构。",
+  "ok": true,
+  "status": "partial",
+  "source": "smartcard",
+  "source_url": "http://smartcard.stu.edu.cn/accounthisTrjn.action",
+  "checked_at": "2026-10-28T02:16:12.880431+00:00",
+  "transport": "school_http",
+  "cached": false,
+  "content_trust": "untrusted_source_data",
+  "items": [
+    {
+      "type": "消费",
+      "subsystem": "第二食堂（合成）",
+      "category": "餐费",
+      "sequence": "1042",
+      "status": "成功",
+      "occurred_at": "2026-10-27T12:01:15+08:00",
+      "amount": "-35.20",
+      "balance": "23.50"
+    },
+    {
+      "type": "消费",
+      "subsystem": "校园超市（合成）",
+      "category": "购物",
+      "sequence": "1041",
+      "status": "冲正",
+      "occurred_at": "2026-10-21T18:22:47+08:00",
+      "amount": "8.00",
+      "balance": "58.70"
+    },
+    {
+      "type": "补助",
+      "subsystem": "补助发放（合成）",
+      "category": "伙食补贴",
+      "sequence": "1040",
+      "status": "成功",
+      "occurred_at": "2026-10-15T10:00:00+08:00",
+      "amount": "15.00",
+      "balance": "50.70"
+    },
+    {
+      "type": "扣款",
+      "subsystem": "宿舍水控（合成）",
+      "category": "水费",
+      "sequence": "1039",
+      "status": "成功",
+      "occurred_at": "2026-10-09T21:40:02+08:00",
+      "amount": "-1.80",
+      "balance": "35.70"
+    },
+    {
+      "type": "消费",
+      "subsystem": "第一食堂（合成）",
+      "category": "餐费",
+      "sequence": "1038",
+      "status": "成功",
+      "occurred_at": "2026-10-03T12:05:31+08:00",
+      "amount": "-12.50",
+      "balance": "37.50"
+    },
+    {
+      "type": "转账",
+      "subsystem": "银行圈存（合成）",
+      "category": "圈存",
+      "sequence": "1037",
+      "status": "成功",
+      "occurred_at": "2026-10-03T08:12:09+08:00",
+      "amount": "20.00",
+      "balance": "50.00"
+    }
+  ],
+  "coverage": {
+    "complete": false,
+    "pages_read": 1,
+    "total_pages": 3,
+    "total_records": 41,
+    "rows_read": 6
+  },
+  "pending": [
+    "学校返回多页流水，本次仅核对第一页；请缩小日期范围以取得完整记录。"
+  ],
+  "query": {
+    "start_date": "2026-10-01",
+    "end_date": "2026-10-28",
+    "transaction_type": "0"
+  },
+  "currency": "CNY",
+  "available_transaction_types": [
+    {
+      "value": "0",
+      "label": "全部"
+    },
+    {
+      "value": "1",
+      "label": "消费"
+    },
+    {
+      "value": "2",
+      "label": "补助"
+    },
+    {
+      "value": "3",
+      "label": "转账"
+    },
+    {
+      "value": "4",
+      "label": "扣款"
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "_comment": "合成样例：get_campus_card() 的原始返回（smartcard/service.py:23-25；字段见 smartcard/parser.py:83-112）。覆盖：① 余额是字符串，单位为元，保留两位小数（money()，parser.py:54-65），不是分；② balance_breakdown 只在学校原文同时带 卡余额/当前过渡余额/上次过渡余额 三个标签时出现，三项不相加（parser.py:68-85；server.py:311），当前过渡余额可以为负；③ 卡状态异常：card_status='挂失'、freeze_status='冻结'、loss_status='已挂失'；④ check_status=null 表示页面没有该行，状态未知，不代表正常（parser.py:109）。学号和姓名不返回。transport='school_http' 表示官方入口是明文 HTTP。【形状推断】'挂失'/'冻结'/'已挂失' 这些异常值源码与测试里都没有出现（测试只有 正常/未冻结/未挂失，tests/test_smartcard_reads.py:33），待真实样本核对。金额为虚构。概况没有 pending，status 恒为 'ok'。",
+  "ok": true,
+  "status": "ok",
+  "source": "smartcard",
+  "source_url": "http://smartcard.stu.edu.cn/accountcardUser.action",
+  "checked_at": "2026-10-28T02:15:40.302118+00:00",
+  "transport": "school_http",
+  "cached": false,
+  "content_trust": "untrusted_source_data",
+  "balance": "23.50",
+  "card_status": "挂失",
+  "freeze_status": "冻结",
+  "check_status": null,
+  "loss_status": "已挂失",
+  "currency": "CNY",
+  "balance_breakdown": {
+    "card_balance": "23.50",
+    "current_transition_balance": "-2.00",
+    "previous_transition_balance": "0.00"
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "_comment": "合成样例：完整空学期（get_academic_timetable(semester='2025-2026-3')）。与 2026-10-24 真实读取的历史空学期计数一致（docs/verification/2026-10-23-academic-timetable.md），测试见 tests/test_jw_timetable.py:238-248。判定'确认为空'的条件：ok=true 且 status='ok' 且 courses/unarranged/pending 均为 [] 且 coverage.complete=true。失败不会长这样：登录页 → ok=false,status='login_expired'；维护页/未知页面/缺网格 → ok=false,status='schema_changed'（timetable.py:24-26, 303-304），示例见 errors.json。",
+  "ok": true,
+  "status": "ok",
+  "source": "jw",
+  "source_url": "https://jw.stu.edu.cn/jsxsd/xskb/xskb_list.do",
+  "checked_at": "2026-10-28T02:03:08.104217+00:00",
+  "transport": "https",
+  "cached": false,
+  "content_trust": "untrusted_source_data",
+  "semester": "2025-2026-3",
+  "available_semesters": [
+    {
+      "semester": "2026-2027-1",
+      "label": "2026-2027-1"
+    },
+    {
+      "semester": "2025-2026-3",
+      "label": "2025-2026-3"
+    },
+    {
+      "semester": "2025-2026-2",
+      "label": "2025-2026-2"
+    },
+    {
+      "semester": "2025-2026-1",
+      "label": "2025-2026-1"
+    }
+  ],
+  "courses": [],
+  "unarranged": [],
+  "unplaced_details": [],
+  "pending": [],
+  "coverage": {
+    "kind": "theory",
+    "weeks": "all",
+    "complete": true,
+    "course_count": 0,
+    "meeting_count": 0,
+    "grid_arrangements": 0,
+    "unarranged_count": 0,
+    "unplaced_detail_count": 0,
+    "calendar_verified": false,
+    "period_times_verified": false,
+    "experimental_timetable_included": false
+  }
+}

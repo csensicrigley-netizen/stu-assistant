@@ -1,0 +1,10 @@
+# STU 事项助手 backend, exact versions.
+#   pip install -c constraints.txt -r requirements.txt wheels/stu_mcp-0.7.3-py3-none-any.whl
+#
+# stu-mcp (the school login and parsing layer, MIT) is installed from the
+# official v0.7.3 release wheel kept in wheels/; constraints.txt pins the rest
+# of the tree to the versions this release was tested with.
+fastapi==0.162.0
+uvicorn==0.54.0
+pydantic==2.14.1
+cryptography==50.0.2

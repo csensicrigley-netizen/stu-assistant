@@ -1,0 +1,155 @@
+{
+  "_comment": "合成样例：search_notices(query='', source='all') 缓存查询的原始返回。列表字段见 notices/parser.py:57-59（public）和 165-166（oa），正文与附件见 222-252，缓存附加字段见 store.py:72-86。覆盖：① 超长标题（列表标题不截断）；② 带 PDF 与文本附件：OA 990101，附件 url 为绝对地址；③ public 附件 url 为页面里的相对 href '/upload/…'，前端要按通知 url 拼接（app.py:286 也用 urljoin）；④ 无正文、仅链接：public 99001、99002，以及 WebVPN 的 OA 990102，都没有 body/attachments 键，说明还没调用过 get_notice(refresh=true)；⑤ 正文为空、只有附件：OA 990103，body=''、department=''，附件名是源码的兜底写法 '附件 {fileid}'；⑥ 需要 WebVPN 才能读正文：990102 的 url 是 https://oa-stu-edu-cn.webvpn.stu.edu.cn/…，没有单独的布尔标记（notices/adapter.py:45-46、app.py:269）；⑦ published_at 是原文日期，格式不统一（'2026-10-27'/'2026年10月26日'/'2026/10/25'/'2026.10.24'/null，parsing.py:73-75）；雨课堂公告却是 +08:00 ISO；⑧ 雨课堂课程公告也是 kind='notice'，字段不同（有 course，没有 category/department）。所有标题、正文、docid、fileid 均为虚构。",
+  "ok": true,
+  "items": [
+    {
+      "id": "public:notice:3a789fb10050229017be844c",
+      "kind": "notice",
+      "title": "学校召开 2026 年秋季学期教学工作会议（合成）",
+      "url": "https://www.stu.edu.cn/info/1021/99001.htm",
+      "category": "学校要闻",
+      "published_at": "2026年10月26日",
+      "source": "public",
+      "collected_at": "2026-10-28T01:41:19.987210+00:00"
+    },
+    {
+      "id": "public:notice:3ff644ba1db1eb996428da59",
+      "kind": "notice",
+      "title": "【讲座预告】大语言模型与校园信息服务（合成）",
+      "url": "https://www.stu.edu.cn/info/1023/99002.htm",
+      "category": "活动预告",
+      "published_at": null,
+      "source": "public",
+      "collected_at": "2026-10-28T01:41:19.987210+00:00"
+    },
+    {
+      "id": "public:notice:cdfa7eab378ec3b374494be7",
+      "kind": "notice",
+      "title": "关于做好 2026 年秋季学期家庭经济困难学生认定、国家助学金评审以及校内勤工助学岗位申请与考核工作的通知（含各书院、各学院联系人名单及材料提交时间节点安排）",
+      "url": "https://xsc.stu.edu.cn/NewsDetail.aspx?ID=990001",
+      "category": "学生通知",
+      "published_at": "2026-10-27",
+      "source": "public",
+      "collected_at": "2026-10-28T01:41:19.987210+00:00",
+      "body": "（合成正文）各书院、各学院：现将有关事项通知如下……（合成正文）各书院、各学院：现将有关事项通知如下……（合成正文）各书院、各学院：现将有关事项通知如下……（合成正文）各书院、各学院：现将有关事项通知如下……（合成正文）各书院、各学院：现将有关事项通知如下……",
+      "attachments": [
+        {
+          "name": "附件：家庭经济困难学生认定申请表（合成）.pdf",
+          "url": "/upload/files/2026/10/synthetic-990001.pdf"
+        }
+      ],
+      "detail_collected_at": "2026-10-27T09:12:44.001900+00:00"
+    },
+    {
+      "id": "yuketang:notice:049b3c4af36afd07b6550d78",
+      "kind": "notice",
+      "title": "第 8 周课堂改为线上（合成雨课堂公告）",
+      "course": "大学物理（上）",
+      "body": "本周四课程改为线上直播（合成）。",
+      "url": "https://changjiang.yuketang.cn/v2/web/studentLog/3300001",
+      "published_at": "2026-10-26T20:15:00+08:00",
+      "source": "yuketang",
+      "collected_at": "2026-10-27T23:10:31.760044+00:00"
+    },
+    {
+      "id": "oa:notice:13c94c4d808aceb5022f92ff",
+      "kind": "notice",
+      "docid": "990101",
+      "title": "关于 2026-2027 学年第一学期补考安排的通知（合成）",
+      "url": "http://oa.stu.edu.cn/newstemplateprotal.jsp?templatetype=1&templateid=3&docid=990101",
+      "department": "教务处",
+      "published_at": "2026-10-26",
+      "source": "oa",
+      "collected_at": "2026-10-27T13:02:10.530018+00:00",
+      "body": "现将补考安排通知如下，详见附件（合成）。",
+      "attachments": [
+        {
+          "name": "补考安排（合成）.pdf",
+          "url": "http://oa.stu.edu.cn/weaver/weaver.file.FileDownload?fileid=880001&download=1&requestid=0"
+        },
+        {
+          "name": "补考名单说明（合成）.txt",
+          "url": "http://oa.stu.edu.cn/weaver/weaver.file.FileDownload?fileid=880002&download=1&requestid=0"
+        }
+      ],
+      "detail_collected_at": "2026-10-27T13:02:10.530018+00:00"
+    },
+    {
+      "id": "oa:notice:d9363d339be521df2ca2b5a2",
+      "kind": "notice",
+      "docid": "990103",
+      "title": "关于寒假宿舍留宿登记的通知（合成，正文只有附件）",
+      "url": "http://oa.stu.edu.cn/newstemplateprotal.jsp?templatetype=1&templateid=3&docid=990103",
+      "department": "",
+      "published_at": "2026/10/25",
+      "source": "oa",
+      "collected_at": "2026-10-27T13:02:10.530018+00:00",
+      "body": "",
+      "attachments": [
+        {
+          "name": "附件 880021",
+          "url": "http://oa.stu.edu.cn/weaver/weaver.file.FileDownload?fileid=880021&download=1&requestid=0"
+        }
+      ],
+      "detail_collected_at": "2026-10-27T13:02:10.530018+00:00"
+    },
+    {
+      "id": "oa:notice:a4043832a2b337f860d47397",
+      "kind": "notice",
+      "docid": "990102",
+      "title": "关于做好 2026-2027 学年第一学期期末考试组织工作的通知（合成）",
+      "url": "https://oa-stu-edu-cn.webvpn.stu.edu.cn/newstemplateprotal.jsp?templatetype=1&templateid=3&docid=990102",
+      "department": "教务处",
+      "published_at": "2026.10.24",
+      "source": "oa",
+      "collected_at": "2026-10-26T08:30:00.000100+00:00"
+    }
+  ],
+  "total_count": 7,
+  "offset": 0,
+  "has_more": false,
+  "cached": true,
+  "unavailable": [],
+  "unverified_count": 0,
+  "scopes": [],
+  "scan_capped": false,
+  "freshness": [
+    {
+      "source": "jw",
+      "attempted_at": "2026-10-28T01:55:12.402871+00:00",
+      "success_at": "2026-10-28T01:55:12.402905+00:00",
+      "status": "partial",
+      "saved": 47
+    },
+    {
+      "source": "mystu",
+      "attempted_at": "2026-10-28T01:50:03.120334+00:00",
+      "success_at": "2026-10-28T01:50:03.120351+00:00",
+      "status": "partial",
+      "saved": 41
+    },
+    {
+      "source": "oa",
+      "attempted_at": "2026-10-28T01:40:44.900112+00:00",
+      "success_at": "2026-10-27T13:02:10.551900+00:00",
+      "status": "oa_unavailable",
+      "saved": 0
+    },
+    {
+      "source": "public",
+      "attempted_at": "2026-10-28T01:41:20.004567+00:00",
+      "success_at": "2026-10-28T01:41:20.004589+00:00",
+      "status": "partial",
+      "saved": 61
+    },
+    {
+      "source": "yuketang",
+      "attempted_at": "2026-10-27T23:10:31.776100+00:00",
+      "success_at": "2026-10-27T23:10:31.776122+00:00",
+      "status": "partial",
+      "saved": 18
+    }
+  ],
+  "auth": [],
+  "content_trust": "untrusted_source_data"
+}

@@ -1,0 +1,33 @@
+[Unit]
+Description=STU 事项助手 (API + browser version)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=stu-assistant
+Group=stu-assistant
+WorkingDirectory=/opt/stu-assistant
+EnvironmentFile=/etc/stu-assistant.env
+# One process on purpose: campus-login jobs and rate limits live in memory.
+ExecStart=/opt/stu-assistant/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8100 --workers 1 --proxy-headers --forwarded-allow-ips 127.0.0.1 --no-server-header
+Restart=on-failure
+RestartSec=3
+
+# hardening: the service can only write its own data directory
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/stu-assistant
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

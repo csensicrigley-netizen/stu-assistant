@@ -1,0 +1,119 @@
+{
+  "_comment": "合成样例：get_schedule() 缓存查询的原始返回，日程字段见 mystu/parser.py:263-277。抓取窗口固定为过去 7 天到未来 31 天，最多 50 条（mystu/adapter.py:66、mystu/schema.py:28）。覆盖：① 已结束（10-21）；② 今天两场，其中一场 end_at=null；③ start_at 与 end_at 都为 null（stamp() 得到空值或 ≤0 时，parsing.py:23-30）；④ 超长标题和超长地点；⑤ 带微秒的时间；⑥ location=''。日程不进入 scopes（sync.py:6），所以 scopes 为 []。complete=false：日程记录与信封里都没有 complete 字段。超过 50 条时只在 refresh_source 返回 limited=true（mystu/service.py:76-77），见 mystu-refresh.json。没有全天标记，也没有所属课程字段。",
+  "ok": true,
+  "items": [
+    {
+      "id": "mystu:event:109c152f2fc5cdc244076df4",
+      "kind": "event",
+      "title": "体测补测",
+      "start_at": "2026-11-27T08:00:00.250000+08:00",
+      "end_at": "2026-11-27T11:30:00+08:00",
+      "location": "运动场",
+      "source": "mystu",
+      "collected_at": "2026-10-28T01:50:03.101155+00:00"
+    },
+    {
+      "id": "mystu:event:1a1fb0870ac83e5eebb5daee",
+      "kind": "event",
+      "title": "导师见面会",
+      "start_at": "2026-10-28T19:30:00+08:00",
+      "end_at": null,
+      "location": "",
+      "source": "mystu",
+      "collected_at": "2026-10-28T01:50:03.101155+00:00"
+    },
+    {
+      "id": "mystu:event:72dbfa6bc69fe6ff42867d65",
+      "kind": "event",
+      "title": "班级例会（第 7 周）",
+      "start_at": "2026-10-21T19:30:00+08:00",
+      "end_at": "2026-10-21T20:30:00+08:00",
+      "location": "D座 9-110",
+      "source": "mystu",
+      "collected_at": "2026-10-28T01:50:03.101155+00:00"
+    },
+    {
+      "id": "mystu:event:91449b807fc27803cf4029f6",
+      "kind": "event",
+      "title": "2026 年秋季学期'书院文化节'开幕式暨优秀学生社团风采展示与新媒体作品评选颁奖典礼（合成长标题）",
+      "start_at": "2026-11-06T18:30:00+08:00",
+      "end_at": "2026-11-06T21:00:00+08:00",
+      "location": "桑浦山校区学生活动中心一楼多功能报告厅（合成长地点）",
+      "source": "mystu",
+      "collected_at": "2026-10-28T01:50:03.101155+00:00"
+    },
+    {
+      "id": "mystu:event:c6b5b0f44881bf33510c20f0",
+      "kind": "event",
+      "title": "数据结构与算法 期中答疑",
+      "start_at": "2026-10-28T14:00:00+08:00",
+      "end_at": "2026-10-28T15:40:00+08:00",
+      "location": "E座 9-101",
+      "source": "mystu",
+      "collected_at": "2026-10-28T01:50:03.101155+00:00"
+    },
+    {
+      "id": "mystu:event:d4eab59eac2f99d29b2ca07d",
+      "kind": "event",
+      "title": "学院通知：请于本周内完成学生信息核对（无具体时间）",
+      "start_at": null,
+      "end_at": null,
+      "location": "",
+      "source": "mystu",
+      "collected_at": "2026-10-28T01:50:03.101155+00:00"
+    }
+  ],
+  "total_count": 6,
+  "offset": 0,
+  "has_more": false,
+  "cached": true,
+  "unavailable": [],
+  "unverified_count": 0,
+  "scopes": [],
+  "scan_capped": false,
+  "freshness": [
+    {
+      "source": "jw",
+      "attempted_at": "2026-10-28T01:55:12.402871+00:00",
+      "success_at": "2026-10-28T01:55:12.402905+00:00",
+      "status": "partial",
+      "saved": 47
+    },
+    {
+      "source": "mystu",
+      "attempted_at": "2026-10-28T01:50:03.120334+00:00",
+      "success_at": "2026-10-28T01:50:03.120351+00:00",
+      "status": "partial",
+      "saved": 41
+    },
+    {
+      "source": "oa",
+      "attempted_at": "2026-10-28T01:40:44.900112+00:00",
+      "success_at": "2026-10-27T13:02:10.551900+00:00",
+      "status": "oa_unavailable",
+      "saved": 0
+    },
+    {
+      "source": "public",
+      "attempted_at": "2026-10-28T01:41:20.004567+00:00",
+      "success_at": "2026-10-28T01:41:20.004589+00:00",
+      "status": "partial",
+      "saved": 61
+    },
+    {
+      "source": "yuketang",
+      "attempted_at": "2026-10-27T23:10:31.776100+00:00",
+      "success_at": "2026-10-27T23:10:31.776122+00:00",
+      "status": "partial",
+      "saved": 18
+    }
+  ],
+  "auth": [
+    {
+      "source": "mystu",
+      "status": "session_saved",
+      "verified_live": false
+    }
+  ],
+  "content_trust": "untrusted_source_data"
+}

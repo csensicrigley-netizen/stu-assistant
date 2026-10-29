@@ -1,0 +1,97 @@
+{
+  "_comment": "合成样例：refresh_source(source='mystu') 的原始返回（app.py:116-118；coverage 键顺序见 mystu/service.py:15-27, 81-82；errors[] 项为 collection.py:20-26 的 {part, stage, course_id?, item_id?, ...错误结构}）。这里集中表达 complete=false：inventory_complete=false（课程清单分页不完整，或有课程缺年份/学期，mystu/parser.py:146-148）、course_snapshot_complete=false、complete_activity_courses < selected_courses、limited=true、status='partial'；课程活动失败、作业详情要求登录、日程读取超时三种局部失败都不会让整体 ok=false。【形状推断】network 字段里 failure_layer='read' 的取值来自 network.py:52-64、312-313 的分支，具体组合待真实样本核对。",
+  "ok": true,
+  "status": "partial",
+  "source": "mystu",
+  "saved": 41,
+  "limited": true,
+  "coverage": {
+    "scope": "latest_term",
+    "max_courses": 20,
+    "activities_per_course": 50,
+    "detail_limit": 20,
+    "semester": "2026-1",
+    "inventory_complete": false,
+    "selected_courses": 10,
+    "complete_activity_courses": 7,
+    "course_snapshot_complete": false
+  },
+  "errors": [
+    {
+      "part": "作业详情",
+      "stage": "task_detail",
+      "course_id": "20936",
+      "item_id": "mystu:task:d352a467d9b732513a1b0f77",
+      "ok": false,
+      "status": "resource_login_required",
+      "message": "此活动返回登录页；不能据此判断整个 MySTU 会话失效，请先核对该活动原页面。",
+      "source": "mystu",
+      "retryable": false,
+      "next_action": "open_source_page"
+    },
+    {
+      "part": "课程活动",
+      "stage": "course_activities",
+      "course_id": "20939",
+      "ok": false,
+      "status": "schema_changed",
+      "message": "MySTU 活动字段发生变化。",
+      "source": "mystu",
+      "retryable": false,
+      "next_action": "report_source_change"
+    },
+    {
+      "part": "个人日程",
+      "stage": "schedule",
+      "ok": false,
+      "status": "request_timeout",
+      "message": "此端点未能完成直连。请检查该来源的 DNS、网络路由或校园接入条件；其他来源仍可使用。",
+      "source": "mystu",
+      "retryable": true,
+      "next_action": "retry_later",
+      "network": {
+        "transport": "direct",
+        "failure_layer": "read",
+        "cached_failure": false,
+        "automatic_proxy_fallback": false
+      }
+    }
+  ],
+  "freshness": [
+    {
+      "source": "jw",
+      "attempted_at": "2026-10-28T01:55:12.402871+00:00",
+      "success_at": "2026-10-28T01:55:12.402905+00:00",
+      "status": "partial",
+      "saved": 47
+    },
+    {
+      "source": "mystu",
+      "attempted_at": "2026-10-28T01:50:03.120334+00:00",
+      "success_at": "2026-10-28T01:50:03.120351+00:00",
+      "status": "partial",
+      "saved": 41
+    },
+    {
+      "source": "oa",
+      "attempted_at": "2026-10-28T01:40:44.900112+00:00",
+      "success_at": "2026-10-27T13:02:10.551900+00:00",
+      "status": "oa_unavailable",
+      "saved": 0
+    },
+    {
+      "source": "public",
+      "attempted_at": "2026-10-28T01:41:20.004567+00:00",
+      "success_at": "2026-10-28T01:41:20.004589+00:00",
+      "status": "partial",
+      "saved": 61
+    },
+    {
+      "source": "yuketang",
+      "attempted_at": "2026-10-27T23:10:31.776100+00:00",
+      "success_at": "2026-10-27T23:10:31.776122+00:00",
+      "status": "partial",
+      "saved": 18
+    }
+  ]
+}

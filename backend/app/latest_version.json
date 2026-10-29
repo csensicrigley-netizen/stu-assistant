@@ -1,0 +1,13 @@
+{
+  "versionName": "1.0.24",
+  "versionCode": 25,
+  "apk": "/download/stu-assistant.apk",
+  "notes": [
+    "充电桩设备名全部按机身二维码重核：修掉「明德书院」这类根本不存在的地点，补上教师宿舍",
+    "没有数据的设备不再显示 0/20 假读数，改成「暂无数据」并说明原因",
+    "主页开场动画（藤蔓/绕飞入书/涨潮鱼）+ 每 5 秒彩虹光"
+  ],
+  "mandatory": false,
+  "releasedAt": "2026-10-29T18:12:00",
+  "minSupported": "1.0.0"
+}

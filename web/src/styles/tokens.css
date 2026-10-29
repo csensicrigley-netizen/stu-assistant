@@ -1,0 +1,302 @@
+/* ==========================================================================
+   STU 事项助手 · design tokens
+   --------------------------------------------------------------------------
+   温柔可爱的一套：樱花奶纸 + 梅子墨字，一个冷冷的香芋紫信号（链接、选中），
+   一个暖暖的蜜桃珊瑚信号（"现在"和到期），外加薄荷（正向）和奶油杏（提醒）。
+   其余全是中性色，课程 7 色是屏幕上唯一的其他色相。
+
+   Every pair below that carries text was checked for WCAG 2.2 AA; the audit
+   script re-measures the rendered pages.
+   ========================================================================== */
+
+@font-face {
+  font-family: "Schibsted Grotesk";
+  src: url("/fonts/schibsted-grotesk-latin-400-700.woff2") format("woff2");
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+  /* Latin + digits only; Chinese falls through to the system face. The colon
+     (U+003A) is left out on purpose: Schibsted's colon carries wide side
+     bearings that turn "10:00" into "10 : 00". */
+  unicode-range: U+0000-0039, U+003B-00FF, U+2010-2027, U+2030-205E, U+2190-2193, U+2212;
+}
+
+:root {
+  color-scheme: light;
+
+  /* ---------- type ---------- */
+  --font-num: "Schibsted Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-ui: "Schibsted Grotesk", -apple-system, BlinkMacSystemFont, "PingFang SC",
+    "HarmonyOS Sans SC", "MiSans", "HONOR Sans CN", "Noto Sans SC", "Noto Sans CJK SC",
+    "Source Han Sans SC", "Microsoft YaHei UI", "Microsoft YaHei", sans-serif;
+
+  --fs-11: 0.6875rem;
+  --fs-12: 0.75rem;
+  --fs-13: 0.8125rem;
+  --fs-14: 0.875rem;
+  --fs-16: 1rem;
+  --fs-18: 1.125rem;
+  --fs-20: 1.25rem;
+  --fs-24: 1.5rem;
+  --fs-30: 1.875rem;
+  --fs-44: 2.75rem;
+
+  --lh-tight: 1.2;
+  --lh-head: 1.35;
+  --lh-body: 1.6;
+
+  /* ---------- space (4pt) ---------- */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 20px;
+  --s-6: 24px;
+  --s-8: 32px;
+  --s-10: 40px;
+  --s-14: 56px;
+
+  --gutter: 20px;
+  --page-max: 600px;
+
+  /* ---------- radius ---------- */
+  --r-sm: 10px;
+  --r-md: 14px;
+  --r-lg: 20px;
+  --r-xl: 28px;
+  --r-full: 999px;
+
+  /* ---------- motion ---------- */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-std: cubic-bezier(0.2, 0, 0, 1);
+  /* 果冻：尾段带一点过冲再收住。CSS 里做回弹只能靠这条曲线，
+     真正的手感交给 motion 的弹簧；这里给纯 CSS 交互（按下/滑入）用。 */
+  --ease-jelly: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-glide: cubic-bezier(0.32, 0.72, 0, 1);
+  --t-fast: 120ms;
+  --t-base: 220ms;
+  --t-slow: 420ms;
+  --t-jelly: 360ms;
+
+  /* ---------- safe areas (the demo shell overrides these) ---------- */
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --tabbar-h: 64px;
+
+  /* ---------- light ---------- */
+  --bg: oklch(96.9% 0.018 16); /* 樱花奶纸 */
+  --surface: oklch(99.6% 0.004 18);
+  --surface-2: oklch(95% 0.018 18);
+  --surface-3: oklch(91.8% 0.022 18);
+  --line: oklch(90.1% 0.016 18);
+  --line-strong: oklch(80.5% 0.022 18);
+
+  --ink: oklch(26% 0.035 355); /* 梅子墨 */
+  --ink-2: oklch(41% 0.028 355);
+  --ink-3: oklch(49% 0.024 355);
+  --ink-inverse: oklch(99.4% 0.005 18);
+
+  --sea: oklch(52% 0.15 288); /* 香芋紫 */
+  --sea-ink: oklch(99.4% 0.005 288);
+  --sea-soft: oklch(94.2% 0.035 288);
+  --sea-soft-ink: oklch(40% 0.13 288);
+
+  --cinnabar: oklch(56% 0.15 22); /* 蜜桃珊瑚 */
+  --cinnabar-soft: oklch(94.6% 0.028 22);
+  --cinnabar-ink: oklch(45% 0.14 22);
+
+  --leaf: oklch(49% 0.09 168); /* 薄荷 */
+  --leaf-soft: oklch(94.6% 0.033 168);
+  --amber: oklch(50% 0.09 78); /* 奶油杏 */
+  --amber-soft: oklch(95% 0.04 82);
+
+  --shadow-1: 0 1px 2px oklch(35% 0.05 340 / 0.05), 0 2px 8px -4px oklch(35% 0.05 340 / 0.08);
+  --shadow-2: 0 2px 6px oklch(35% 0.05 340 / 0.05), 0 18px 40px -16px oklch(35% 0.05 340 / 0.22);
+  --scrim: oklch(28% 0.05 340 / 0.42);
+  --bar-bg: oklch(99.4% 0.006 18 / 0.86);
+
+  /* ---------- brand: the welcome panel and the mark ---------- */
+  --brand-bg: linear-gradient(160deg, #8d76e0, #4f3f8f);
+  --brand-glow-a: oklch(80% 0.11 305 / 0.55);
+  --brand-glow-b: oklch(84% 0.09 25 / 0.45);
+  --brand-ink: #fff7f4;
+  --brand-ink-2: oklch(96% 0.012 20);
+  --brand-ink-3: oklch(95% 0.02 20);
+  --brand-bead: #ff9d7e;
+  --brand-shadow: oklch(25% 0.08 300 / 0.55);
+  --logo-hi: #9d8bf2;
+  --logo-lo: #6a55b0;
+  --logo-paper: #fff7f4;
+  --logo-bead: #ff9d7e;
+  --logo-glow: oklch(45% 0.12 290 / 0.26);
+  --logo-shadow: oklch(30% 0.1 320 / 0.4);
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg: oklch(21.5% 0.022 330); /* 深夜梅 */
+  --surface: oklch(25.5% 0.024 330);
+  --surface-2: oklch(29.5% 0.026 330);
+  --surface-3: oklch(33.5% 0.028 330);
+  --line: oklch(34.5% 0.024 330);
+  --line-strong: oklch(45.5% 0.03 330);
+
+  --ink: oklch(96% 0.008 30);
+  --ink-2: oklch(84% 0.016 20);
+  --ink-3: oklch(75% 0.018 20);
+  --ink-inverse: oklch(24% 0.022 330);
+
+  --sea: oklch(80% 0.1 288);
+  --sea-ink: oklch(22% 0.05 288);
+  --sea-soft: oklch(32% 0.045 288);
+  --sea-soft-ink: oklch(88% 0.06 288);
+
+  --cinnabar: oklch(78% 0.1 22);
+  --cinnabar-soft: oklch(32% 0.045 22);
+  --cinnabar-ink: oklch(88% 0.06 22);
+
+  --leaf: oklch(80% 0.08 168);
+  --leaf-soft: oklch(31% 0.04 168);
+  --amber: oklch(85% 0.08 82);
+  --amber-soft: oklch(32% 0.04 82);
+
+  --shadow-1: 0 1px 2px oklch(0% 0 0 / 0.3);
+  --shadow-2: 0 2px 6px oklch(0% 0 0 / 0.3), 0 24px 48px -20px oklch(0% 0 0 / 0.6);
+  --scrim: oklch(8% 0.02 328 / 0.62);
+  --bar-bg: oklch(25% 0.022 330 / 0.86);
+}
+
+/* Course colours. A custom property that references var() is resolved where it
+   is declared, so the recipe must be declared on every element that sets --h
+   (inline style) — declaring it on :root would freeze one hue for all. */
+:root,
+[style*="--h"],
+.now {
+  --course-mark: oklch(63% 0.11 var(--h, 288));
+  --course-soft: oklch(96.2% 0.03 var(--h, 288));
+  --course-mid: oklch(88.5% 0.06 var(--h, 288));
+  --course-ink: oklch(38% 0.09 var(--h, 288));
+}
+
+[data-theme="dark"],
+[data-theme="dark"] [style*="--h"],
+[data-theme="dark"] .now {
+  --course-mark: oklch(73% 0.1 var(--h, 288));
+  --course-soft: oklch(27% 0.035 var(--h, 288));
+  --course-mid: oklch(44% 0.065 var(--h, 288));
+  --course-ink: oklch(90% 0.05 var(--h, 288));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --t-fast: 1ms;
+    --t-base: 1ms;
+    --t-slow: 1ms;
+    --t-jelly: 1ms;
+  }
+}
+
+/* ==========================================================================
+   经典色系（海蓝 + 朱）—— 最早那套，作为可选色系原样保留
+   <html data-palette="classic">。默认是上面的樱粉。
+   ========================================================================== */
+
+[data-palette="classic"] {
+  --bg: oklch(97.4% 0.007 85);
+  --surface: oklch(99.5% 0.003 85);
+  --surface-2: oklch(94.6% 0.008 85);
+  --surface-3: oklch(91.5% 0.01 85);
+  --line: oklch(89.5% 0.009 85);
+  --line-strong: oklch(80% 0.012 85);
+
+  --ink: oklch(22% 0.022 262);
+  --ink-2: oklch(40% 0.02 262);
+  --ink-3: oklch(50% 0.016 262);
+  --ink-inverse: oklch(98% 0.004 85);
+
+  --sea: oklch(48% 0.17 258);
+  --sea-ink: oklch(99% 0.004 258);
+  --sea-soft: oklch(93.5% 0.035 258);
+  --sea-soft-ink: oklch(38% 0.15 258);
+
+  --cinnabar: oklch(55% 0.18 32);
+  --cinnabar-soft: oklch(94% 0.03 32);
+  --cinnabar-ink: oklch(45% 0.16 32);
+
+  --leaf: oklch(48% 0.11 155);
+  --leaf-soft: oklch(94% 0.035 155);
+  --amber: oklch(48% 0.1 70);
+  --amber-soft: oklch(94.5% 0.045 85);
+
+  --shadow-1: 0 1px 2px oklch(20% 0.02 262 / 0.05), 0 2px 8px -4px oklch(20% 0.02 262 / 0.08);
+  --shadow-2: 0 2px 6px oklch(20% 0.02 262 / 0.05), 0 18px 40px -16px oklch(20% 0.02 262 / 0.22);
+  --scrim: oklch(18% 0.02 262 / 0.42);
+  --bar-bg: oklch(99% 0.004 85 / 0.86);
+
+  --brand-bg: linear-gradient(160deg, #1f63cc, #0a2c74);
+  --brand-glow-a: oklch(70% 0.14 250 / 0.55);
+  --brand-glow-b: oklch(70% 0.15 40 / 0.35);
+  --brand-ink: #f9f6f1;
+  --brand-ink-2: oklch(92% 0.02 255);
+  --brand-ink-3: oklch(90% 0.04 230);
+  --brand-bead: #f5714e;
+  --brand-shadow: oklch(5% 0.05 260 / 0.6);
+  --logo-hi: #2a7ae0;
+  --logo-lo: #0b3586;
+  --logo-paper: #f9f6f1;
+  --logo-bead: #f5714e;
+  --logo-glow: oklch(30% 0.12 258 / 0.3);
+  --logo-shadow: oklch(10% 0.08 260 / 0.45);
+}
+
+[data-theme="dark"][data-palette="classic"] {
+  --bg: oklch(16.5% 0.012 262);
+  --surface: oklch(20.5% 0.014 262);
+  --surface-2: oklch(24.5% 0.016 262);
+  --surface-3: oklch(28.5% 0.017 262);
+  --line: oklch(29% 0.016 262);
+  --line-strong: oklch(40% 0.018 262);
+
+  --ink: oklch(95.5% 0.006 85);
+  --ink-2: oklch(80% 0.012 262);
+  --ink-3: oklch(70% 0.012 262);
+  --ink-inverse: oklch(18% 0.014 262);
+
+  --sea: oklch(74% 0.13 258);
+  --sea-ink: oklch(17% 0.03 258);
+  --sea-soft: oklch(30% 0.06 258);
+  --sea-soft-ink: oklch(86% 0.08 258);
+
+  --cinnabar: oklch(72% 0.15 35);
+  --cinnabar-soft: oklch(30% 0.06 32);
+  --cinnabar-ink: oklch(82% 0.1 35);
+
+  --leaf: oklch(76% 0.12 155);
+  --leaf-soft: oklch(29% 0.05 155);
+  --amber: oklch(82% 0.11 80);
+  --amber-soft: oklch(30% 0.05 80);
+
+  --shadow-1: 0 1px 2px oklch(0% 0 0 / 0.3);
+  --shadow-2: 0 2px 6px oklch(0% 0 0 / 0.3), 0 24px 48px -20px oklch(0% 0 0 / 0.6);
+  --scrim: oklch(5% 0.01 262 / 0.6);
+  --bar-bg: oklch(19% 0.014 262 / 0.86);
+}
+
+[data-palette="classic"],
+[data-palette="classic"] [style*="--h"],
+[data-palette="classic"] .now {
+  --course-mark: oklch(60% 0.13 var(--h, 258));
+  --course-soft: oklch(95% 0.032 var(--h, 258));
+  --course-mid: oklch(87% 0.07 var(--h, 258));
+  --course-ink: oklch(36% 0.1 var(--h, 258));
+}
+
+[data-theme="dark"][data-palette="classic"],
+[data-theme="dark"][data-palette="classic"] [style*="--h"],
+[data-theme="dark"][data-palette="classic"] .now {
+  --course-mark: oklch(70% 0.12 var(--h, 258));
+  --course-soft: oklch(26% 0.04 var(--h, 258));
+  --course-mid: oklch(42% 0.08 var(--h, 258));
+  --course-ink: oklch(88% 0.06 var(--h, 258));
+}

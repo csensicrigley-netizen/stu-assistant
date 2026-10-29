@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=5"
+    />
+    <meta name="theme-color" content="#f9f6f1" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="STU 助手" />
+    <meta name="description" content="下一节课在哪，作业几点截止。教务、MySTU 和学校通知收在一处，按教务处官方作息计算每节课的时间。" />
+    <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+    <link rel="icon" href="./favicon-32.png" type="image/png" sizes="32x32" />
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+    <link rel="preload" href="./fonts/schibsted-grotesk-latin-400-700.woff2" as="font" type="font/woff2" crossorigin />
+    <title>STU 事项助手</title>
+    <script>
+      // Theme + palette before first paint: no flash of the wrong background.
+      try {
+        var q = new URLSearchParams(location.search).get("theme");
+        var saved = q || localStorage.getItem("stu.theme") || "system";
+        var dark = saved === "dark" || (saved === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
+        document.documentElement.dataset.theme = dark ? "dark" : "light";
+        var pal =
+          new URLSearchParams(location.search).get("palette") || localStorage.getItem("stu.palette") || "sweet";
+        if (pal !== "classic") pal = "sweet";
+        document.documentElement.dataset.palette = pal;
+        document
+          .querySelector('meta[name="theme-color"]')
+          .setAttribute(
+            "content",
+            pal === "classic" ? (dark ? "#0b0e14" : "#f9f6f1") : dark ? "#1b1518" : "#fffbfb",
+          );
+      } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

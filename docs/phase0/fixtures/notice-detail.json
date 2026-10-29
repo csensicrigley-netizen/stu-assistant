@@ -1,0 +1,29 @@
+{
+  "_comment": "合成样例：get_notice(item_id=<oa 990102>, refresh=true) 的原始返回（app.py:262-275）。这条记录的 url 指向 WebVPN，所以读正文和附件都走 WebVPN 会话；没有 WebVPN 登录时返回 needs_login 或 login_expired，见 errors.json。refresh=true 时 cached=false，collected_at 与 detail_collected_at 都更新为本次时间（store.py:72-75）。body 最长 60000 字；附件最多 30 个。",
+  "ok": true,
+  "item": {
+    "id": "oa:notice:a4043832a2b337f860d47397",
+    "kind": "notice",
+    "docid": "990102",
+    "title": "关于做好 2026-2027 学年第一学期期末考试组织工作的通知（合成）",
+    "url": "https://oa-stu-edu-cn.webvpn.stu.edu.cn/newstemplateprotal.jsp?templatetype=1&templateid=3&docid=990102",
+    "department": "教务处",
+    "published_at": "2026.10.24",
+    "source": "oa",
+    "collected_at": "2026-10-28T02:10:05.441300+00:00",
+    "body": "各学院：根据学校安排，2026-2027 学年第一学期期末考试将于第 19–20 周进行。请各学院于 11 月 20 日前完成考试安排核对（合成正文）。",
+    "attachments": [
+      {
+        "name": "2026-2027学年第一学期期末考试安排表（合成）.pdf",
+        "url": "https://oa-stu-edu-cn.webvpn.stu.edu.cn/weaver/weaver.file.FileDownload?fileid=880011&download=1&requestid=0"
+      },
+      {
+        "name": "考场规则说明（合成）.txt",
+        "url": "https://oa-stu-edu-cn.webvpn.stu.edu.cn/weaver/weaver.file.FileDownload?fileid=880012&download=1&requestid=0"
+      }
+    ],
+    "detail_collected_at": "2026-10-28T02:10:05.441300+00:00"
+  },
+  "cached": false,
+  "content_trust": "untrusted_source_data"
+}

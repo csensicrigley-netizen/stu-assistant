@@ -1,0 +1,134 @@
+{
+  "_comment": "合成样例：get_charging_device(device_code='4GR00008490', refresh=false) 的原始返回（charging/service.py:116-121）。只读本机缓存，样本已有 420 秒，超过 120 秒，且没有错误，所以 status='stale'、stale=true、cached=true（service.py:31-35）；信封 status='partial'。ports 覆盖完整的状态枚举：1 空闲、2 占用、0 粘连故障、3 开路故障、5 过温保护，以及没有登记的 state=9 → label='未知状态'，它计入 unknown（parser.py:262-279）。7、15 号口平台没有返回，所以 observed=18、ports_complete=false，unknown 包含这 2 个缺失口。插座状态均为虚构。",
+  "ok": true,
+  "status": "partial",
+  "source": "charging",
+  "official": false,
+  "provider": "isfdz",
+  "content_trust": "untrusted_source_data",
+  "queried_at": "2026-10-28T02:20:00.517700+00:00",
+  "stale": true,
+  "cached": true,
+  "cache_ttl_seconds": 60,
+  "stale_after_seconds": 120,
+  "errors": [],
+  "device": {
+    "device_code": "4GR00008490",
+    "name": "思源书院 SY-1",
+    "location": "思源书院",
+    "expected_port_count": 20,
+    "registry_verified_on": "2026-10-16",
+    "source_url": "https://wx.isfdz.com/charge/enter/4GR00008490",
+    "device_type": 2,
+    "ports": [
+      {
+        "num": 1,
+        "state": 1,
+        "label": "空闲"
+      },
+      {
+        "num": 2,
+        "state": 2,
+        "label": "占用"
+      },
+      {
+        "num": 3,
+        "state": 1,
+        "label": "空闲"
+      },
+      {
+        "num": 4,
+        "state": 1,
+        "label": "空闲"
+      },
+      {
+        "num": 5,
+        "state": 2,
+        "label": "占用"
+      },
+      {
+        "num": 6,
+        "state": 2,
+        "label": "占用"
+      },
+      {
+        "num": 8,
+        "state": 1,
+        "label": "空闲"
+      },
+      {
+        "num": 9,
+        "state": 1,
+        "label": "空闲"
+      },
+      {
+        "num": 10,
+        "state": 1,
+        "label": "空闲"
+      },
+      {
+        "num": 11,
+        "state": 2,
+        "label": "占用"
+      },
+      {
+        "num": 12,
+        "state": 0,
+        "label": "粘连故障"
+      },
+      {
+        "num": 13,
+        "state": 3,
+        "label": "开路故障"
+      },
+      {
+        "num": 14,
+        "state": 1,
+        "label": "空闲"
+      },
+      {
+        "num": 16,
+        "state": 5,
+        "label": "过温保护"
+      },
+      {
+        "num": 17,
+        "state": 1,
+        "label": "空闲"
+      },
+      {
+        "num": 18,
+        "state": 1,
+        "label": "空闲"
+      },
+      {
+        "num": 19,
+        "state": 9,
+        "label": "未知状态"
+      },
+      {
+        "num": 20,
+        "state": 2,
+        "label": "占用"
+      }
+    ],
+    "counts": {
+      "total": 20,
+      "observed": 18,
+      "free": 9,
+      "occupied": 5,
+      "fault": 3,
+      "unknown": 3
+    },
+    "ports_complete": false,
+    "collected_at": "2026-10-28T02:13:00.004410+00:00",
+    "status": "stale",
+    "online": null,
+    "last_attempt_at": "2026-10-28T02:12:59.700300+00:00",
+    "cached": true,
+    "stale": true,
+    "cache_age_seconds": 420,
+    "retained_from_cache": false,
+    "error": null
+  }
+}

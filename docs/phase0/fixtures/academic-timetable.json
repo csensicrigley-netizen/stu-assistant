@@ -1,0 +1,633 @@
+{
+  "_comment": "合成样例：get_academic_timetable(semester='') 的原始返回形状（features/jw/service.py:56-58 + features/jw/timetable.py:330-338）。所有课程名、教师、教室、班级、通知单编号均为虚构；id 按 parsing.py:18-20 的规则用虚构输入真实计算。覆盖：① 最长课名（≥20 字，马原专题）；② 同名不同班（大学英语（三）-03班 / -07班，course id 不同）；③ 离散周次 1,3,5-9；④ 单双周两种原文写法 3-17(单周) 与 4-18(周)(双)，同一时段单周风雨球馆、双周游泳馆；⑤ 跨大节连排：线性代数周一 6-7 节与 8-9 节，stu-mcp 输出为两个 meeting（timetable.py:286-287），合并要前端做；⑥ 第 0 节：大学物理 periods=[8,9,10]；⑦ 晚上 A–C 节：影视鉴赏 periods=[11,12,13]；⑧ 多教师多教室：数据结构周四同格按周次拆给林知远/顾北辰两间教室，另有离散节次 [03-05节] 拆成 [3] 与 [5] 两个 meeting；⑨ 位置三种拼法（room 以楼名开头只取 room、否则 building+空格+room、building 与 room 都空时 location 为空串）；⑩ 未排课 unarranged 2 门（其中 1 门两位教师）；⑪ 待核实项：周临川在明细里有、网格里没有 → unplaced_details + pending 两条 + coverage.complete=false + status=partial。【形状推断】节次整数 10/11/12/13 对应官方小节 0/A/B/C 是推断：源码只接受 1–30 的数字小节（timetable.py:152,169-171），未定义 0/A–C 的编码，网格行 '第四大节 (08,09,10小节)'、'第五大节 (11,12,13小节)' 也是推断，待真实样本核对。exam/校历/节次时刻均不在此返回中。",
+  "ok": true,
+  "status": "partial",
+  "source": "jw",
+  "source_url": "https://jw.stu.edu.cn/jsxsd/xskb/xskb_list.do",
+  "checked_at": "2026-10-28T02:03:04.512345+00:00",
+  "transport": "https",
+  "cached": false,
+  "content_trust": "untrusted_source_data",
+  "semester": "2026-2027-1",
+  "available_semesters": [
+    {
+      "semester": "2026-2027-1",
+      "label": "2026-2027-1"
+    },
+    {
+      "semester": "2025-2026-3",
+      "label": "2025-2026-3"
+    },
+    {
+      "semester": "2025-2026-2",
+      "label": "2025-2026-2"
+    },
+    {
+      "semester": "2025-2026-1",
+      "label": "2025-2026-1"
+    }
+  ],
+  "courses": [
+    {
+      "id": "jw:timetable:2153587c0df92f3b5f5768b1",
+      "title": "马克思主义基本原理与当代中国社会发展前沿问题专题研讨（含社会实践环节）",
+      "course_code": "MX2026001",
+      "class_name": "马原-2026-05班",
+      "teachers": [
+        "林知远"
+      ],
+      "meetings": [
+        {
+          "id": "jw:meeting:11fba5e0b4a6294ae6a5bdf3",
+          "weekday": 2,
+          "weeks": [
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18
+          ],
+          "periods": [
+            3,
+            4,
+            5
+          ],
+          "teacher": "林知远",
+          "location": "E座 9-301",
+          "building": "E座",
+          "room": "E座 9-301",
+          "raw_time": "3-18(周)[03-04-05节]",
+          "notes": "",
+          "online_info": ""
+        }
+      ],
+      "teacher": "林知远"
+    },
+    {
+      "id": "jw:timetable:2abdc3dfcf31d16796338888",
+      "title": "数据结构与算法",
+      "course_code": "CS2302",
+      "class_name": "数据结构与算法-01班",
+      "teachers": [
+        "周临川",
+        "林知远",
+        "顾北辰"
+      ],
+      "meetings": [
+        {
+          "id": "jw:meeting:87f19cd68d73e8f0f5695c53",
+          "weekday": 4,
+          "weeks": [
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10
+          ],
+          "periods": [
+            3,
+            4
+          ],
+          "teacher": "林知远",
+          "location": "E座 9-101",
+          "building": "E座",
+          "room": "E座 9-101",
+          "raw_time": "3-10(周)[03-04节]",
+          "notes": "",
+          "online_info": ""
+        },
+        {
+          "id": "jw:meeting:e89983dae0febb706928e965",
+          "weekday": 4,
+          "weeks": [
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18
+          ],
+          "periods": [
+            3,
+            4
+          ],
+          "teacher": "顾北辰",
+          "location": "E座 9-102",
+          "building": "E座",
+          "room": "E座 9-102",
+          "raw_time": "11-18(周)[03-04节]",
+          "notes": "",
+          "online_info": ""
+        },
+        {
+          "id": "jw:meeting:e464de383d109d6af70c25d7",
+          "weekday": 5,
+          "weeks": [
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18
+          ],
+          "periods": [
+            3
+          ],
+          "teacher": "顾北辰",
+          "location": "E座 9-101",
+          "building": "E座",
+          "room": "E座 9-101",
+          "raw_time": "3-18(周)[03-05节]",
+          "notes": "",
+          "online_info": "雨课堂同步直播（合成）"
+        },
+        {
+          "id": "jw:meeting:fc77544c127941f179510d2b",
+          "weekday": 5,
+          "weeks": [
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18
+          ],
+          "periods": [
+            5
+          ],
+          "teacher": "顾北辰",
+          "location": "E座 9-101",
+          "building": "E座",
+          "room": "E座 9-101",
+          "raw_time": "3-18(周)[03-05节]",
+          "notes": "",
+          "online_info": "雨课堂同步直播（合成）"
+        }
+      ],
+      "teacher": "周临川、林知远、顾北辰"
+    },
+    {
+      "id": "jw:timetable:2c99768120ee4d39c275a1d5",
+      "title": "大学物理（上）",
+      "course_code": "PH1102",
+      "class_name": "大学物理（上）-02班",
+      "teachers": [
+        "何以宁"
+      ],
+      "meetings": [
+        {
+          "id": "jw:meeting:a545ef7d47926731fa0cee1b",
+          "weekday": 3,
+          "weeks": [
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18
+          ],
+          "periods": [
+            8,
+            9,
+            10
+          ],
+          "teacher": "何以宁",
+          "location": "理科楼 理9-203",
+          "building": "理科楼",
+          "room": "理9-203",
+          "raw_time": "3-18(周)[08-09-10节]",
+          "notes": "",
+          "online_info": ""
+        }
+      ],
+      "teacher": "何以宁"
+    },
+    {
+      "id": "jw:timetable:2d463bf00b7827c2d8f16b37",
+      "title": "体育（三）-羽毛球",
+      "course_code": "PE2004",
+      "class_name": "体育（三）-羽毛球-02班",
+      "teachers": [
+        "宋一帆"
+      ],
+      "meetings": [
+        {
+          "id": "jw:meeting:24974fbe61f72816e2003f1c",
+          "weekday": 5,
+          "weeks": [
+            3,
+            5,
+            7,
+            9,
+            11,
+            13,
+            15,
+            17
+          ],
+          "periods": [
+            6,
+            7
+          ],
+          "teacher": "宋一帆",
+          "location": "风雨球馆",
+          "building": "",
+          "room": "风雨球馆",
+          "raw_time": "3-17(单周)[06-07节]",
+          "notes": "",
+          "online_info": ""
+        },
+        {
+          "id": "jw:meeting:14e09dce338b6ddf11b07960",
+          "weekday": 5,
+          "weeks": [
+            4,
+            6,
+            8,
+            10,
+            12,
+            14,
+            16,
+            18
+          ],
+          "periods": [
+            6,
+            7
+          ],
+          "teacher": "宋一帆",
+          "location": "游泳馆（东侧）",
+          "building": "",
+          "room": "游泳馆（东侧）",
+          "raw_time": "4-18(周)(双)[06-07节]",
+          "notes": "双周改在游泳馆上课（合成备注）",
+          "online_info": ""
+        }
+      ],
+      "teacher": "宋一帆"
+    },
+    {
+      "id": "jw:timetable:3c8b3bae21fede2b6fe38a3c",
+      "title": "形势与政策（四）",
+      "course_code": "GE1001",
+      "class_name": "形势与政策（四）-12班",
+      "teachers": [
+        "韩知秋"
+      ],
+      "meetings": [
+        {
+          "id": "jw:meeting:1cff95505c3c370d358fd675",
+          "weekday": 4,
+          "weeks": [
+            9,
+            13
+          ],
+          "periods": [
+            11,
+            12
+          ],
+          "teacher": "韩知秋",
+          "location": "",
+          "building": "",
+          "room": "",
+          "raw_time": "9,13(周)[11-12节]",
+          "notes": "",
+          "online_info": "线上授课，链接见课程群（合成）"
+        }
+      ],
+      "teacher": "韩知秋"
+    },
+    {
+      "id": "jw:timetable:43721ec418aae4e0d4b4d9fe",
+      "title": "影视鉴赏与批评",
+      "course_code": "AR3001",
+      "class_name": "影视鉴赏与批评-01班",
+      "teachers": [
+        "苏念白"
+      ],
+      "meetings": [
+        {
+          "id": "jw:meeting:47913f66eece7db3d749cac1",
+          "weekday": 2,
+          "weeks": [
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10
+          ],
+          "periods": [
+            11,
+            12,
+            13
+          ],
+          "teacher": "苏念白",
+          "location": "讲堂九",
+          "building": "",
+          "room": "讲堂九",
+          "raw_time": "3-10(周)[11-12-13节]",
+          "notes": "期中周停课一次，以学院通知为准（合成）",
+          "online_info": ""
+        }
+      ],
+      "teacher": "苏念白"
+    },
+    {
+      "id": "jw:timetable:4d37fd15c4d7beea87b34293",
+      "title": "大学英语（三）",
+      "course_code": "EN1003",
+      "class_name": "大学英语（三）-03班",
+      "teachers": [
+        "陈语桐"
+      ],
+      "meetings": [
+        {
+          "id": "jw:meeting:c1877fcc682c9a480ee20063",
+          "weekday": 1,
+          "weeks": [
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18
+          ],
+          "periods": [
+            1,
+            2
+          ],
+          "teacher": "陈语桐",
+          "location": "D座 9-102",
+          "building": "D座",
+          "room": "9-102",
+          "raw_time": "3-18(周)[01-02节]",
+          "notes": "",
+          "online_info": ""
+        }
+      ],
+      "teacher": "陈语桐"
+    },
+    {
+      "id": "jw:timetable:63d849193abd645c8caa2c91",
+      "title": "线性代数",
+      "course_code": "MA2201",
+      "class_name": "线性代数-04班",
+      "teachers": [
+        "郑可言"
+      ],
+      "meetings": [
+        {
+          "id": "jw:meeting:0728d587cb421b72bc0b99b9",
+          "weekday": 1,
+          "weeks": [
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18
+          ],
+          "periods": [
+            6,
+            7
+          ],
+          "teacher": "郑可言",
+          "location": "E座 9-412",
+          "building": "E座",
+          "room": "E座 9-412",
+          "raw_time": "3-18(周)[06-07节]",
+          "notes": "",
+          "online_info": ""
+        },
+        {
+          "id": "jw:meeting:bb6c4c90fde2acc0f743ee04",
+          "weekday": 1,
+          "weeks": [
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18
+          ],
+          "periods": [
+            8,
+            9
+          ],
+          "teacher": "郑可言",
+          "location": "E座 9-412",
+          "building": "E座",
+          "room": "E座 9-412",
+          "raw_time": "3-18(周)[08-09节]",
+          "notes": "",
+          "online_info": ""
+        }
+      ],
+      "teacher": "郑可言"
+    },
+    {
+      "id": "jw:timetable:afcd58db0692c7c1d9a3425a",
+      "title": "程序设计基础",
+      "course_code": "CS2101",
+      "class_name": "程序设计基础-01班",
+      "teachers": [
+        "许明澈"
+      ],
+      "meetings": [
+        {
+          "id": "jw:meeting:66384dfa8a9ea1a13f9759eb",
+          "weekday": 4,
+          "weeks": [
+            1,
+            3,
+            5,
+            6,
+            7,
+            8,
+            9
+          ],
+          "periods": [
+            6,
+            7
+          ],
+          "teacher": "许明澈",
+          "location": "计算机中心机房九",
+          "building": "",
+          "room": "计算机中心机房九",
+          "raw_time": "1,3,5-9(周)[06-07节]",
+          "notes": "",
+          "online_info": ""
+        }
+      ],
+      "teacher": "许明澈"
+    },
+    {
+      "id": "jw:timetable:d36eac6f33c058a5754b847b",
+      "title": "大学英语（三）",
+      "course_code": "EN1003",
+      "class_name": "大学英语（三）-07班",
+      "teachers": [
+        "周晚晴"
+      ],
+      "meetings": [
+        {
+          "id": "jw:meeting:b4c2e0337158bfea1c1008f7",
+          "weekday": 3,
+          "weeks": [
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18
+          ],
+          "periods": [
+            1,
+            2
+          ],
+          "teacher": "周晚晴",
+          "location": "D座 9-205",
+          "building": "D座",
+          "room": "9-205",
+          "raw_time": "3-18(周)[01-02节]",
+          "notes": "",
+          "online_info": ""
+        }
+      ],
+      "teacher": "周晚晴"
+    }
+  ],
+  "unarranged": [
+    {
+      "id": "jw:timetable:457029d9d72f2a3033880a07",
+      "title": "毕业论文（设计）",
+      "course_code": "GR4999",
+      "class_name": "毕业论文（设计）-2027届-09组",
+      "teachers": [
+        "导师组（合成）"
+      ]
+    },
+    {
+      "id": "jw:timetable:a2b080c7e7e2ad3c8d4f94ee",
+      "title": "创新创业实践",
+      "course_code": "IE2001",
+      "class_name": "创新创业实践-01班",
+      "teachers": [
+        "江晓舟",
+        "温以南"
+      ]
+    }
+  ],
+  "unplaced_details": [
+    {
+      "course_id": "jw:timetable:2abdc3dfcf31d16796338888",
+      "class_name": "数据结构与算法-01班",
+      "title": "数据结构与算法",
+      "teacher": "周临川"
+    }
+  ],
+  "pending": [
+    "学校列有未排课课程，导出前须确认这些课程的安排。",
+    "部分已排课教师明细没有对应的网格安排，须在学校核对，不能认定这些安排为空。"
+  ],
+  "coverage": {
+    "kind": "theory",
+    "weeks": "all",
+    "complete": false,
+    "course_count": 10,
+    "meeting_count": 15,
+    "grid_arrangements": 14,
+    "unarranged_count": 2,
+    "unplaced_detail_count": 1,
+    "calendar_verified": false,
+    "period_times_verified": false,
+    "experimental_timetable_included": false
+  }
+}

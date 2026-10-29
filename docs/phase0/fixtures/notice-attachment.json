@@ -1,0 +1,9 @@
+{
+  "_comment": "合成样例：read_attachment(item_id=<oa 990102>, index=1) 的原始返回（app.py:277-317）。只支持 PDF（≤100 页）和 text/*、html。text 最长 60000 字，达到上限时 truncated=true。url 是 urljoin 后的绝对地址。扫描版 PDF 返回 attachment_unreadable，其他格式返回 unsupported_attachment，见 errors.json。",
+  "ok": true,
+  "name": "考场规则说明（合成）.txt",
+  "text": "一、考生须提前 15 分钟进入考场。二、开考 15 分钟后不得入场。（合成附件文字）",
+  "url": "https://oa-stu-edu-cn.webvpn.stu.edu.cn/weaver/weaver.file.FileDownload?fileid=880012&download=1&requestid=0",
+  "content_trust": "untrusted_source_data",
+  "truncated": false
+}

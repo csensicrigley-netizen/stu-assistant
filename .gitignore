@@ -1,0 +1,66 @@
+# ---- 依赖与虚拟环境 ----
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+pip-*
+*.egg-info/
+
+# ---- 构建产物 ----
+dist/
+dist-android/
+build/
+.gradle/
+*.tsbuildinfo
+
+# ---- 安卓签名（绝不外传：这是发布身份，泄露等于别人能冒充你发版）----
+android-signing/
+*.jks
+*.keystore
+keystore.properties
+web/android/local.properties
+
+# ---- 发布包 ----
+release/
+*.apk
+*.aab
+*.tar.gz
+
+# ---- 运行期数据 ----
+data/
+*.db
+*.sqlite3
+*.db-wal
+*.db-shm
+tenants/
+logs/
+*.log
+
+# ---- 密钥与配置 ----
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+secrets/
+
+# ---- 编辑器与系统 ----
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# ---- 本地临时 ----
+_bak_before_*/
+_probe/
+tmp/
+*.tmp
+
+# ---- 本地备份 ----
+*.bak*
+*.orig
+

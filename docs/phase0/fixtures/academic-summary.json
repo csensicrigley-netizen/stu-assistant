@@ -1,0 +1,57 @@
+{
+  "_comment": "合成样例：academic_summary(semester='') 的原始返回（app.py:334-361），由 grades.json 的 12 条合成记录按源码规则计算：float(score) 失败的（等级制、''、'待公布'）不计入 weighted_score；gpa 为 null 的不计入 weighted_gpa；credits 必须 >0；补考/重修与原记录逐条计入，不去重（所以 C语言程序设计、大学物理导论各计两次）。course_count 是参与扫描的全部条数，含非数值成绩。value 保留 4 位小数，没有可计入项时为 null。前端必须展示 method 文案，这不是学校官方绩点。",
+  "ok": true,
+  "cached": true,
+  "semester": "all",
+  "course_count": 12,
+  "weighted_score": {
+    "value": 72.619,
+    "included_count": 6,
+    "included_credits": 21.0
+  },
+  "weighted_gpa": {
+    "value": 2.1826,
+    "included_count": 7,
+    "included_credits": 23.0
+  },
+  "method": "按缓存中每条成绩的学分加权；非数值成绩排除，重修/补考逐条计入。不是学校官方绩点认定。",
+  "freshness": [
+    {
+      "source": "jw",
+      "attempted_at": "2026-10-28T01:55:12.402871+00:00",
+      "success_at": "2026-10-28T01:55:12.402905+00:00",
+      "status": "partial",
+      "saved": 47
+    },
+    {
+      "source": "mystu",
+      "attempted_at": "2026-10-28T01:50:03.120334+00:00",
+      "success_at": "2026-10-28T01:50:03.120351+00:00",
+      "status": "partial",
+      "saved": 41
+    },
+    {
+      "source": "oa",
+      "attempted_at": "2026-10-28T01:40:44.900112+00:00",
+      "success_at": "2026-10-27T13:02:10.551900+00:00",
+      "status": "oa_unavailable",
+      "saved": 0
+    },
+    {
+      "source": "public",
+      "attempted_at": "2026-10-28T01:41:20.004567+00:00",
+      "success_at": "2026-10-28T01:41:20.004589+00:00",
+      "status": "partial",
+      "saved": 61
+    },
+    {
+      "source": "yuketang",
+      "attempted_at": "2026-10-27T23:10:31.776100+00:00",
+      "success_at": "2026-10-27T23:10:31.776122+00:00",
+      "status": "partial",
+      "saved": 18
+    }
+  ],
+  "scan_capped": false,
+  "unverified_count": 0
+}

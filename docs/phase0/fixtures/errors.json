@@ -1,0 +1,565 @@
+{
+  "_comment": "合成样例：统一错误结构 {ok:false, status, message, source, retryable, next_action, http_status?, retry_after_seconds?, network?}（runtime.py:24-76）。每个 response 都是原样的工具返回。外层的 examples、tool、scenario 只是本 fixture 用来组织样例的，不是 stu-mcp 的输出。message 逐字取自源码；next_action 和 retryable 按 runtime.py:25-63 计算。注意：① source 可以是 null；② 只有 6 个错误码 retryable=true；③ network.failure_layer 为 dns/tls 时强制 retryable=false；④ 部分失败不会以 ok=false 返回，而是出现在成功结果的 errors[] 里，见末尾 partial_success_example（refresh_source('jw') 成绩成功、考试失败，jw/service.py:26-34）。充电的 device_offline 只出现在 charging.json 的 errors[] 与 items[].error 里。【形状推断】network 对象在命中端点策略时还会多出 endpoint_id、preferred_access 两个字段（network.py:314-315），hint 文案也会换成策略里的提示，本样例用的是无策略的默认分支。",
+  "examples": [
+    {
+      "tool": "get_academic_timetable",
+      "scenario": "从未登录教务（vault.py:54，这里 source 为 null）",
+      "response": {
+        "ok": false,
+        "status": "needs_login",
+        "message": "尚未建立本地登录会话，请打开设置页登录。",
+        "source": null,
+        "retryable": false,
+        "next_action": "open_setup"
+      }
+    },
+    {
+      "tool": "get_grades",
+      "scenario": "缓存为空且 jw 没有会话（app.py:147-150，错误码直接来自 vault.status）",
+      "response": {
+        "ok": false,
+        "status": "needs_login",
+        "message": "此来源还需要本地登录和刷新；其他功能可独立使用。",
+        "source": "jw",
+        "retryable": false,
+        "next_action": "open_setup"
+      }
+    },
+    {
+      "tool": "get_academic_timetable",
+      "scenario": "教务返回登录页（jw/timetable.py:24-26）",
+      "response": {
+        "ok": false,
+        "status": "login_expired",
+        "message": "教务登录已过期，请在设置页重新登录。",
+        "source": "jw",
+        "retryable": false,
+        "next_action": "open_setup"
+      }
+    },
+    {
+      "tool": "get_notice",
+      "scenario": "WebVPN 会话过期，被重定向到门户（network.py:259-264）",
+      "response": {
+        "ok": false,
+        "status": "login_expired",
+        "message": "此来源需要重新登录；请在 MCP 宿主终端运行对应的 stu-mcp login 命令。",
+        "source": "oa",
+        "retryable": false,
+        "next_action": "open_setup"
+      }
+    },
+    {
+      "tool": "get_notice",
+      "scenario": "正文页本身是登录页（notices/parser.py:195-196）",
+      "response": {
+        "ok": false,
+        "status": "needs_login",
+        "message": "正文需要在学校页面登录。",
+        "source": "oa",
+        "retryable": false,
+        "next_action": "open_setup"
+      }
+    },
+    {
+      "tool": "get_campus_card",
+      "scenario": "一卡通页面显示的学号与保存的本人账号不一致（smartcard/parser.py:104-105）",
+      "response": {
+        "ok": false,
+        "status": "session_invalid",
+        "message": "一卡通当前身份与保存的本人账号不符，请重新登录。",
+        "source": "smartcard",
+        "retryable": false,
+        "next_action": "open_setup"
+      }
+    },
+    {
+      "tool": "get_academic_timetable",
+      "scenario": "读取期间换号或退出（jw/service.py:54-55）",
+      "response": {
+        "ok": false,
+        "status": "session_changed",
+        "message": "教务登录在读取期间改变，已丢弃本次课表。",
+        "source": "jw",
+        "retryable": false,
+        "next_action": "refresh_source"
+      }
+    },
+    {
+      "tool": "refresh_source",
+      "scenario": "HTTP 403（network.py:240-242）",
+      "response": {
+        "ok": false,
+        "status": "access_denied",
+        "message": "来源拒绝访问此资源；请在原页面核对权限或访问限制。",
+        "source": "mystu",
+        "retryable": false,
+        "next_action": "open_source_page",
+        "http_status": 403
+      }
+    },
+    {
+      "tool": "get_notice",
+      "scenario": "HTTP 404（network.py:246-248）",
+      "response": {
+        "ok": false,
+        "status": "not_found",
+        "message": "来源未找到此资源；请刷新列表后核对原页面。",
+        "source": "public",
+        "retryable": false,
+        "next_action": "refresh_then_check_source",
+        "http_status": 404
+      }
+    },
+    {
+      "tool": "refresh_source",
+      "scenario": "HTTP 429，并带 Retry-After（network.py:243-245）",
+      "response": {
+        "ok": false,
+        "status": "rate_limited",
+        "message": "来源限制了请求频率，请等待后重试。",
+        "source": "jw",
+        "retryable": true,
+        "next_action": "wait_then_retry",
+        "http_status": 429,
+        "retry_after_seconds": 120
+      }
+    },
+    {
+      "tool": "refresh_source",
+      "scenario": "HTTP 5xx（network.py:249-252）",
+      "response": {
+        "ok": false,
+        "status": "source_unavailable",
+        "message": "来源服务暂时异常，请稍后重试。",
+        "source": "jw",
+        "retryable": true,
+        "next_action": "retry_later",
+        "http_status": 503
+      }
+    },
+    {
+      "tool": "refresh_source",
+      "scenario": "public 四个栏目和服务目录全部失败（notices/service.py:25-26）",
+      "response": {
+        "ok": false,
+        "status": "source_unavailable",
+        "message": "公开来源暂时无法读取；这不表示没有通知。",
+        "source": "public",
+        "retryable": true,
+        "next_action": "retry_later"
+      }
+    },
+    {
+      "tool": "refresh_source",
+      "scenario": "其他 4xx（network.py:271-273）",
+      "response": {
+        "ok": false,
+        "status": "source_rejected",
+        "message": "来源未接受此请求；请核对资源与读取条件。",
+        "source": "jw",
+        "retryable": false,
+        "next_action": "open_source_page",
+        "http_status": 400
+      }
+    },
+    {
+      "tool": "refresh_source",
+      "scenario": "DNS 解析失败（network.py:303-318；failure_layer=dns 时强制 retryable=false）",
+      "response": {
+        "ok": false,
+        "status": "network_error",
+        "message": "此端点未能完成直连。请检查该来源的 DNS、网络路由或校园接入条件；其他来源仍可使用。",
+        "source": "jw",
+        "retryable": false,
+        "next_action": "check_dns_and_route",
+        "network": {
+          "transport": "direct",
+          "failure_layer": "dns",
+          "cached_failure": false,
+          "automatic_proxy_fallback": false
+        }
+      }
+    },
+    {
+      "tool": "get_charging_device",
+      "scenario": "第三方平台读取超时（charging/adapter.py:87）",
+      "response": {
+        "ok": false,
+        "status": "request_timeout",
+        "message": "充电平台读取超时。",
+        "source": "charging",
+        "retryable": true,
+        "next_action": "retry_later"
+      }
+    },
+    {
+      "tool": "refresh_source",
+      "scenario": "本轮读取超过总时限（network.py:276-277）",
+      "response": {
+        "ok": false,
+        "status": "request_deadline",
+        "message": "来源读取超时，已停止此轮请求。",
+        "source": "mystu",
+        "retryable": false,
+        "next_action": "reduce_scope"
+      }
+    },
+    {
+      "tool": "get_campus_card_transactions",
+      "scenario": "单页流水超过 200 行（smartcard/parser.py:312-313）",
+      "response": {
+        "ok": false,
+        "status": "response_too_large",
+        "message": "一卡通本页记录超过读取上限，请缩小日期范围。",
+        "source": "smartcard",
+        "retryable": false,
+        "next_action": "reduce_scope"
+      }
+    },
+    {
+      "tool": "get_academic_timetable",
+      "scenario": "节次写成 'A-C' 或 '待定'，无法解析（jw/timetable.py:152-154）",
+      "response": {
+        "ok": false,
+        "status": "schema_changed",
+        "message": "教务课表周次／节次表达无法无歧义解析。",
+        "source": "jw",
+        "retryable": false,
+        "next_action": "report_source_change"
+      }
+    },
+    {
+      "tool": "refresh_source",
+      "scenario": "来源数据处理时出现未预期异常（app.py:122-124）",
+      "response": {
+        "ok": false,
+        "status": "source_error",
+        "message": "来源数据未能处理；未把解析失败当作空结果，也未输出认证信息。",
+        "source": "jw",
+        "retryable": false,
+        "next_action": "report_source_change"
+      }
+    },
+    {
+      "tool": "refresh_source",
+      "scenario": "OA 匿名和 WebVPN 都读不到列表（notices/parser.py:182）",
+      "response": {
+        "ok": false,
+        "status": "oa_unavailable",
+        "message": "此网络无法读取 OA 列表；请查看本地设置中的 OA 状态。",
+        "source": "oa",
+        "retryable": false,
+        "next_action": "check_request"
+      }
+    },
+    {
+      "tool": "get_notice",
+      "scenario": "item_id 不在缓存里（store.py:201-202）",
+      "response": {
+        "ok": false,
+        "status": "not_cached",
+        "message": "缓存中尚无此记录；这不表示学校没有该事项。",
+        "source": null,
+        "retryable": false,
+        "next_action": "check_request"
+      }
+    },
+    {
+      "tool": "academic_summary",
+      "scenario": "只有旧 schema 版本的成绩缓存（app.py:338-339）",
+      "response": {
+        "ok": false,
+        "status": "cache_needs_refresh",
+        "message": "旧教务缓存字段可能错位，请刷新 jw 后再计算成绩统计。",
+        "source": "jw",
+        "retryable": false,
+        "next_action": "check_request"
+      }
+    },
+    {
+      "tool": "refresh_source",
+      "scenario": "已有另一个刷新在进行（app.py:87-88）",
+      "response": {
+        "ok": false,
+        "status": "refresh_running",
+        "message": "已有刷新正在进行，请稍后重试。",
+        "source": "mystu",
+        "retryable": true,
+        "next_action": "wait_then_retry"
+      }
+    },
+    {
+      "tool": "get_academic_timetable",
+      "scenario": "学期参数格式不对（jw/service.py:41-42）",
+      "response": {
+        "ok": false,
+        "status": "invalid_semester",
+        "message": "学期格式为 2026-2027-1；留空使用学校当前选定学期。",
+        "source": "jw",
+        "retryable": false,
+        "next_action": "check_request"
+      }
+    },
+    {
+      "tool": "get_campus_card_transactions",
+      "scenario": "日期跨度超过 30 天（smartcard/parser.py:217-227）",
+      "response": {
+        "ok": false,
+        "status": "invalid_date_range",
+        "message": "请使用 YYYY-MM-DD，单次查询范围需为同一天至30天（含首尾）。",
+        "source": "smartcard",
+        "retryable": false,
+        "next_action": "check_request"
+      }
+    },
+    {
+      "tool": "get_campus_card_transactions",
+      "scenario": "类型不在学校选项里（smartcard/parser.py:190-192）",
+      "response": {
+        "ok": false,
+        "status": "invalid_transaction_type",
+        "message": "交易类别不在学校当前选项中，请先留空查询全部及可选类别。",
+        "source": "smartcard",
+        "retryable": false,
+        "next_action": "check_request"
+      }
+    },
+    {
+      "tool": "get_campus_card_transactions",
+      "scenario": "名下有多张卡或没有卡账户（smartcard/parser.py:168-170）",
+      "response": {
+        "ok": false,
+        "status": "unsupported_scope",
+        "message": "一卡通提供多个或未提供卡账户，请先在原站核对。",
+        "source": "smartcard",
+        "retryable": false,
+        "next_action": "check_request"
+      }
+    },
+    {
+      "tool": "refresh_source",
+      "scenario": "对 smartcard 调用了 refresh_source（app.py:81-82）",
+      "response": {
+        "ok": false,
+        "status": "query_required",
+        "message": "一卡通请使用 get_campus_card/get_campus_card_transactions 或 stu-mcp card。",
+        "source": "smartcard",
+        "retryable": false,
+        "next_action": "check_request"
+      }
+    },
+    {
+      "tool": "read_attachment",
+      "scenario": "还没有读过正文，或序号越界（app.py:280-281）",
+      "response": {
+        "ok": false,
+        "status": "attachment_not_cached",
+        "message": "请先读取并刷新通知正文，再选择附件序号。",
+        "source": null,
+        "retryable": false,
+        "next_action": "check_request"
+      }
+    },
+    {
+      "tool": "read_attachment",
+      "scenario": "PDF 超过 100 页（app.py:301-302）",
+      "response": {
+        "ok": false,
+        "status": "attachment_too_long",
+        "message": "此 PDF 超过 100 页，请在学校页面查看。",
+        "source": null,
+        "retryable": false,
+        "next_action": "check_request"
+      }
+    },
+    {
+      "tool": "read_attachment",
+      "scenario": "扫描版 PDF（app.py:306-307）",
+      "response": {
+        "ok": false,
+        "status": "attachment_unreadable",
+        "message": "PDF 无法提取文字；扫描件需另行 OCR。",
+        "source": null,
+        "retryable": false,
+        "next_action": "check_request"
+      }
+    },
+    {
+      "tool": "read_attachment",
+      "scenario": "docx 或图片等格式（app.py:312-313）",
+      "response": {
+        "ok": false,
+        "status": "unsupported_attachment",
+        "message": "首版支持 PDF 和文本附件；其他格式请通过学校原链接查看。",
+        "source": null,
+        "retryable": false,
+        "next_action": "check_request"
+      }
+    },
+    {
+      "tool": "get_charging_device",
+      "scenario": "设备编号不在清单里（charging/service.py:118-119）",
+      "response": {
+        "ok": false,
+        "status": "unknown_device",
+        "message": "设备不在已核验清单内，请先按位置查询总览取得编号。",
+        "source": "charging",
+        "retryable": false,
+        "next_action": "check_request"
+      }
+    },
+    {
+      "tool": "get_charging_overview",
+      "scenario": "limit 超过 4（charging/service.py:91-92）",
+      "response": {
+        "ok": false,
+        "status": "invalid_limit",
+        "message": "充电总览每页 1–4 台设备，偏移量为 0–10000。",
+        "source": "charging",
+        "retryable": false,
+        "next_action": "check_request"
+      }
+    },
+    {
+      "tool": "get_tasks",
+      "scenario": "limit 超过 50（store.py:137-138）",
+      "response": {
+        "ok": false,
+        "status": "invalid_limit",
+        "message": "每页 1–50 条，偏移量最大 10000。",
+        "source": null,
+        "retryable": false,
+        "next_action": "check_request"
+      }
+    },
+    {
+      "tool": "refresh_source",
+      "scenario": "MySTU 测验要求活动密码；通常出现在 errors[] 或 detail_error 里（network.py:290-293）",
+      "response": {
+        "ok": false,
+        "status": "activity_password_required",
+        "message": "此测验要求活动密码，请在学校页面处理。",
+        "source": "mystu",
+        "retryable": false,
+        "next_action": "open_source_page",
+        "http_status": 200
+      }
+    },
+    {
+      "tool": "set_task_status",
+      "scenario": "status 不是 todo/done/ignored，或记录不是任务（store.py:206-207）",
+      "response": {
+        "ok": false,
+        "status": "invalid_task",
+        "message": "请选择待办，并使用 todo、done 或 ignored 状态。",
+        "source": null,
+        "retryable": false,
+        "next_action": "check_request"
+      }
+    },
+    {
+      "tool": "get_capabilities",
+      "scenario": "本机系统密钥库不可用（credentials.py:48）",
+      "response": {
+        "ok": false,
+        "status": "secure_storage_unavailable",
+        "message": "系统密钥库不可用；公开功能仍可使用。",
+        "source": null,
+        "retryable": false,
+        "next_action": "check_system_keyring"
+      }
+    },
+    {
+      "tool": "get_academic_timetable",
+      "scenario": "本地锁 5 秒内没拿到（runtime.py:131-132）",
+      "response": {
+        "ok": false,
+        "status": "local_state_busy",
+        "message": "本地安全状态正在变更，请稍后重试。",
+        "source": null,
+        "retryable": false,
+        "next_action": "check_request"
+      }
+    },
+    {
+      "tool": "任意工具",
+      "scenario": "依赖库抛出了非 AppError 异常（server.py:76-78）",
+      "response": {
+        "ok": false,
+        "status": "operation_failed",
+        "message": "操作未完成；未输出认证信息。请检查本地状态或重试。",
+        "source": null,
+        "retryable": false,
+        "next_action": "check_local_state"
+      }
+    }
+  ],
+  "partial_success_example": {
+    "tool": "refresh_source",
+    "scenario": "成绩写入成功，考试读取遇到登录页",
+    "response": {
+      "ok": true,
+      "status": "partial",
+      "source": "jw",
+      "saved": 44,
+      "limited": true,
+      "coverage": {
+        "grade_scope": "available_table",
+        "max_grade_rows": 200,
+        "exam_semester": "2026-2027-1",
+        "transport": "https",
+        "login_entry": "jwglxt",
+        "grade_rows_read": 44
+      },
+      "errors": [
+        {
+          "part": "考试安排",
+          "ok": false,
+          "status": "login_expired",
+          "message": "此来源需要重新登录；请在 MCP 宿主终端运行对应的 stu-mcp login 命令。",
+          "source": "jw",
+          "retryable": false,
+          "next_action": "open_setup"
+        }
+      ],
+      "freshness": [
+        {
+          "source": "jw",
+          "attempted_at": "2026-10-28T01:55:12.402871+00:00",
+          "success_at": "2026-10-28T01:55:12.402905+00:00",
+          "status": "partial",
+          "saved": 47
+        },
+        {
+          "source": "mystu",
+          "attempted_at": "2026-10-28T01:50:03.120334+00:00",
+          "success_at": "2026-10-28T01:50:03.120351+00:00",
+          "status": "partial",
+          "saved": 41
+        },
+        {
+          "source": "oa",
+          "attempted_at": "2026-10-28T01:40:44.900112+00:00",
+          "success_at": "2026-10-27T13:02:10.551900+00:00",
+          "status": "oa_unavailable",
+          "saved": 0
+        },
+        {
+          "source": "public",
+          "attempted_at": "2026-10-28T01:41:20.004567+00:00",
+          "success_at": "2026-10-28T01:41:20.004589+00:00",
+          "status": "partial",
+          "saved": 61
+        },
+        {
+          "source": "yuketang",
+          "attempted_at": "2026-10-27T23:10:31.776100+00:00",
+          "success_at": "2026-10-27T23:10:31.776122+00:00",
+          "status": "partial",
+          "saved": 18
+        }
+      ]
+    }
+  }
+}
