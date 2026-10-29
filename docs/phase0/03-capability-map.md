@@ -2,7 +2,7 @@
 
 > 目的：把 stu-mcp 采集层「能做什么、验收到哪一步、数据多新」和 App「现在接了什么」一次摊开，作为后续用 Kano 做功能取舍的依据。本文只做整理与风险标注，**不排序、不下结论要不要做**。
 >
-> 材料基线：开源 MIT 仓库 `stu-mcp` tag **v0.7.3**（`<本地 stu-mcp 检出目录>`），共 51 个 MCP 工具、`SOURCES` 实际登记 8 个来源；App 侧为 `backend/app/`（FastAPI 多租户）+ `web/`（React PWA，五个 tab）。
+> 材料基线：开源 MIT 仓库 `stu-mcp` tag **v0.7.3**（`C:\Users\Administrator\AppData\Local\Temp\stu-mcp-v0.7.3`），共 51 个 MCP 工具、`SOURCES` 实际登记 8 个来源；App 侧为 `backend/app/`（FastAPI 多租户）+ `web/`（React PWA，五个 tab）。
 >
 > 关键区分（全文沿用 stu-mcp 自己的口径）：
 > - **接入程度**：`implemented`（已有业务适配器）/ `navigation_only`（只有入口导航，不办业务）/ `not_integrated`（未接入）。

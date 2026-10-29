@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { motion } from "motion/react";
 import { IS_NATIVE, api, apiBase, setToken } from "../lib/api";
 import { clearSchool, readSchool } from "../lib/school";
 import {
@@ -14,6 +15,8 @@ import { agoText } from "../lib/clock";
 import { usePalette, useTheme, type PalettePref, type ThemePref } from "../lib/useTheme";
 import { SOURCE_NAME } from "../lib/records";
 import { Icon } from "../components/Icon";
+import { Magnetic } from "../components/Magnetic";
+import { rise } from "../lib/motion";
 import { Notice, PageHead, Section } from "../components/Layout";
 import { Segmented } from "../components/Segmented";
 
@@ -91,10 +94,10 @@ export function MeScreen({ onSignOut }: { onSignOut: () => void }) {
 
   return (
     <>
-      <PageHead title="我的" />
+      <PageHead eyebrow="账号 · 外观 · 关于" title="我的" />
 
       {!signedIn ? (
-        <section className="connect">
+        <motion.section className="connect" {...rise(0, { y: 8 })}>
           <div className="connect__icon" aria-hidden="true">
             <Icon name="shield" size={24} />
           </div>
@@ -103,10 +106,10 @@ export function MeScreen({ onSignOut }: { onSignOut: () => void }) {
           <button type="button" className="btn btn--primary btn--block" onClick={connect}>
             登录 / 注册
           </button>
-        </section>
+        </motion.section>
       ) : (
         <>
-          <section className="account">
+          <motion.section className="account" {...rise(0, { y: 8 })}>
             <div className="account__avatar" aria-hidden="true">
               {(store.me?.email ?? "S").slice(0, 1).toUpperCase()}
             </div>
@@ -121,19 +124,23 @@ export function MeScreen({ onSignOut }: { onSignOut: () => void }) {
                 {IS_NATIVE && apiBase() && ` · ${hostOf(apiBase())}`}
               </p>
             </div>
-          </section>
+          </motion.section>
 
           {store.connected === false && (
-            <button type="button" className="cta" onClick={connect}>
-              <span className="cta__icon" aria-hidden="true">
-                <Icon name="shield" size={20} />
-              </span>
-              <span className="cta__text">
-                <b>连接校园账号</b>
-                <small>读取你的课表、作业、考试和成绩</small>
-              </span>
-              <Icon name="chevron-right" size={18} />
-            </button>
+            <motion.div {...rise(1, { y: 6 })}>
+              <Magnetic pull={0.5}>
+                <button type="button" className="cta" onClick={connect}>
+                  <span className="cta__icon" aria-hidden="true">
+                    <Icon name="shield" size={20} />
+                  </span>
+                  <span className="cta__text">
+                    <b>连接校园账号</b>
+                    <small>读取你的课表、作业、考试和成绩</small>
+                  </span>
+                  <Icon name="chevron-right" size={18} />
+                </button>
+              </Magnetic>
+            </motion.div>
           )}
 
           {store.needsReconnect.length > 0 && (
@@ -199,41 +206,50 @@ export function MeScreen({ onSignOut }: { onSignOut: () => void }) {
       )}
 
       <Section title="外观">
-        <div className="stack-3">
-          <Segmented<ThemePref>
-            label="外观"
-            value={pref}
-            onChange={choose}
-            options={[
-              { key: "system", label: "跟随系统" },
-              { key: "light", label: "浅色" },
-              { key: "dark", label: "深色" },
-            ]}
-          />
-          <Segmented<PalettePref>
-            label="色系"
-            value={palette}
-            onChange={choosePalette}
-            options={[
-              { key: "sweet", label: "樱粉" },
-              { key: "classic", label: "海蓝" },
-            ]}
-          />
+        <div className="card card--pad stack-4">
+          <div className="stack-2">
+            <p className="field__label">主题</p>
+            <Segmented<ThemePref>
+              label="外观"
+              value={pref}
+              onChange={choose}
+              options={[
+                { key: "system", label: "跟随系统" },
+                { key: "light", label: "浅色" },
+                { key: "dark", label: "深色" },
+              ]}
+            />
+          </div>
+          <div className="stack-2">
+            <p className="field__label">色系</p>
+            <Segmented<PalettePref>
+              label="色系"
+              value={palette}
+              onChange={choosePalette}
+              options={[
+                { key: "sweet", label: "樱粉" },
+                { key: "classic", label: "海蓝" },
+              ]}
+            />
+          </div>
+          <p className="field__hint">跟手机系统的深浅色走，装到桌面之后也不会跳。</p>
         </div>
       </Section>
 
       {!IS_NATIVE && (
         <Section title="安卓 App">
-          <a className="download" href="/download/stu-assistant.apk" download>
-            <span className="download__icon" aria-hidden="true">
-              <Icon name="monitor" size={20} />
-            </span>
-            <span className="download__text">
-              <b>下载安卓安装包</b>
-              <small>和网页版用同一个账号。iPhone 可以在 Safari 里“添加到主屏幕”。</small>
-            </span>
-            <Icon name="arrow-right" size={18} />
-          </a>
+          <Magnetic pull={0.5}>
+            <a className="download" href="/download/stu-assistant.apk" download>
+              <span className="download__icon" aria-hidden="true">
+                <Icon name="monitor" size={20} />
+              </span>
+              <span className="download__text">
+                <b>下载安卓安装包</b>
+                <small>和网页版用同一个账号。iPhone 可以在 Safari 里“添加到主屏幕”。</small>
+              </span>
+              <Icon name="arrow-right" size={18} />
+            </a>
+          </Magnetic>
         </Section>
       )}
 

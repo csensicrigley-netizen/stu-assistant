@@ -34,6 +34,9 @@
   --fs-12: 0.75rem;
   --fs-13: 0.8125rem;
   --fs-14: 0.875rem;
+  /* 15px：列表标题与正文之间那一档。以前全站写 var(--fs-15, 0.9375rem)，
+     因为令牌里根本没有 --fs-15，每次都在走兜底值；补上，别再让它悬空。 */
+  --fs-15: 0.9375rem;
   --fs-16: 1rem;
   --fs-18: 1.125rem;
   --fs-20: 1.25rem;
@@ -59,6 +62,17 @@
   --gutter: 20px;
   --page-max: 600px;
 
+  /* ---------- 纵向节奏（只有四个数，页面不再靠手感拼） ----------
+     page：页面级大块之间（头 → 内容 → 尾注）
+     sec ：一级板块之间（Section 与 Section）
+     head：板块标题到它自己的内容
+     item：列表项之间
+     四张页面共用这一套，密度才会看起来像同一个 App。 */
+  --rhythm-page: 20px;
+  --rhythm-sec: 24px;
+  --rhythm-head: 10px;
+  --rhythm-item: 8px;
+
   /* ---------- radius ---------- */
   --r-sm: 10px;
   --r-md: 14px;
@@ -77,10 +91,21 @@
   --t-base: 220ms;
   --t-slow: 420ms;
   --t-jelly: 360ms;
+  /* 退场永远比进场快：退场没人看，慢了就是"卡"。 */
+  --t-exit: 120ms;
+  --t-enter: 300ms;
 
-  /* ---------- safe areas (the demo shell overrides these) ---------- */
-  --safe-t: env(safe-area-inset-top, 0px);
-  --safe-b: env(safe-area-inset-bottom, 0px);
+  /* ---------- safe areas ----------
+     Web / PWA：按浏览器给的 env() 走。
+     Android App：Capacitor 8 的 SystemBars 插件在 insetsHandling:"css" 下
+     把四边以 CSS 变量 --safe-area-inset-* 写在 <html> 上（它不再给 WebView 加
+     padding，页面自己让位）。所以这里先取插件变量、再退回 env()：
+     两个都认，才不会出现"内容钻到状态栏底下 / 底部返回条压住标签栏"。
+     env() 在 Android WebView 里只有刘海屏才非零，单靠它必然对不齐。 */
+  --safe-t: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+  --safe-b: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+  --safe-l: var(--safe-area-inset-left, env(safe-area-inset-left, 0px));
+  --safe-r: var(--safe-area-inset-right, env(safe-area-inset-right, 0px));
   --tabbar-h: 64px;
 
   /* ---------- light ---------- */
@@ -113,7 +138,7 @@
   --shadow-1: 0 1px 2px oklch(35% 0.05 340 / 0.05), 0 2px 8px -4px oklch(35% 0.05 340 / 0.08);
   --shadow-2: 0 2px 6px oklch(35% 0.05 340 / 0.05), 0 18px 40px -16px oklch(35% 0.05 340 / 0.22);
   --scrim: oklch(28% 0.05 340 / 0.42);
-  --bar-bg: oklch(99.4% 0.006 18 / 0.86);
+  --bar-bg: oklch(99.4% 0.006 18 / 0.9);
 
   /* ---------- brand: the welcome panel and the mark ---------- */
   --brand-bg: linear-gradient(160deg, #8d76e0, #4f3f8f);
@@ -164,7 +189,7 @@
   --shadow-1: 0 1px 2px oklch(0% 0 0 / 0.3);
   --shadow-2: 0 2px 6px oklch(0% 0 0 / 0.3), 0 24px 48px -20px oklch(0% 0 0 / 0.6);
   --scrim: oklch(8% 0.02 328 / 0.62);
-  --bar-bg: oklch(25% 0.022 330 / 0.86);
+  --bar-bg: oklch(25% 0.022 330 / 0.9);
 }
 
 /* Course colours. A custom property that references var() is resolved where it
@@ -232,7 +257,7 @@
   --shadow-1: 0 1px 2px oklch(20% 0.02 262 / 0.05), 0 2px 8px -4px oklch(20% 0.02 262 / 0.08);
   --shadow-2: 0 2px 6px oklch(20% 0.02 262 / 0.05), 0 18px 40px -16px oklch(20% 0.02 262 / 0.22);
   --scrim: oklch(18% 0.02 262 / 0.42);
-  --bar-bg: oklch(99% 0.004 85 / 0.86);
+  --bar-bg: oklch(99% 0.004 85 / 0.9);
 
   --brand-bg: linear-gradient(160deg, #1f63cc, #0a2c74);
   --brand-glow-a: oklch(70% 0.14 250 / 0.55);
@@ -280,7 +305,7 @@
   --shadow-1: 0 1px 2px oklch(0% 0 0 / 0.3);
   --shadow-2: 0 2px 6px oklch(0% 0 0 / 0.3), 0 24px 48px -20px oklch(0% 0 0 / 0.6);
   --scrim: oklch(5% 0.01 262 / 0.6);
-  --bar-bg: oklch(19% 0.014 262 / 0.86);
+  --bar-bg: oklch(19% 0.014 262 / 0.9);
 }
 
 [data-palette="classic"],

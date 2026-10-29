@@ -61,7 +61,7 @@ if ($notes.Count -eq 0) { Write-Output "    note: 没有更新说明（notes 为
 
 # dist\version.json 是网页版自己的版本探针：PWA 会把旧 js 缓存住，
 # 前端拿它和页面里的版本比一比，发现旧了就弹「刷新页面」。
-# 必须写在 dist 里（会随静态站一起发布），且不能被 service worker 缓存。
+# 必须写在 dist 里（会被一起发到 your-host），且不能被 service worker 缓存。
 $probe = [ordered]@{
   versionName = $appName
   versionCode = $appCode

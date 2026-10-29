@@ -4,10 +4,13 @@ import { Logo } from "./Logo";
 import { ModePill } from "./Layout";
 import { PILL } from "../lib/motion";
 
-export type TabKey = "today" | "week" | "study" | "campus" | "me";
+// "import" 不是底栏的一格：它是课表页点进去的子页面，只参与路由与返回，
+// 所以不进 TABS。TabBar 只遍历 TABS，current 落在这里时不会有任何一格高亮。
+export type TabKey = "today" | "plan" | "week" | "study" | "campus" | "me" | "import" | "medbind";
 
 export const TABS: { key: TabKey; label: string; icon: IconName }[] = [
   { key: "today", label: "今天", icon: "today" },
+  { key: "plan", label: "计划", icon: "check" },
   { key: "week", label: "课表", icon: "week" },
   { key: "study", label: "学业", icon: "study" },
   { key: "campus", label: "校园", icon: "campus" },
@@ -32,25 +35,22 @@ export function TabBar({
       <div className="tabbar__row">
         {TABS.map((tab) => {
           const on = tab.key === current;
+          // 导入是课表的子页面：停在那一页时把「课表」保持点亮，
+          // 否则底栏会出现"一格都不亮"的空档，人不知道自己站在哪。
+          const lit = on || (current === "import" && tab.key === "week");
           const badge = badges[tab.key];
           return (
             <button
               key={tab.key}
               type="button"
-              className={`tabbar__btn${on ? " is-on" : ""}`}
+              className={`tabbar__btn${lit ? " is-on" : ""}`}
               onClick={() => onChange(tab.key)}
               aria-current={on ? "page" : undefined}
               aria-label={badge ? `${tab.label}，${badge} 项待处理` : tab.label}
             >
               <span className="tabbar__icon">
-                {on && (
-                  <motion.span
-                    className="tabbar__pill"
-                    layoutId="tab-pill"
-                    transition={PILL}
-                  />
-                )}
-                <Icon name={tab.icon} size={22} strokeWidth={on ? 2 : 1.75} />
+                {lit && <motion.span className="tabbar__pill" layoutId="tab-pill" transition={PILL} />}
+                <Icon name={tab.icon} size={22} strokeWidth={lit ? 2 : 1.75} />
                 {badge ? (
                   <span className="tabbar__badge" aria-hidden="true">
                     {badge > 9 ? "9+" : badge}

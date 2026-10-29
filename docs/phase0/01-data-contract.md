@@ -1,6 +1,6 @@
 # 01 stu-mcp v0.7.3 数据契约（一手材料）
 
-> 基线：`stu-mcp` tag v0.7.3，commit `31fd2863a41e5e6f2ad13341b85b04e3f4eb2642`（已用 `git rev-parse HEAD` 核对），本地只读源码 `<本地 stu-mcp 检出目录>`。全程未登录、未联网请求学校系统、未运行需要凭据的命令。
+> 基线：`stu-mcp` tag v0.7.3，commit `31fd2863a41e5e6f2ad13341b85b04e3f4eb2642`（已用 `git rev-parse HEAD` 核对），本地只读源码 `C:\Users\Administrator\AppData\Local\Temp\stu-mcp-v0.7.3`。全程未登录、未联网请求学校系统、未运行需要凭据的命令。
 > 文件路径相对仓库根目录 `src/stu_mcp/`（另注明 `tests/`、`docs/` 的除外），行号指该 tag 下的文件。
 > 能力地图与验收状态见 `03-capability-map.md`，官方作息（13 小节：1–9、0、A–C，分 5 大节）见 `02-official-sources.md`，本文不重复。
 > 合成样例见同目录 `fixtures/`，保持 stu-mcp 原始返回形状。

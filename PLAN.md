@@ -264,7 +264,7 @@ DELETE /v1/account                                            → {ok}   清空�
 ## 六、部署
 
 ```
-B 机（`<SCHOOL_HOST>`）
+B 机
 ├── nginx :443  → 后端 :8100
 ├── FastAPI (systemd: stu-app.service)
 ├── /data/tenants/          租户数据
@@ -304,5 +304,5 @@ App Studio → APK / IPA
 | 多步登录状态机 | `repo/src/stu_mcp/setup_auth.py` → `SetupAuthJobs` |
 | 会话加密 | `repo/src/stu_mcp/vault.py` |
 | 文件密钥 | `repo/src/stu_mcp/credentials.py` → `FileKeyStore` |
-| B 机会话维持脚本 | `<SCHOOL_HOST>`:`/root/ensure_jw.py` |
-| B 机课表生成 | `<SCHOOL_HOST>`:`/root/weekly_thisweek.py` |
+| B 机会话维持脚本 | B 机:`/root/ensure_jw.py` |
+| B 机课表生成 | B 机:`/root/weekly_thisweek.py` |

@@ -5,7 +5,9 @@ import { saveSchool } from "../lib/school";
 import { onBack } from "../lib/native";
 import { Icon } from "../components/Icon";
 import { Logo } from "../components/Logo";
+import { Magnetic } from "../components/Magnetic";
 import { Segmented } from "../components/Segmented";
+import { rise } from "../lib/motion";
 
 export type Step = "hello" | "account" | "bind";
 
@@ -135,16 +137,24 @@ function Intro() {
 
 function Hello({ onStart, onPreview }: { onStart: () => void; onPreview?: () => void }) {
   const android = /Android/i.test(navigator.userAgent) && !IS_NATIVE;
+  /*
+   * 首屏的进场是有先后的：标志 → 标题 → 说明 → 三条 → 动作。
+   * 全部走 rise()，延迟由 stagger() 统一出，谁也不许自己写 delay。
+   */
   return (
     <div className="hello">
-      <Logo size={64} className="hello__logo" />
-      <h1 className="welcome__title">
+      <motion.div {...rise(0, { y: 12, scale: 0.96 })}>
+        <Logo size={64} className="hello__logo" />
+      </motion.div>
+      <motion.h1 className="welcome__title" {...rise(1, { y: 8, scale: 1 })}>
         下一节课在哪，
         <br />
         作业几点截止。
-      </h1>
-      <p className="welcome__lead">教务课表、MySTU 作业和学校通知收在一处，按教务处官方作息算准每一节课。</p>
-      <ul className="welcome__points">
+      </motion.h1>
+      <motion.p className="welcome__lead" {...rise(2, { y: 8, scale: 1 })}>
+        教务课表、MySTU 作业和学校通知收在一处，按教务处官方作息算准每一节课。
+      </motion.p>
+      <motion.ul className="welcome__points" {...rise(3, { y: 8, scale: 1 })}>
         <li>
           <Icon name="clock" size={18} />
           <span>现在该去哪间教室，还有几分钟</span>
@@ -157,17 +167,19 @@ function Hello({ onStart, onPreview }: { onStart: () => void; onPreview?: () => 
           <Icon name="shield" size={18} />
           <span>只读不代办，账号密码由你本人输入、加密存在你自己的空间</span>
         </li>
-      </ul>
-      <div className="welcome__actions">
-        <button type="button" className="btn btn--primary btn--block btn--lg" onClick={onStart}>
-          开始使用
-        </button>
+      </motion.ul>
+      <motion.div className="welcome__actions" {...rise(4, { y: 8, scale: 1 })}>
+        <Magnetic pull={0.4}>
+          <button type="button" className="btn btn--primary btn--block btn--lg" onClick={onStart}>
+            开始使用
+          </button>
+        </Magnetic>
         {onPreview && (
           <button type="button" className="btn btn--ghost btn--block btn--lg" onClick={onPreview}>
             先看看示例
           </button>
         )}
-      </div>
+      </motion.div>
       {android && (
         <a className="welcome__apk" href="/download/stu-assistant.apk" download>
           <Icon name="arrow-right" size={16} />

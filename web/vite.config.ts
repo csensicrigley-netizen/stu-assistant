@@ -48,6 +48,25 @@ export default defineConfig({
       },
     }),
   ],
+  build: {
+    target: "es2020",
+    /*
+     * 手动分包的理由是缓存，不是体积：把 react 和 motion 从业务代码里拆出来，
+     * 改一个页面只让业务包换哈希，vendor 包还留在 WebView 缓存里 —— 手机上
+     * 一次更新的下载量能少一大半。手写 manualChunks 而不是自动分包，是因为
+     * 自动分包的边界会随依赖顺序变，缓存收益反而不稳。
+     */
+    rollupOptions: {
+      output: {
+        manualChunks(id: string) {
+          if (!id.includes("node_modules")) return undefined;
+          if (id.includes("motion") || id.includes("framer-motion")) return "vendor-motion";
+          if (id.includes("react") || id.includes("scheduler")) return "vendor-react";
+          return "vendor";
+        },
+      },
+    },
+  },
   server: {
     port: 5180,
     watch: {
@@ -60,6 +79,9 @@ export default defineConfig({
         "**/node_modules/**",
         "**/android/**",
         "**/_legacy/**",
+        // 编辑器保存时会在目标文件旁建一个 .xxx.tmpdir/，那一瞬间目录是锁的，
+        // 监视器去 watch 它会 EBUSY 把 dev server 直接打挂。整条路径不监视。
+        "**/*.tmpdir/**",
       ],
     },
     proxy: {

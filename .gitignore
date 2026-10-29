@@ -59,8 +59,3 @@ _bak_before_*/
 _probe/
 tmp/
 *.tmp
-
-# ---- 本地备份 ----
-*.bak*
-*.orig
-

@@ -87,6 +87,52 @@ CREATE TABLE IF NOT EXISTS consents (
   version  TEXT NOT NULL DEFAULT '1',
   PRIMARY KEY (user_id, scope)
 );
+
+-- 手动录入的课表（医学院等教务系统无法自动同步的院系）。
+-- payload 存整份课表文档，形状与 sync._flatten_timetable() 一致；
+-- 同一用户同一学期只有一份，再保存就是覆盖。
+CREATE TABLE IF NOT EXISTS manual_timetables (
+  id         TEXT PRIMARY KEY,
+  user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  semester   TEXT NOT NULL,
+  school     TEXT NOT NULL DEFAULT 'main',
+  source     TEXT NOT NULL DEFAULT 'manual',
+  payload    TEXT NOT NULL,
+  note       TEXT NOT NULL DEFAULT '',
+  created_at REAL NOT NULL,
+  updated_at REAL NOT NULL,
+  UNIQUE (user_id, semester)
+);
+
+-- 医学院教务会话：只存会话 token，不存密码。
+-- 医学院那套是 JSON API + token 头（强智新版教学服务平台），token 由用户
+-- 自己输账号密码换出来，换完就只留 token；密码一个字都不落库。
+-- token 失效时接口会回 401，前端让用户重新输一次即可。
+CREATE TABLE IF NOT EXISTS med_sessions (
+  user_id    TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  username   TEXT NOT NULL DEFAULT '',
+  name       TEXT NOT NULL DEFAULT '',
+  token      TEXT NOT NULL,
+  updated_at REAL NOT NULL
+);
+
+-- 每日计划：本人自己写的待办，和 items 里学校推下来的 task 是两回事。
+-- end 是 SQL 关键字，必须加双引号。老库靠 IF NOT EXISTS 平滑升级。
+CREATE TABLE IF NOT EXISTS plans (
+  id         TEXT PRIMARY KEY,
+  user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  date       TEXT NOT NULL,
+  title      TEXT NOT NULL,
+  note       TEXT NOT NULL DEFAULT '',
+  start      TEXT,
+  "end"      TEXT,
+  done       INTEGER NOT NULL DEFAULT 0,
+  priority   INTEGER NOT NULL DEFAULT 0,
+  sort       INTEGER NOT NULL DEFAULT 0,
+  created_at REAL NOT NULL,
+  updated_at REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_plans_user_date ON plans(user_id, date, sort);
 """
 
 
@@ -361,3 +407,260 @@ class DB:
     def withdraw_consent(self, uid: str, scope: str = "oa") -> None:
         with self.conn() as c:
             c.execute("DELETE FROM consents WHERE user_id=? AND scope=?", (uid, scope))
+
+    # ---------- 手动录入的课表 ----------
+    #
+    # 医学院的教务系统和主校区不一样，没法自动同步，只能自己录。
+    # 这里只管存取；解析和校验在 timetable_import.py，不混进来。
+
+    def tt_manual_get(self, uid: str, semester: str) -> dict | None:
+        with self.conn() as c:
+            row = c.execute(
+                "SELECT * FROM manual_timetables WHERE user_id=? AND semester=?",
+                (uid, semester),
+            ).fetchone()
+        if not row:
+            return None
+        out = dict(row)
+        out["doc"] = json.loads(out.pop("payload"))
+        return out
+
+    def tt_manual_list(self, uid: str) -> list[dict]:
+        with self.conn() as c:
+            rows = c.execute(
+                "SELECT * FROM manual_timetables WHERE user_id=? ORDER BY semester DESC",
+                (uid,),
+            ).fetchall()
+        out: list[dict] = []
+        for row in rows:
+            item = dict(row)
+            item["doc"] = json.loads(item.pop("payload"))
+            out.append(item)
+        return out
+
+    def tt_manual_save(self, uid: str, semester: str, payload: dict, *,
+                       school: str = "main", source: str = "manual", note: str = "") -> dict:
+        """同一用户同一学期只有一份：再保存就是覆盖，created_at 保持第一次的。"""
+        ts = now()
+        body = json.dumps(payload, ensure_ascii=False)
+        with self.conn() as c:
+            cur = c.execute(
+                "SELECT id, created_at FROM manual_timetables WHERE user_id=? AND semester=?",
+                (uid, semester),
+            ).fetchone()
+            if cur:
+                tid = cur["id"]
+                created = cur["created_at"]
+                c.execute(
+                    "UPDATE manual_timetables SET school=?, source=?, payload=?, note=?, updated_at=?"
+                    " WHERE id=?",
+                    (school, source, body, note, ts, tid),
+                )
+            else:
+                tid = "ttman_" + uuid.uuid4().hex[:16]
+                created = ts
+                c.execute(
+                    "INSERT INTO manual_timetables(id,user_id,semester,school,source,payload,note,"
+                    "created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)",
+                    (tid, uid, semester, school, source, body, note, ts, ts),
+                )
+        return {
+            "id": tid,
+            "user_id": uid,
+            "semester": semester,
+            "school": school,
+            "source": source,
+            "doc": payload,
+            "note": note,
+            "created_at": created,
+            "updated_at": ts,
+        }
+
+    def tt_manual_delete(self, uid: str, semester: str) -> bool:
+        with self.conn() as c:
+            cur = c.execute(
+                "DELETE FROM manual_timetables WHERE user_id=? AND semester=?",
+                (uid, semester),
+            )
+            return cur.rowcount > 0
+
+    # ---------- 医学院教务会话（只有 token，没有密码） ----------
+
+    def med_session_get(self, uid: str) -> dict | None:
+        with self.conn() as c:
+            row = c.execute(
+                "SELECT * FROM med_sessions WHERE user_id=?", (uid,)
+            ).fetchone()
+        if row is None:
+            return None
+        return {
+            "username": row["username"],
+            "name": row["name"],
+            "token": row["token"],
+            "updated_at": row["updated_at"],
+        }
+
+    def med_session_save(self, uid: str, *, username: str, name: str, token: str) -> None:
+        ts = now()
+        with self.conn() as c:
+            c.execute(
+                "INSERT INTO med_sessions(user_id, username, name, token, updated_at) "
+                "VALUES(?,?,?,?,?) "
+                "ON CONFLICT(user_id) DO UPDATE SET username=excluded.username, "
+                "name=excluded.name, token=excluded.token, updated_at=excluded.updated_at",
+                (uid, username, name, token, ts),
+            )
+
+    def med_session_delete(self, uid: str) -> bool:
+        with self.conn() as c:
+            cur = c.execute("DELETE FROM med_sessions WHERE user_id=?", (uid,))
+            return cur.rowcount > 0
+
+    # ---------- 每日计划（本人自己写的待办） ----------
+    #
+    # 全部方法都带 uid：租户隔离靠 WHERE user_id=?，没有一处按 id 单查。
+    # 字段校验在 plan.normalize_fields 里；这里只做「跨行才看得见」的那部分
+    # （新建时排到当天末尾、改一头时拿合并后的整行复查时间段）。
+
+    @staticmethod
+    def _plan_row(row: sqlite3.Row) -> dict:
+        return {
+            "id": row["id"],
+            "date": row["date"],
+            "title": row["title"],
+            "note": row["note"] or "",
+            "start": row["start"],
+            "end": row["end"],
+            "done": bool(row["done"]),
+            "priority": int(row["priority"]),
+            "sort": int(row["sort"]),
+            "created_at": row["created_at"],
+            "updated_at": row["updated_at"],
+        }
+
+    def plan_list(self, uid: str, *, date: str | None = None, start: str | None = None,
+                  end: str | None = None, include_done: bool = True) -> list[dict]:
+        """按 (date, sort, created_at) 排序；start/end 是 YYYY-MM-DD 闭区间。"""
+        q = "SELECT * FROM plans WHERE user_id=?"
+        args: list[Any] = [uid]
+        if date:
+            q += " AND date=?"
+            args.append(date)
+        if start:
+            q += " AND date>=?"
+            args.append(start)
+        if end:
+            q += " AND date<=?"
+            args.append(end)
+        if not include_done:
+            q += " AND done=0"
+        q += " ORDER BY date ASC, sort ASC, created_at ASC"
+        with self.conn() as c:
+            rows = c.execute(q, args).fetchall()
+        return [self._plan_row(r) for r in rows]
+
+    def plan_get(self, uid: str, plan_id: str) -> dict | None:
+        with self.conn() as c:
+            row = c.execute(
+                "SELECT * FROM plans WHERE user_id=? AND id=?", (uid, plan_id)
+            ).fetchone()
+        return self._plan_row(row) if row else None
+
+    def plan_create(self, uid: str, fields: dict) -> dict:
+        """新建。`sort` 没给（或给 0）就排到当天末尾——加一条总是落在最下面。"""
+        from .plan import new_plan_id
+
+        ts = now()
+        pid = str(fields.get("id") or new_plan_id())
+        day = str(fields["date"])
+        with self.conn() as c:
+            sort = int(fields.get("sort") or 0)
+            if sort <= 0:
+                row = c.execute(
+                    "SELECT COALESCE(MAX(sort), -1) + 1 AS next FROM plans WHERE user_id=? AND date=?",
+                    (uid, day),
+                ).fetchone()
+                sort = int(row["next"]) if row else 0
+            c.execute(
+                'INSERT INTO plans(id,user_id,date,title,note,start,"end",done,priority,sort,'
+                "created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+                (
+                    pid, uid, day, str(fields["title"]), str(fields.get("note") or ""),
+                    fields.get("start"), fields.get("end"),
+                    1 if fields.get("done") else 0,
+                    int(fields.get("priority") or 0), sort, ts, ts,
+                ),
+            )
+        return self.plan_get(uid, pid) or {}
+
+    def plan_update(self, uid: str, plan_id: str, fields: dict) -> dict | None:
+        """改一条。只写传进来的列；时间段按「合并后的整行」复查。"""
+        current = self.plan_get(uid, plan_id)
+        if current is None:
+            return None
+
+        merged = {**current, **fields}
+        start = merged.get("start") or None
+        end = merged.get("end") or None
+        if (start is None) != (end is None):
+            raise ValueError("开始和结束时间要么都填，要么都空")
+        if start and end and str(end) <= str(start):
+            raise ValueError("结束时间要晚于开始时间")
+
+        # 列名 → 新值；`end` 是 SQL 关键字，写语句时统一加双引号。
+        changes: dict[str, Any] = {}
+        for column in ("date", "title", "note", "start", "end", "priority", "sort"):
+            if column in fields:
+                changes[column] = fields[column]
+        # 时间段成对：清掉一头，另一头一起清，不留半截。
+        if ("start" in changes and changes["start"] is None) or ("end" in changes and changes["end"] is None):
+            changes["start"] = None
+            changes["end"] = None
+        if "done" in fields:
+            changes["done"] = 1 if fields["done"] else 0
+        if not changes:
+            return current
+
+        sets = [('"end"=?' if column == "end" else f"{column}=?") for column in changes]
+        args: list[Any] = [*changes.values(), now(), uid, plan_id]
+        with self.conn() as c:
+            c.execute(f"UPDATE plans SET {', '.join(sets)}, updated_at=? WHERE user_id=? AND id=?", args)
+        return self.plan_get(uid, plan_id)
+
+    def plan_delete(self, uid: str, plan_id: str) -> bool:
+        with self.conn() as c:
+            cur = c.execute("DELETE FROM plans WHERE user_id=? AND id=?", (uid, plan_id))
+            return cur.rowcount > 0
+
+    def plan_toggle(self, uid: str, plan_id: str, done: bool) -> dict | None:
+        with self.conn() as c:
+            cur = c.execute(
+                "UPDATE plans SET done=?, updated_at=? WHERE user_id=? AND id=?",
+                (1 if done else 0, now(), uid, plan_id),
+            )
+            if cur.rowcount <= 0:
+                return None
+        return self.plan_get(uid, plan_id)
+
+    def plan_reorder(self, uid: str, date: str, ordered_ids: list[str]) -> int:
+        """按给定顺序重排某一天；不属于这一天的一律跳过，返回真正动过的条数。"""
+        if not ordered_ids:
+            return 0
+        ts = now()
+        moved = 0
+        with self.conn() as c:
+            owned = {
+                row["id"]
+                for row in c.execute(
+                    "SELECT id FROM plans WHERE user_id=? AND date=?", (uid, date)
+                ).fetchall()
+            }
+            for index, pid in enumerate(ordered_ids):
+                if pid not in owned:
+                    continue
+                c.execute(
+                    "UPDATE plans SET sort=?, updated_at=? WHERE user_id=? AND id=?",
+                    (index, ts, uid, pid),
+                )
+                moved += 1
+        return moved
