@@ -1,0 +1,795 @@
+{
+  "source": "web/src/lib/{clock,records,timetable,calendar,plan}.ts via tests/helpers.cjs",
+  "now": 1793154000000,
+  "clock": [
+    {
+      "input": "2026-10-28T00:05:00+08:00",
+      "expected": {
+        "ms": 1793117100000,
+        "date": "2026-10-28",
+        "weekday": 3,
+        "minutes": 5
+      }
+    },
+    {
+      "input": "2026-10-27T16:05:00Z",
+      "expected": {
+        "ms": 1793117100000,
+        "date": "2026-10-28",
+        "weekday": 3,
+        "minutes": 5
+      }
+    },
+    {
+      "input": "2026-10-28T00:05:00-05:00",
+      "expected": {
+        "ms": 1793163900000,
+        "date": "2026-10-28",
+        "weekday": 3,
+        "minutes": 785
+      }
+    }
+  ],
+  "tasks": [
+    {
+      "input": {
+        "due": "2026-10-29"
+      },
+      "expected": {
+        "id": "",
+        "title": "未命名任务",
+        "course": "",
+        "source": "mystu",
+        "url": null,
+        "dueMs": 1793289540000,
+        "dueRaw": "2026-10-29",
+        "schoolStatus": ""
+      },
+      "bucket": "soon"
+    },
+    {
+      "input": {
+        "due": "2026-10-29T23:59"
+      },
+      "expected": {
+        "id": "",
+        "title": "未命名任务",
+        "course": "",
+        "source": "mystu",
+        "url": null,
+        "dueMs": 1793289540000,
+        "dueRaw": "2026-10-29T23:59",
+        "schoolStatus": ""
+      },
+      "bucket": "soon"
+    },
+    {
+      "input": {
+        "due": "2026-10-29 23:59:00"
+      },
+      "expected": {
+        "id": "",
+        "title": "未命名任务",
+        "course": "",
+        "source": "mystu",
+        "url": null,
+        "dueMs": 1793289540000,
+        "dueRaw": "2026-10-29 23:59:00",
+        "schoolStatus": ""
+      },
+      "bucket": "soon"
+    },
+    {
+      "input": {
+        "due": "2026-10-29T15:59:00Z"
+      },
+      "expected": {
+        "id": "",
+        "title": "未命名任务",
+        "course": "",
+        "source": "mystu",
+        "url": null,
+        "dueMs": 1793289540000,
+        "dueRaw": "2026-10-29T15:59:00Z",
+        "schoolStatus": ""
+      },
+      "bucket": "soon"
+    },
+    {
+      "input": {
+        "due": "2026-10-29T23:59:00-05:00"
+      },
+      "expected": {
+        "id": "",
+        "title": "未命名任务",
+        "course": "",
+        "source": "mystu",
+        "url": null,
+        "dueMs": 1793336340000,
+        "dueRaw": "2026-10-29T23:59:00-05:00",
+        "schoolStatus": ""
+      },
+      "bucket": "soon"
+    },
+    {
+      "input": {
+        "due": "待定"
+      },
+      "expected": {
+        "id": "",
+        "title": "未命名任务",
+        "course": "",
+        "source": "mystu",
+        "url": null,
+        "dueMs": null,
+        "dueRaw": "待定",
+        "schoolStatus": ""
+      },
+      "bucket": "none"
+    },
+    {
+      "input": {
+        "due": ""
+      },
+      "expected": {
+        "id": "",
+        "title": "未命名任务",
+        "course": "",
+        "source": "mystu",
+        "url": null,
+        "dueMs": null,
+        "dueRaw": "",
+        "schoolStatus": ""
+      },
+      "bucket": "none"
+    },
+    {
+      "input": {
+        "due": "bad",
+        "dueMs": 1793289540000
+      },
+      "expected": {
+        "id": "",
+        "title": "未命名任务",
+        "course": "",
+        "source": "mystu",
+        "url": null,
+        "dueMs": 1793289540000,
+        "dueRaw": "bad",
+        "schoolStatus": ""
+      },
+      "bucket": "soon"
+    },
+    {
+      "input": {
+        "due_at": "2026-10-28T10:30:00"
+      },
+      "expected": {
+        "id": "",
+        "title": "未命名任务",
+        "course": "",
+        "source": "mystu",
+        "url": null,
+        "dueMs": 1793154600000,
+        "dueRaw": "2026-10-28T10:30:00",
+        "schoolStatus": ""
+      },
+      "bucket": "today"
+    },
+    {
+      "input": {
+        "due": "2026-10-28T10:19:00"
+      },
+      "expected": {
+        "id": "",
+        "title": "未命名任务",
+        "course": "",
+        "source": "mystu",
+        "url": null,
+        "dueMs": 1793153940000,
+        "dueRaw": "2026-10-28T10:19:00",
+        "schoolStatus": ""
+      },
+      "bucket": "overdue"
+    },
+    {
+      "input": {
+        "due": "2026-10-13T10:19:00"
+      },
+      "expected": {
+        "id": "",
+        "title": "未命名任务",
+        "course": "",
+        "source": "mystu",
+        "url": null,
+        "dueMs": 1791857940000,
+        "dueRaw": "2026-10-13T10:19:00",
+        "schoolStatus": ""
+      },
+      "bucket": "expired"
+    },
+    {
+      "input": {
+        "due": "2026-11-02"
+      },
+      "expected": {
+        "id": "",
+        "title": "未命名任务",
+        "course": "",
+        "source": "mystu",
+        "url": null,
+        "dueMs": 1793635140000,
+        "dueRaw": "2026-11-02",
+        "schoolStatus": ""
+      },
+      "bucket": "later"
+    },
+    {
+      "input": {
+        "due": "2026-10-29",
+        "due_at": "2026-10-30"
+      },
+      "expected": {
+        "id": "",
+        "title": "未命名任务",
+        "course": "",
+        "source": "mystu",
+        "url": null,
+        "dueMs": 1793375940000,
+        "dueRaw": "2026-10-30",
+        "schoolStatus": ""
+      },
+      "bucket": "soon"
+    },
+    {
+      "input": {
+        "source": "yuketang",
+        "id": "yuketang-1",
+        "title": "任务",
+        "school_status": "未提交",
+        "url": "https://example.edu/task"
+      },
+      "expected": {
+        "id": "yuketang-1",
+        "title": "任务",
+        "course": "",
+        "source": "yuketang",
+        "url": "https://example.edu/task",
+        "dueMs": null,
+        "dueRaw": "",
+        "schoolStatus": "未提交"
+      },
+      "bucket": "none"
+    }
+  ],
+  "timetable": {
+    "input": {
+      "semester": "2026-2027-1",
+      "courses": [
+        {
+          "id": "a",
+          "title": "A100",
+          "meetings": [
+            {
+              "weekday": 3,
+              "weeks": [
+                8,
+                9
+              ],
+              "periods": [
+                1
+              ],
+              "location": "A101",
+              "raw_time": "原始课时"
+            },
+            {
+              "weekday": 3,
+              "weeks": [
+                8,
+                9
+              ],
+              "periods": [
+                2
+              ],
+              "location": "A101",
+              "raw_time": "原始课时"
+            }
+          ]
+        },
+        {
+          "id": "b",
+          "title": "B155",
+          "meetings": [
+            {
+              "weekday": 3,
+              "weeks": [
+                8,
+                9
+              ],
+              "periods": [
+                3,
+                4,
+                5
+              ],
+              "location": "B202",
+              "raw_time": "原始课时"
+            }
+          ]
+        },
+        {
+          "id": "c",
+          "title": "C午间分开",
+          "meetings": [
+            {
+              "weekday": 3,
+              "weeks": [
+                8,
+                9
+              ],
+              "periods": [
+                5,
+                6
+              ],
+              "location": "C303",
+              "raw_time": "原始课时"
+            }
+          ]
+        },
+        {
+          "id": "d",
+          "title": "D晚饭分开",
+          "meetings": [
+            {
+              "weekday": 3,
+              "weeks": [
+                8,
+                9
+              ],
+              "periods": [
+                10,
+                11
+              ],
+              "location": "D404",
+              "raw_time": "原始课时"
+            }
+          ]
+        },
+        {
+          "id": "e",
+          "title": "E换教室",
+          "meetings": [
+            {
+              "weekday": 3,
+              "weeks": [
+                8,
+                9
+              ],
+              "periods": [
+                8
+              ],
+              "location": "E501",
+              "raw_time": "原始课时"
+            },
+            {
+              "weekday": 3,
+              "weeks": [
+                8,
+                9
+              ],
+              "periods": [
+                9
+              ],
+              "location": "E502",
+              "raw_time": "原始课时"
+            }
+          ]
+        },
+        {
+          "id": "f",
+          "title": "F过滤未知",
+          "meetings": [
+            {
+              "weekday": 3,
+              "weeks": "8-9",
+              "periods": [
+                1.5,
+                0,
+                99,
+                13
+              ],
+              "location": "F601",
+              "raw_time": "原始课时",
+              "notes": "保留备注",
+              "online_info": "保留线上说明"
+            }
+          ]
+        }
+      ]
+    },
+    "blocks": [
+      {
+        "key": "a|3|1,2",
+        "periods": [
+          1,
+          2
+        ],
+        "start": "08:00",
+        "end": "09:40",
+        "span": 100,
+        "location": "A101",
+        "inferred": false,
+        "conflict": false
+      },
+      {
+        "key": "b|3|3,4,5",
+        "periods": [
+          3,
+          4,
+          5
+        ],
+        "start": "10:00",
+        "end": "12:35",
+        "span": 155,
+        "location": "B202",
+        "inferred": false,
+        "conflict": true
+      },
+      {
+        "key": "c|3|5",
+        "periods": [
+          5
+        ],
+        "start": "11:50",
+        "end": "12:35",
+        "span": 45,
+        "location": "C303",
+        "inferred": false,
+        "conflict": true
+      },
+      {
+        "key": "c|3|6",
+        "periods": [
+          6
+        ],
+        "start": "14:00",
+        "end": "14:45",
+        "span": 45,
+        "location": "C303",
+        "inferred": false,
+        "conflict": false
+      },
+      {
+        "key": "e|3|8",
+        "periods": [
+          8
+        ],
+        "start": "16:00",
+        "end": "16:45",
+        "span": 45,
+        "location": "E501",
+        "inferred": false,
+        "conflict": false
+      },
+      {
+        "key": "e|3|9",
+        "periods": [
+          9
+        ],
+        "start": "16:55",
+        "end": "17:40",
+        "span": 45,
+        "location": "E502",
+        "inferred": false,
+        "conflict": false
+      },
+      {
+        "key": "d|3|10",
+        "periods": [
+          10
+        ],
+        "start": "17:50",
+        "end": "18:35",
+        "span": 45,
+        "location": "D404",
+        "inferred": true,
+        "conflict": false
+      },
+      {
+        "key": "d|3|11",
+        "periods": [
+          11
+        ],
+        "start": "19:20",
+        "end": "20:05",
+        "span": 45,
+        "location": "D404",
+        "inferred": true,
+        "conflict": false
+      },
+      {
+        "key": "f|3|13",
+        "periods": [
+          13
+        ],
+        "start": "21:10",
+        "end": "21:55",
+        "span": 45,
+        "location": "F601",
+        "inferred": true,
+        "conflict": false
+      }
+    ],
+    "gaps": [
+      {
+        "start": "12:35",
+        "end": "14:00",
+        "startMin": 755,
+        "endMin": 840,
+        "span": 85,
+        "label": "午间"
+      },
+      {
+        "start": "14:45",
+        "end": "16:00",
+        "startMin": 885,
+        "endMin": 960,
+        "span": 75,
+        "label": "下午空闲"
+      },
+      {
+        "start": "18:35",
+        "end": "19:20",
+        "startMin": 1115,
+        "endMin": 1160,
+        "span": 45,
+        "label": "傍晚"
+      },
+      {
+        "start": "20:05",
+        "end": "21:10",
+        "startMin": 1205,
+        "endMin": 1270,
+        "span": 65,
+        "label": "晚上空闲"
+      }
+    ],
+    "slots": [
+      {
+        "weekday": 3,
+        "periods": [
+          13
+        ],
+        "location": "F601",
+        "teacher": "",
+        "weeks": [
+          8,
+          9
+        ],
+        "rawTimes": [
+          "原始课时"
+        ],
+        "notes": [
+          "保留备注"
+        ],
+        "online": [
+          "保留线上说明"
+        ]
+      }
+    ],
+    "progress": {
+      "total": 2,
+      "done": 1
+    }
+  },
+  "calendar": [
+    {
+      "date": "2026-09-20",
+      "status": {
+        "kind": "makeup",
+        "note": "国家调休上班日，学校按哪天课表上课尚未公布"
+      },
+      "week": 2,
+      "blocks": 0
+    },
+    {
+      "date": "2026-09-25",
+      "status": {
+        "kind": "closed",
+        "closure": "holiday",
+        "label": "中秋节"
+      },
+      "week": 3,
+      "blocks": 0
+    },
+    {
+      "date": "2026-10-01",
+      "status": {
+        "kind": "closed",
+        "closure": "holiday",
+        "label": "国庆节"
+      },
+      "week": 4,
+      "blocks": 0
+    },
+    {
+      "date": "2026-10-10",
+      "status": {
+        "kind": "makeup",
+        "note": "国家调休上班日，学校按哪天课表上课尚未公布"
+      },
+      "week": 5,
+      "blocks": 0
+    },
+    {
+      "date": "2026-10-28",
+      "status": {
+        "kind": "normal"
+      },
+      "week": 8,
+      "blocks": 9
+    },
+    {
+      "date": "2026-12-03",
+      "status": {
+        "kind": "closed",
+        "closure": "suspended",
+        "label": "校运会停课"
+      },
+      "week": 13,
+      "blocks": 0
+    },
+    {
+      "date": "2027-01-30",
+      "status": {
+        "kind": "outside"
+      },
+      "week": null,
+      "blocks": 0
+    },
+    {
+      "date": "2027-03-01",
+      "status": {
+        "kind": "normal"
+      },
+      "week": 1,
+      "blocks": 0
+    },
+    {
+      "date": "2027-08-29",
+      "status": {
+        "kind": "outside"
+      },
+      "week": null,
+      "blocks": 0
+    }
+  ],
+  "milestones": [
+    {
+      "label": "校运会停课",
+      "from": "2026-12-03",
+      "to": "2026-12-04",
+      "days": 36,
+      "kind": "suspended"
+    },
+    {
+      "label": "秋季考试周",
+      "from": "2027-01-11",
+      "to": "2027-01-22",
+      "days": 75,
+      "kind": "exam"
+    },
+    {
+      "label": "寒假",
+      "from": "2027-01-23",
+      "to": "2027-02-27",
+      "days": 87,
+      "kind": "break"
+    },
+    {
+      "label": "春季考试周",
+      "from": "2027-06-21",
+      "to": "2027-07-02",
+      "days": 236,
+      "kind": "exam"
+    }
+  ],
+  "exams": [
+    {
+      "input": {
+        "title": "原文考试",
+        "exam_time": "2026年11月2日 8:00–10:00",
+        "location": "E208",
+        "seat_number": "17",
+        "exam_campus": "东海岸",
+        "notes": "携带证件"
+      },
+      "expected": {
+        "id": "exam||原文考试|2026年11月2日 8:00–10:00",
+        "title": "原文考试",
+        "timeRaw": "2026年11月2日 8:00–10:00",
+        "location": "E208",
+        "seat": "17",
+        "campus": "东海岸",
+        "notes": "携带证件",
+        "date": "2026-11-02",
+        "startMs": 1793577600000
+      }
+    },
+    {
+      "input": {
+        "title": "仅有日期",
+        "exam_time": "2026/11/3"
+      },
+      "expected": {
+        "id": "exam||仅有日期|2026/11/3",
+        "title": "仅有日期",
+        "timeRaw": "2026/11/3",
+        "location": "",
+        "seat": "",
+        "campus": "",
+        "notes": "",
+        "date": "2026-11-03",
+        "startMs": 1793635200000
+      }
+    },
+    {
+      "input": {
+        "title": "尚未安排",
+        "exam_time": "由学院另行通知",
+        "notes": "原文保留"
+      },
+      "expected": {
+        "id": "exam||尚未安排|由学院另行通知",
+        "title": "尚未安排",
+        "timeRaw": "由学院另行通知",
+        "location": "",
+        "seat": "",
+        "campus": "",
+        "notes": "原文保留",
+        "date": null,
+        "startMs": null
+      }
+    }
+  ],
+  "grades": {
+    "input": [
+      {
+        "title": "数值成绩",
+        "semester": "2026-2027-1",
+        "score": "90",
+        "credits": 2,
+        "gpa": 4
+      },
+      {
+        "title": "等级成绩",
+        "semester": "2026-2027-1",
+        "score": "优秀",
+        "credits": 3,
+        "gpa": 3.5
+      },
+      {
+        "title": "有成绩无绩点",
+        "semester": "2026-2027-1",
+        "score": "60",
+        "credits": 1,
+        "gpa": null
+      },
+      {
+        "title": "重修逐条计入",
+        "semester": "2026-2027-1",
+        "score": "80",
+        "credits": 2,
+        "gpa": 3,
+        "exam_type": "重修"
+      }
+    ],
+    "expected": {
+      "weightedScore": 80,
+      "weightedGpa": 3.5,
+      "credits": 8,
+      "countedCredits": 5,
+      "counted": 3,
+      "total": 4
+    }
+  }
+}

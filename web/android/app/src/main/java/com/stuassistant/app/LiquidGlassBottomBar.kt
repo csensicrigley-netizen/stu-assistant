@@ -187,7 +187,7 @@ private fun NavigationGlyph(key: String, color: Color, modifier: Modifier) {
                     line(12f, 3.5f, 12f, 5.5f); line(12f, 18.5f, 12f, 20.5f)
                     line(3.5f, 12f, 5.5f, 12f); line(18.5f, 12f, 20.5f, 12f)
                 }
-                "plan" -> {
+                "plan", "items" -> {
                     val path = Path().apply { moveTo(5f, 12.5f); lineTo(9.5f, 17f); lineTo(19f, 7.5f) }
                     drawPath(path, color, style = stroke)
                 }
