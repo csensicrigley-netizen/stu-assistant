@@ -2,6 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { MotionConfig } from "motion/react";
 import App from "./App";
+import { installInteractionFeedback } from "./lib/haptics";
 
 import "./styles/tokens.css";
 import "./styles/app.css";
@@ -21,6 +22,8 @@ if (params.has("frame")) {
 
 const el = document.getElementById("root");
 if (!el) throw new Error("no #root");
+const stopFeedback = installInteractionFeedback();
+if (import.meta.hot) import.meta.hot.dispose(stopFeedback);
 
 /**
  * 一次性清理：把旧的 service worker 和它的缓存全注销掉。

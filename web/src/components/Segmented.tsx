@@ -1,6 +1,7 @@
 import { useId } from "react";
 import { motion } from "motion/react";
 import { PILL } from "../lib/motion";
+import { haptic } from "../lib/haptics";
 
 /**
  * A segmented control. It switches a view in place, so it is a radio group,
@@ -25,10 +26,12 @@ export function Segmented<T extends string>({
     const i = options.findIndex((o) => o.key === value);
     if (e.key === "ArrowRight" || e.key === "ArrowDown") {
       e.preventDefault();
+      if (options.length > 1) haptic("selection");
       onChange(options[(i + 1) % options.length].key);
     }
     if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
       e.preventDefault();
+      if (options.length > 1) haptic("selection");
       onChange(options[(i - 1 + options.length) % options.length].key);
     }
   };
