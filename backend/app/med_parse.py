@@ -22,6 +22,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from typing import Any
 
@@ -163,8 +164,11 @@ def parse_timetable(payload: dict, *, semester: str) -> dict:
             # 原来只用 (课程, 星期, 节次)：周 1 在 A 教室、周 2 换到 B 教室时，
             # 两条会被并成一条，周次 [1,2] 但地点只留了 A——学生按课表走到 A 教室，
             # 结果那天在 B（审查报告第 16 项）。地点不同就是两个时间段。
-            mid = imp._meeting_id(cid, weekday, periods) + "-" + str(abs(hash(location)) % 10000)
-            meeting = course["_by_meeting"].get(mid)
+            # 用完整字段归并，持久 ID 则使用跨进程稳定的摘要。
+            key = (weekday, tuple(periods), location)
+            identity = json.dumps(key, ensure_ascii=False, separators=(",", ":"))
+            mid = imp._meeting_id(cid, weekday, periods) + "-" + hashlib.sha256(identity.encode("utf-8")).hexdigest()
+            meeting = course["_by_meeting"].get(key)
             if meeting is None:
                 meeting = {
                     "id": mid,
@@ -181,7 +185,7 @@ def parse_timetable(payload: dict, *, semester: str) -> dict:
                     "onlineInfo": "",
                     "_teachers": set(),
                 }
-                course["_by_meeting"][mid] = meeting
+                course["_by_meeting"][key] = meeting
                 course["meetings"].append(meeting)
             meeting["weeks"] = sorted(set(meeting["weeks"]) | set(weeks))
             if teacher:

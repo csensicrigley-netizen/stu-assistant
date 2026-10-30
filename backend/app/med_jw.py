@@ -935,6 +935,11 @@ def get_bytes(path: str, *, token: str = "", timeout: float = CAPTCHA_TIMEOUT) -
 
 def _json_of(status: int, raw: bytes) -> dict:
     """把响应体解成 dict；解不出来就包成 `code=-1`，让上层统一走 `error_text`。"""
+    # 认证错误可能没有 JSON 正文，HTTP 状态优先于响应体的业务 code。
+    if status == 401:
+        return {"code": 401, "msg": "医学院的登录过期了，需要重新连一次。"}
+    if status >= 400:
+        return {"code": -1, "http_status": status, "msg": f"医学院教务请求失败（HTTP {status}），稍后再试。"}
     text = raw.decode("utf-8", "replace").strip()
     if not text:
         return {"code": -1, "msg": "教务这次没有返回内容，稍后再试一次"}

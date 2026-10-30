@@ -1,15 +1,5 @@
-/**
- * 医学院教务（强智「教学服务平台」）的后端客户端。
- *
- * 和 `plan-api.ts` 一样：不复用 `api.ts` 里没导出的 `request`，但**复刻同一套
- * 约定**（同一个 token、同一个 base、同一套 ApiError 语义、401 广播 AUTH_LOST），
- * 只把 path 前缀换成 `/v1/med`。
- *
- * 一条重要的产品约束：医学院登录**强制图形验证码**，所以这里不可能是"填一次
- * 账号密码就完事"的静默登录——验证码图片必须显示给人看，由他自己敲。
- * 密码同样只在这一来一回里用一次，后端换到 token 就把它丢掉，不落库。
- */
-import { ApiError, apiBase, getToken, AUTH_LOST } from "./api";
+/** Medical endpoints using the shared authenticated transport. */
+import { ApiError, request as requestJson } from "./http";
 
 export interface MedStatus {
   linked: boolean;
@@ -43,51 +33,8 @@ export interface MedSyncResult {
   message: string;
 }
 
-async function request<T>(path: string, init: RequestInit = {}, timeoutMs = 25_000): Promise<T> {
-  const base = apiBase();
-  const token = getToken();
-  const headers = new Headers(init.headers);
-  headers.set("Accept", "application/json");
-  if (init.body) headers.set("Content-Type", "application/json");
-  if (token) headers.set("Authorization", `Bearer ${token}`);
-
-  const attempt = async (): Promise<Response> => {
-    const ctrl = new AbortController();
-    const timer = window.setTimeout(() => ctrl.abort(), timeoutMs);
-    try {
-      const res = await fetch(base + path, { ...init, headers, signal: ctrl.signal });
-      // fetch 只等到响应头；把 body 也读进内存，隧道抖动时才不会"头到了、体挂住"
-      const text = await res.text();
-      return new Response(text, { status: res.status, statusText: res.statusText, headers: res.headers });
-    } finally {
-      window.clearTimeout(timer);
-    }
-  };
-
-  let res: Response;
-  try {
-    res = await attempt();
-  } catch {
-    try {
-      res = await attempt();
-    } catch {
-      throw new ApiError(0, "timeout");
-    }
-  }
-
-  if (!res.ok) {
-    let code = `http_${res.status}`;
-    try {
-      const body = (await res.json()) as { detail?: unknown };
-      if (typeof body.detail === "string") code = body.detail;
-      else if (Array.isArray(body.detail)) code = "invalid_input";
-    } catch {
-      /* 非 JSON 错误体 */
-    }
-    if (res.status === 401 && token) window.dispatchEvent(new CustomEvent(AUTH_LOST));
-    throw new ApiError(res.status, code);
-  }
-  return (await res.json()) as T;
+function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  return requestJson<T>(path, init, 25_000);
 }
 
 export const medApi = {

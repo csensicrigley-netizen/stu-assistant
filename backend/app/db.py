@@ -135,6 +135,12 @@ CREATE TABLE IF NOT EXISTS plans (
 CREATE INDEX IF NOT EXISTS idx_plans_user_date ON plans(user_id, date, sort);
 """
 
+# Keep account deletion and the one-time legacy orphan cleanup in sync.
+USER_TABLES = (
+    "items", "devices", "consents", "manual_timetables", "med_sessions", "plans",
+    "credentials_meta", "sync_runs", "push_log",
+)
+
 
 def now() -> float:
     return time.time()
@@ -150,21 +156,23 @@ class DB:
 
     @staticmethod
     def _migrate(c: sqlite3.Connection) -> None:
-        """老库平滑升级：只加列，不改名不删列。"""
+        """保留有效用户的数据，并在事务内清理旧版本留下的孤儿记录。"""
 
         cols = {row["name"] for row in c.execute("PRAGMA table_info(devices)")}
         for name, ddl in (("app_version", "TEXT"), ("app_code", "INTEGER"), ("seen_at", "REAL")):
             if name not in cols:
                 c.execute(f"ALTER TABLE devices ADD COLUMN {name} {ddl}")
+        if c.execute("PRAGMA user_version").fetchone()[0] < 1:
+            for table in USER_TABLES:
+                c.execute(f"DELETE FROM {table} WHERE NOT EXISTS "
+                          f"(SELECT 1 FROM users WHERE users.id = {table}.user_id)")
+            c.execute("PRAGMA user_version=1")
 
     @contextmanager
     def conn(self) -> Iterator[sqlite3.Connection]:
         c = sqlite3.connect(self.path, timeout=30)
         c.row_factory = sqlite3.Row
-        # 每条新连接都要单独开外键。SQLite 的 PRAGMA 是「按连接」生效的，
-        # 建表那一条连接上开了，后面这些连接并不会继承——于是
-        # ON DELETE CASCADE 全是摆设，删账号只删掉 users 一行，
-        # 其余 9 张业务表都留着孤儿数据（审查报告第 05 项）。
+        # 外键开关按连接生效；不能只在建表连接上开启。
         c.execute("PRAGMA foreign_keys=ON")
         try:
             yield c
@@ -202,6 +210,9 @@ class DB:
 
     def delete_user(self, uid: str) -> None:
         with self.conn() as c:
+            # 老库的三张日志/凭据元数据表没有外键，不能只依赖 CASCADE。
+            for table in USER_TABLES:
+                c.execute(f"DELETE FROM {table} WHERE user_id=?", (uid,))
             c.execute("DELETE FROM users WHERE id=?", (uid,))
 
     # ---------- items ----------
