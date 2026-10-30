@@ -44,7 +44,7 @@ android {
              // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
             // The native entry has no bundled web UI. Keep old assets on disk for
             // rollback, but exclude them through the Android asset merger itself.
-            ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~:!public:!capacitor.config.json:!capacitor.plugins.json'
+            ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~:!public:!capacitor.config.json:!capacitor.plugins.json:!native-bridge.js'
         }
     }
     buildTypes {
