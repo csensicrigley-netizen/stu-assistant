@@ -1,0 +1,249 @@
+#!/usr/bin/env bash
+# 把合作人上传的发布包，从 /srv/stu-upload/inbox 发到生产。
+#
+# 这是**唯一**允许大脑（以及我）执行的动作。设计原则：
+#   1. 只认 inbox 里的文件名，不接受任意路径；
+#   2. 先校验再动手，校验不过就什么都不改；
+#   3. 服务器包和网页包分开处理，各自可独立发布；
+#   4. 失败要能回滚，至少把旧包留在 accepted 里；
+#   5. 全程写审计日志，谁发的、发的哪个包、结果如何。
+#
+# 用法（root 或 sudo）：
+#   stu-release list                       列出 inbox 里待发的包
+#   stu-release accept <文件名>            校验并把包挪进 accepted（不改生产）
+#   stu-release deploy <文件名>            校验 + 发到生产（服务器包/网页包自动识别）
+#   stu-release reject <文件名> <理由>      退回
+#   stu-release log [行数]                 看审计日志
+#
+# 退出码：0 成功；1 参数/环境错；2 校验失败；3 发布失败。
+
+set -euo pipefail
+
+INBOX=/srv/stu-upload/inbox
+ACCEPTED=/srv/stu-upload/accepted
+REJECTED=/srv/stu-upload/rejected
+LOG=/var/log/stu-release.log
+SERVER_APP=/opt/stu-assistant
+SERVICE=stu-assistant
+WEB_HOST=web-host          # ~/.ssh/config 里配好的静态站别名
+WEB_ROOT=/opt/stu-web
+
+say() { printf '%s\n' "$*"; }
+die() { printf '错误：%s\n' "$*" >&2; exit "${2:-1}"; }
+
+need_root() {
+  [ "$(id -u)" -eq 0 ] || die "请用 root 或 sudo 运行"
+}
+
+audit() {
+  # 时间 | 操作者 | 动作 | 文件 | 结果 | 细节
+  local actor="${SUDO_USER:-$(id -un)}"
+  printf '%s | %s | %s | %s | %s | %s\n' \
+    "$(date -Is)" "$actor" "$1" "${2:-}" "${3:-}" "${4:-}" >> "$LOG"
+}
+
+# inbox 里的文件名只允许这些字符，避免路径穿越
+safe_name() {
+  local n="$1"
+  [[ "$n" =~ ^[A-Za-z0-9._-]+$ ]] || die "文件名不合法：$n（只允许字母数字点下划线短横线）"
+  [ -f "$INBOX/$n" ] || die "inbox 里没有这个文件：$n"
+  printf '%s' "$INBOX/$n"
+}
+
+# ---- 校验 ----------------------------------------------------------------
+
+check_tar() {
+  local f="$1"
+  # 必须是 tar.gz 且能列出内容。
+  # 注意：不要把 `tar | grep -q` 直接放进 if —— grep -q 命中即退出，
+  # tar 会收到 SIGPIPE，在 set -o pipefail 下整条管道返回非零，
+  # if 就永远判假。先把清单读进变量再匹配。
+  local listing
+  listing=$(tar -tzf "$f" 2>/dev/null) || return 1
+  [ -n "$listing" ] || return 1
+  # 不许绝对路径、不许 ..
+  case "$listing" in
+    /*) return 1 ;;
+  esac
+  printf '%s\n' "$listing" | grep -qE '(^|/)\.\.(/|$)' && return 1
+  return 0
+}
+
+check_web() {
+  local f="$1"
+  tar -tzf "$f" >/dev/null 2>&1 || return 1
+  # 网页包必须带 index.html 和 assets/
+  tar -tzf "$f" | grep -qE '(^\./)?index\.html$' || return 1
+  return 0
+}
+
+check_apk() {
+  local f="$1"
+  [ "$(stat -c %s "$f")" -gt 1048576 ] || return 1
+  # APK 是 zip，头部应为 PK
+  [ "$(head -c 2 "$f")" = "PK" ] || return 1
+  return 0
+}
+
+# ---- 动作 ----------------------------------------------------------------
+
+cmd_list() {
+  say "inbox（待发布）："
+  find "$INBOX" -maxdepth 1 -type f -printf '  %-46f %10s B  %TY-%Tm-%Td %TH:%TM\n' 2>/dev/null | sort || true
+  say ""
+  say "accepted（已批准/已发布）："
+  find "$ACCEPTED" -maxdepth 1 -type f -printf '  %-46f %10s B  %TY-%Tm-%Td %TH:%TM\n' 2>/dev/null | sort || true
+}
+
+cmd_accept() {
+  local name="${1:-}"; [ -n "$name" ] || die "用法：stu-release accept <文件名>"
+  local src; src=$(safe_name "$name")
+  # 大小上限 200MB，防止塞大文件把盘撑爆
+  [ "$(stat -c %s "$src")" -le 209715200 ] || die "文件超过 200MB" 2
+  case "$name" in
+    *.tar.gz|*.tgz) check_tar "$src" || die "不是合法的 tar.gz（或有绝对路径/..）" 2 ;;
+    *.apk)          check_apk "$src" || die "APK 不对（太小或不是 zip）" 2 ;;
+    *)              die "不认识的包类型：$name" 2 ;;
+  esac
+  cp -p "$src" "$ACCEPTED/$name"
+  rm -f "$src"
+  chmod 644 "$ACCEPTED/$name"
+  audit accept "$name" ok "$(stat -c %s "$ACCEPTED/$name") bytes"
+  say "已接收：$name（只挪位置，还没发到生产）"
+  say "确认要发布就执行：stu-release deploy $name"
+}
+
+cmd_reject() {
+  local name="${1:-}"; shift || true
+  local why="${*:-未说明}"
+  [ -n "$name" ] || die "用法：stu-release reject <文件名> <理由>"
+  local src; src=$(safe_name "$name")
+  mv "$src" "$REJECTED/$name"
+  audit reject "$name" ok "$why"
+  say "已退回：$name（理由：$why）"
+}
+
+deploy_server() {
+  local f="$1"
+  local stage=/tmp/stu-release-stage
+  rm -rf "$stage"; mkdir -p "$stage"
+  tar -xzf "$f" -C "$stage"
+  local root="$stage/stu-assistant-server"
+  [ -d "$root" ] || die "包里没有 stu-assistant-server/ 目录" 3
+  [ -f "$root/backend/app/main.py" ] || die "包里缺 backend/app/main.py" 3
+  [ -f "$root/deploy/install.sh" ] || die "包里缺 deploy/install.sh" 3
+  # 先把旧版本留一份，失败可回滚
+  local backup="/var/backups/stu-assistant/$(date +%Y%m%d-%H%M%S)"
+  mkdir -p "$backup"
+  if [ -d "$SERVER_APP" ]; then cp -a "$SERVER_APP/." "$backup/" 2>/dev/null || true; fi
+  say "旧版本已备份到 $backup"
+  ( cd "$root" && bash deploy/install.sh --no-proxy ) || {
+    audit deploy "$(basename "$f")" failed "install.sh 失败，已保留备份 $backup"
+    die "install.sh 失败；旧版本在 $backup" 3
+  }
+  systemctl is-active --quiet "$SERVICE" || {
+    audit deploy "$(basename "$f")" failed "服务没起来"
+    die "服务没起来，检查 journalctl -u $SERVICE" 3
+  }
+  rm -rf "$stage"
+  say "服务器已更新，服务运行中"
+}
+
+deploy_web() {
+  local f="$1"
+  local stage=/tmp/stu-web-stage
+  rm -rf "$stage"; mkdir -p "$stage"
+  tar -xzf "$f" -C "$stage"
+  [ -f "$stage/index.html" ] || die "网页包里没有 index.html" 3
+  # 先传到临时目录再原子切换，避免半旧半新。
+  # 关键：网页包里通常不含 download/（APK 太大），切换时必须把旧的那份
+  # 搬过去，否则一次发网页就把安装包弄成 404——之前踩过这个坑。
+  ssh -o BatchMode=yes "$WEB_HOST" "rm -rf /opt/stu-web.new && mkdir -p /opt/stu-web.new"
+  tar -czf - -C "$stage" . | ssh -o BatchMode=yes "$WEB_HOST" "tar -xzf - -C /opt/stu-web.new"
+  ssh -o BatchMode=yes "$WEB_HOST" bash -s <<'REMOTE'
+set -e
+test -s /opt/stu-web.new/index.html
+# 新包里没有 download/ 就沿用旧的
+if [ ! -d /opt/stu-web.new/download ] && [ -d /opt/stu-web/download ]; then
+  cp -a /opt/stu-web/download /opt/stu-web.new/download
+fi
+rm -rf /opt/stu-web.old && mv /opt/stu-web /opt/stu-web.old && mv /opt/stu-web.new /opt/stu-web
+chmod -R a+rX /opt/stu-web && chown -R root:root /opt/stu-web
+test -s /opt/stu-web/download/stu-assistant.apk || echo "警告：download/stu-assistant.apk 不存在，学生下载会 404"
+curl -s -o /dev/null -w "首页 %{http_code}\n" https://your.domain/
+curl -s -o /dev/null -w "APK  %{http_code}\n" https://your.domain/download/stu-assistant.apk
+REMOTE
+  rm -rf "$stage"
+  say "网页已更新"
+}
+
+deploy_apk() {
+  local f="$1"
+  # APK 只放进网页的 download 目录，由网页版提供下载
+  local name="stu-assistant.apk"
+  scp -q "$f" "$WEB_HOST:/opt/stu-web/download/$name"
+  ssh -o BatchMode=yes "$WEB_HOST" "chmod 644 /opt/stu-web/download/$name && ls -l /opt/stu-web/download/$name"
+  say "APK 已放到 /download/$name"
+}
+
+cmd_deploy() {
+  local name="${1:-}"; [ -n "$name" ] || die "用法：stu-release deploy <文件名>"
+  # 允许直接发 inbox 里的（一步到位），也允许发 accepted 里的
+  local src
+  if [ -f "$INBOX/$name" ]; then src=$(safe_name "$name")
+  elif [ -f "$ACCEPTED/$name" ]; then src="$ACCEPTED/$name"
+  else die "inbox 和 accepted 里都没有：$name"; fi
+
+  say "校验 $name …"
+  local kind=""
+  case "$name" in
+    *.apk)          check_apk "$src"   || die "APK 校验失败" 2; kind=apk ;;
+    *.tar.gz|*.tgz)
+      check_tar "$src" || die "tar.gz 校验失败（损坏或有危险路径）" 2
+      # 先把清单读进变量再判断：`tar | grep -q` 在 pipefail 下会因为
+      # grep 提前退出触发 SIGPIPE，让整条管道判假。
+      local listing
+      listing=$(tar -tzf "$src" 2>/dev/null || true)
+      case "$listing" in
+        *stu-assistant-server/backend/app/main.py*) kind=server ;;
+        *index.html*)                               kind=web ;;
+        *) die "包内容不认识：既不是服务器包也不是网页包" 2 ;;
+      esac
+      ;;
+    *) die "不认识的包类型：$name" 2 ;;
+  esac
+  say "识别为：$kind"
+
+  # 校验通过才进 accepted，留痕
+  [ -f "$ACCEPTED/$name" ] || cp -p "$src" "$ACCEPTED/$name"
+  chmod 644 "$ACCEPTED/$name" 2>/dev/null || true
+
+  say "开始发布 …"
+  case "$kind" in
+    server) deploy_server "$ACCEPTED/$name" ;;
+    web)    deploy_web    "$ACCEPTED/$name" ;;
+    apk)    deploy_apk    "$ACCEPTED/$name" ;;
+  esac
+
+  # 发成功才把 inbox 里那份删掉
+  [ -f "$INBOX/$name" ] && rm -f "$INBOX/$name"
+  audit deploy "$name" ok "$kind"
+  say "完成：$name（$kind）"
+}
+
+cmd_log() {
+  local n="${1:-40}"
+  [ -f "$LOG" ] || { say "还没有审计日志"; return 0; }
+  tail -n "$n" "$LOG"
+}
+
+need_root
+action="${1:-}"; shift || true
+case "$action" in
+  list)    cmd_list ;;
+  accept)  cmd_accept "$@" ;;
+  deploy)  cmd_deploy "$@" ;;
+  reject)  cmd_reject "$@" ;;
+  log)     cmd_log "$@" ;;
+  *) say "用法：stu-release {list|accept|deploy|reject|log} [参数]"; exit 1 ;;
+esac

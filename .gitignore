@@ -59,3 +59,5 @@ _bak_before_*/
 _probe/
 tmp/
 *.tmp
+# 含真实上传凭据，只在本机
+docs/上传说明-给合作方agent.md
