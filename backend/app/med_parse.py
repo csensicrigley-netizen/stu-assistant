@@ -154,7 +154,8 @@ def parse_timetable(payload: dict, *, semester: str) -> dict:
             # 结果那天在 B（审查报告第 16 项）。地点不同就是两个时间段。
             # 用完整字段归并，持久 ID 则使用跨进程稳定的摘要。
             key = (weekday, tuple(periods), location)
-            mid = imp._meeting_id(cid, weekday, periods) + "-" + hashlib.sha256(location.encode("utf-8")).hexdigest()
+            identity = json.dumps(key, ensure_ascii=False, separators=(",", ":"))
+            mid = imp._meeting_id(cid, weekday, periods) + "-" + hashlib.sha256(identity.encode("utf-8")).hexdigest()
             meeting = course["_by_meeting"].get(key)
             if meeting is None:
                 meeting = {

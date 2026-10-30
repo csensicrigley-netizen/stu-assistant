@@ -46,6 +46,16 @@ def test_meeting_identity_is_stable_across_python_processes():
     assert ids[0] == ids[1]
 
 
+def test_distinct_non_contiguous_periods_have_distinct_meeting_ids():
+    rows = [{"kcmc": "Course", "kcbh": "BIO1", "jcdm2": periods, "xq": 1,
+             "zc": week, "jxcdmc": "Room A"}
+            for week, periods in enumerate(("01,02,04", "01,03,04"), 1)]
+    doc = med_parse.parse_timetable({"code": 200, "kbList": [{"01": rows}]}, semester=SEMESTER)
+    meetings = doc["courses"][0]["meetings"]
+    assert {tuple(m["periods"]) for m in meetings} == {(1, 2, 4), (1, 3, 4)}
+    assert len(meetings) == len({m["id"] for m in meetings}) == 2
+
+
 @pytest.mark.parametrize("body", [b"", b"<html>login required</html>", b'{}', b'{"code":200,"kbList":[]}'])
 def test_http_401_is_expired_regardless_of_body(monkeypatch, body):
     monkeypatch.setattr(med_jw, "_raw_request", lambda *a, **kw: (401, body))
