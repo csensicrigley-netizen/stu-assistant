@@ -112,6 +112,10 @@ def parse_timetable(payload: dict, *, semester: str) -> dict:
         days = []
 
     courses: dict[str, dict] = {}
+    # 有课名、但排不出星期/节次/周次的记录：不能静默丢弃，
+    # 否则学生"课表里找不到这门课"却完全不知道为什么（比如劳动课、
+    # 讲座课这种没有固定节次的安排）。收进 unarranged，界面上会列出来。
+    unplaced: dict[str, dict] = {}
     for index, day in enumerate(days):
         for bucket, row in _rows_of(day):
             title = _text(row.get("kcmc"))
@@ -123,6 +127,14 @@ def parse_timetable(payload: dict, *, semester: str) -> dict:
             periods = _periods(row, bucket)
             weeks = _weeks(row)
             if not periods or not weeks:
+                uid_key = _text(row.get("kcbh")) + "|" + title
+                if uid_key not in unplaced:
+                    unplaced[uid_key] = {
+                        "id": imp._course_id(title, "", _text(row.get("kcbh"))),
+                        "title": title,
+                        "className": _text(row.get("jxbmc")),
+                        "teachers": [_text(row.get("teaxms"))] if _text(row.get("teaxms")) else [],
+                    }
                 continue
 
             teacher = _text(row.get("teaxms"))
@@ -187,4 +199,12 @@ def parse_timetable(payload: dict, *, semester: str) -> dict:
         )
         prepared.append(course)
 
-    return imp.to_timetable_doc(prepared, semester=semester)
+    doc = imp.to_timetable_doc(prepared, semester=semester)
+    if unplaced:
+        doc["unarranged"] = list(unplaced.values())
+        # 有未排课就说明这份课表不完整，状态要跟着变
+        doc["status"] = "partial"
+        notes = list(doc.get("pending") or [])
+        notes.append(f"有 {len(unplaced)} 门课学校还没排时间，已列在「需要留意」里。")
+        doc["pending"] = notes
+    return doc
