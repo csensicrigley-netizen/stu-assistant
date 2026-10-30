@@ -41,8 +41,6 @@ const partsFmt = new Intl.DateTimeFormat("en-CA", {
   hourCycle: "h23",
 });
 
-const WD: Record<string, number> = { Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 7 };
-
 export interface Moment {
   ms: number;
   /** "2026-10-28" */
@@ -69,9 +67,27 @@ export function moment(ms = nowMs()): Moment {
     year,
     month,
     day,
-    weekday: WD[parts.weekday] ?? 1,
+    /*
+     * 星期几**不查 Intl 的 weekday 文本**。
+     *
+     * 原来用 `WD[parts.weekday] ?? 1`：Chrome / Node 给的是 "Fri"，但
+     * Android WebView 的 ICU 对 en-CA 会给 "Fri."（带句点），查表落空后
+     * `?? 1` 把**每一天都当成周一**——于是课表只剩周一那一行，其他天的课
+     * 全被排到周一，学生看到的就是"课表是空的/只有周一"。
+     *
+     * 现在直接用日期算：把这一天当作 UTC 正午，取 getUTCDay()。
+     * 正午取整不会被时区或夏令时影响，也不依赖任何 locale 数据。
+     */
+    weekday: weekdayOfDate(year, month, day),
     minutes: Number(parts.hour) * 60 + Number(parts.minute),
   };
+}
+
+/** "YYYY-MM-DD" → 1..7（周一=1）。纯算术，不看 Intl。 */
+function weekdayOfDate(year: number, month: number, day: number): number {
+  // Date.UTC 的月份从 0 开始；getUTCDay 里周日=0，转成 7
+  const dow = new Date(Date.UTC(year, month - 1, day, 12, 0, 0)).getUTCDay();
+  return dow === 0 ? 7 : dow;
 }
 
 /** Midnight (Shanghai) of a "YYYY-MM-DD" date, as epoch ms. */
