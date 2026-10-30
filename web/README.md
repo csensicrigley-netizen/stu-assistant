@@ -25,6 +25,7 @@ APK 的签名密钥在 `..\android-signing\`，不在这个目录里，也不会
 ## 检查
 
 ```powershell
+npm test                     # 离线请求层/日期回归测试，无需后端或校园账号
 node scripts/audit.mjs        # axe 无障碍、触控目标、横向溢出、CLS（需 npm run dev）
 node scripts/shoot.mjs        # 全部页面截图 → shots/（需 npm run dev）
 node scripts/e2e.mjs          # 网页版完整流程（需后端演示模式托管 dist/）

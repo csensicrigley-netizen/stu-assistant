@@ -40,7 +40,7 @@ export function normalizeTask(raw: unknown): Task {
    * 首页"快到截止"的提示、排序、角标全部失效，界面上写"没写截止时间"。
    *
    * 所以顺序是：先认后端已经算好的 dueMs，再退回字符串自己解析。
-   * 字符串一律按 **+08:00** 解释（学校在汕头，日期不带时区），
+   * 无时区的字符串按 **+08:00** 解释，显式时区原样保留，
    * 不能让它走浏览器本地时区，也不能当 UTC（差 8 小时）。
    */
   const rawMs = Number(r.dueMs);
@@ -49,7 +49,11 @@ export function normalizeTask(raw: unknown): Task {
   if (Number.isFinite(rawMs) && rawMs > 0) {
     dueMs = rawMs;
   } else if (due) {
-    const parsed = Date.parse(/T\d/.test(due) ? due : `${due}T23:59:00+08:00`);
+    let iso = due.trim().replace(/^(\d{4}-\d{2}-\d{2})\s+(\d{2}:)/, "$1T$2");
+    if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) iso += "T23:59:00+08:00";
+    const isDateTime = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?$/i.test(iso);
+    if (isDateTime && !/(?:Z|[+-]\d{2}:?\d{2})$/i.test(iso)) iso += "+08:00";
+    const parsed = isDateTime ? Date.parse(iso) : NaN;
     dueMs = Number.isNaN(parsed) ? null : parsed;
   }
 

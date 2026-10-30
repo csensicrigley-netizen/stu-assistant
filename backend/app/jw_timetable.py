@@ -1,11 +1,9 @@
 """Pure parsing of the theoretical timetable — a patched copy of stu-mcp 0.7.3.
 
-Only one behaviour differs from the installed package: a class may legitimately
-sit across two 大节 rows (the school writes ``[06-07-08-09节]`` inside the
-第三大节 cell), and upstream compares each block against that single row, so it
-raised ``schema_changed``. Here the block is checked against every 大节 on the
-page, which is the check the page actually supports. Everything else is
-byte-for-byte upstream; re-copy and re-apply this fix when stu-mcp is upgraded.
+Classes may span multiple 大节 rows and appear more than once in the grid.
+Usable courses survive malformed inventory rows or blocks, but every skipped
+record is reported in coverage/pending. Recheck these adaptations when upgrading
+stu-mcp rather than replacing this module without its regression tests.
 """
 from __future__ import annotations
 
@@ -119,7 +117,7 @@ def _text(node: Tag) -> str:
     return result
 
 
-def _inventory(soup: BeautifulSoup, table_id: str) -> list[dict]:
+def _inventory(soup: BeautifulSoup, table_id: str) -> tuple[list[dict], int]:
     table = one(soup.select("#" + table_id), "课程明细表缺失或重复。")
     rows = _rows(table)
     candidates = []
@@ -133,6 +131,7 @@ def _inventory(soup: BeautifulSoup, table_id: str) -> list[dict]:
             candidates.append((index, {k: indices[0] for k, indices in matches.items()}, len(labels)))
     head, columns, width = one(candidates, "课程表头缺失或有歧义。")
     result = []
+    skipped = 0
     for position, row in enumerate(rows):
         if position == head:
             continue
@@ -143,17 +142,17 @@ def _inventory(soup: BeautifulSoup, table_id: str) -> list[dict]:
             continue
         if len(cells) != width or any(c.get("rowspan", "1") != "1" or
                                      c.get("colspan", "1") != "1" or c.find("table") for c in cells):
-            # 以前这里整份作废（schema_changed），一个人课表里只要有一行是合并单元格、
-            # 整份课表就全没了（2026-10-29 群里反馈的"课表不能同步"就是这个）。
-            # 现在只跳过这一行：少一条不要紧，整份读不到才要紧。
+            # 保留可解析的课程，但必须向调用方报告漏掉的明细。
+            skipped += 1
             continue
         record = {key: _text(cells[index]) for key, index in columns.items()}
         if not all(record[key] for key in ("class_name", "course_code", "title")):
+            skipped += 1
             continue
         result.append(record)
     if len(result) > 1000:
         raise changed("课程明细超过读取上限。")
-    return result
+    return result, skipped
 
 
 def meeting_time(raw: str) -> tuple[list[int], list[list[int]]]:
@@ -239,7 +238,9 @@ def parse_timetable(html: str, semester: str) -> dict:
     include_unarranged = one(soup.select('form input[name="wkbkc"]'), "未排课查询字段有歧义。")
     if not include_unarranged.has_attr("checked"):
         raise changed("未返回已启用的未排课查询，不能确认完整范围。")
-    arranged, unarranged = _inventory(soup, "dataTables2"), _inventory(soup, "dataTables")
+    arranged, skipped_arranged = _inventory(soup, "dataTables2")
+    unarranged, skipped_unarranged = _inventory(soup, "dataTables")
+    skipped_inventory = skipped_arranged + skipped_unarranged
     courses = {}
     index = {}
     for row in arranged:
@@ -263,6 +264,7 @@ def parse_timetable(html: str, semester: str) -> dict:
     if len(headings) != 8 or set(headings[1:]) != set(weekdays):
         raise changed("星期表头缺失或有歧义。")
     seen, matched_details, grid_periods, blocks = set(), set(), set(), 0
+    skipped_time = skipped_blocks = 0
     # Every 小节 that appears anywhere in the grid: a class may legitimately span
     # two adjacent 大节 rows (the page writes [06-07-08-09节] inside 第三大节),
     # so blocks are validated against the whole page, not one row.
@@ -293,19 +295,20 @@ def parse_timetable(html: str, semester: str) -> dict:
         for heading, cell in zip(headings[1:], cells[1:], strict=True):
             nodes = cell.select(".kbcontent")
             if not nodes:
-                # 空格子/没容器的格子跳过，不整份作废
+                if _text(cell):
+                    skipped_blocks += 1
                 continue
             for node in nodes:
                 for block in _blocks(node):
                     required = {"title", "教师", "周次(节次)", "班级", "通知单编号", "教室"}
                     if not required.issubset(block) or not block["通知单编号"]:
+                        skipped_blocks += 1
                         continue
                     key = (block["班级"], block["title"], block["教师"])
                     if key not in index:
                         # 明细里没有这条（比如明细行被跳过了）：跳过这个块，别把整份课表废掉
+                        skipped_blocks += 1
                         continue
-                    skipped_time = 0
-    matched_details.add(key)
                     cid = index[key]
                     try:
                         weeks, runs = meeting_time(block["周次(节次)"])
@@ -317,6 +320,7 @@ def parse_timetable(html: str, semester: str) -> dict:
                         continue
                     if not set(sum(runs, [])).issubset(all_periods):
                         raise changed("授课节次与网格对应不一致。")
+                    matched_details.add(key)
                     building, room = block.get("教学楼", ""), block["教室"]
                     location = room if not building or room.startswith(building) else clean(building + " " + room)
                     for periods in runs:
@@ -352,6 +356,10 @@ def parse_timetable(html: str, semester: str) -> dict:
         pending.append("部分已排课教师明细没有对应的网格安排，须在学校核对，不能认定这些安排为空。")
     if skipped_time:
         pending.append(f"有 {skipped_time} 条安排的周次写法没认出来，已跳过；这份课表不完整，别当成全部课。")
+    if skipped_inventory:
+        pending.append(f"有 {skipped_inventory} 条课程明细无法识别，须在学校核对。")
+    if skipped_blocks:
+        pending.append(f"有 {skipped_blocks} 条网格安排缺少字段或无法匹配明细，须在学校核对。")
     unscheduled = {}
     for row in unarranged:
         cid = item_id("jw", "timetable", semester, row["course_code"], row["class_name"])
@@ -373,9 +381,11 @@ def parse_timetable(html: str, semester: str) -> dict:
             "unarranged": sorted(unscheduled.values(), key=lambda c: c["id"]),
             "unplaced_details": unplaced, "pending": pending,
             "coverage": {"kind": "theory", "weeks": "all",
-                          "complete": not unplaced and skipped_time == 0,
+                         "complete": not unplaced and not (skipped_time or skipped_inventory or skipped_blocks),
                          "course_count": len(courses), "meeting_count": len(seen), "grid_arrangements": blocks,
                          "unarranged_count": len(unscheduled), "unplaced_detail_count": len(unplaced),
-                          "skipped_time_count": skipped_time,
+                         "skipped_time_count": skipped_time,
+                         "skipped_inventory_count": skipped_inventory,
+                         "skipped_block_count": skipped_blocks,
                          "calendar_verified": False,
                          "period_times_verified": False, "experimental_timetable_included": False}}
