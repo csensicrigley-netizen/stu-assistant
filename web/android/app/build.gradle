@@ -44,6 +44,15 @@ android {
                 signingConfig signingConfigs.release
             }
         }
+        // Full app for local verification; can coexist with the maintainer's release.
+        haptics {
+            initWith release
+            debuggable false
+            applicationIdSuffix '.haptics'
+            versionNameSuffix '-haptics.7'
+            signingConfig signingConfigs.debug
+            matchingFallbacks = ['release']
+        }
     }
 }
 
@@ -54,6 +63,7 @@ repositories {
 }
 
 dependencies {
+    implementation files('libs/richtap-2.0.4-lite.aar')
     implementation fileTree(include: ['*.jar'], dir: 'libs')
     implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
     implementation "androidx.activity:activity:$androidxActivityVersion"

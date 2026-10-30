@@ -19,6 +19,7 @@ import { Magnetic } from "../components/Magnetic";
 import { rise } from "../lib/motion";
 import { Notice, PageHead, Section } from "../components/Layout";
 import { Segmented } from "../components/Segmented";
+import { FeedbackSettings } from "../components/FeedbackSettings";
 
 const STATE: Record<string, { label: string; tone: string }> = {
   ok: { label: "正常", tone: "ok" },
@@ -239,6 +240,8 @@ export function MeScreen({ onSignOut }: { onSignOut: () => void }) {
           <p className="field__hint">跟手机系统的深浅色走，装到桌面之后也不会跳。</p>
         </div>
       </Section>
+
+      {IS_NATIVE && <FeedbackSettings />}
 
       {!IS_NATIVE && (
         <Section title="安卓 App">

@@ -3,6 +3,7 @@
 # Built application files
 *.apk
 *.aar
+!app/libs/richtap-2.0.4-lite.aar
 *.ap_
 *.aab
 

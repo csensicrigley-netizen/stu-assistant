@@ -1,0 +1,37 @@
+package com.stuassistant.app;
+
+import org.junit.Test;
+import static org.junit.Assert.*;
+
+public class HapticTimingTest {
+    @Test public void fastClickPreserves110MillisecondOnsetSpacing() {
+        HapticTiming timing = new HapticTiming();
+        timing.played("press", 100);
+        assertFalse(timing.throttled("release", 104));
+        assertEquals(106, timing.releaseDelay("release", 104));
+        assertEquals(1, timing.releaseDelay("release", 209));
+        assertEquals(0, timing.releaseDelay("release", 210));
+    }
+
+    @Test public void heldButtonReleasesImmediately() {
+        HapticTiming timing = new HapticTiming();
+        timing.played("press", 100);
+        assertEquals(0, timing.releaseDelay("release", 600));
+    }
+
+    @Test public void repeatedClicksAndSliderEventsDoNotBuildAQueue() {
+        HapticTiming timing = new HapticTiming();
+        timing.played("release", 210);
+        assertTrue(timing.throttled("press", 220));
+        assertTrue(timing.throttled("selection", 259));
+        assertFalse(timing.throttled("selection", 260));
+    }
+
+    @Test public void cancellationResetsThePressPair() {
+        HapticTiming timing = new HapticTiming();
+        timing.played("press", 100);
+        timing.reset();
+        assertEquals(0, timing.releaseDelay("release", 110));
+        assertFalse(timing.throttled("press", 110));
+    }
+}
