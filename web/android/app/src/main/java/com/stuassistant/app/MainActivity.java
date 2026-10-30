@@ -25,6 +25,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(LiveWindowPlugin.class);
+        registerPlugin(InteractionHapticsPlugin.class);
         super.onCreate(savedInstanceState);
         // Draw behind the status and navigation bars on every Android version;
         // the page keeps clear of them with the safe-area insets.
