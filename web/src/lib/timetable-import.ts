@@ -13,7 +13,7 @@
  *   DELETE /v1/timetable/manual?semester=
  *   GET    /v1/timetable/import/template   → text/csv
  */
-import { ApiError, AUTH_LOST, apiBase, getToken } from "./api";
+import { request, requestText } from "./http";
 import { normalizeTimetable, type Course, type TimetableDoc, type Unarranged } from "./timetable";
 
 /* ------------------------------------------------------------------ 形状 */
@@ -69,56 +69,12 @@ export const EMPTY_PREVIEW: ImportPreview = {
 
 /* ------------------------------------------------------------- 传输层 */
 
-async function call<T>(path: string, init: RequestInit = {}, timeoutMs = 20_000): Promise<T> {
-  const token = getToken();
-  const headers = new Headers(init.headers);
-  headers.set("Accept", "application/json");
-  if (init.body) headers.set("Content-Type", "application/json");
-  if (token) headers.set("Authorization", `Bearer ${token}`);
-
-  const ctrl = new AbortController();
-  const timer = window.setTimeout(() => ctrl.abort(), timeoutMs);
-  let res: Response;
-  try {
-    res = await fetch(apiBase() + path, { ...init, headers, signal: ctrl.signal });
-  } catch {
-    throw new ApiError(0, "timeout");
-  } finally {
-    window.clearTimeout(timer);
-  }
-
-  if (!res.ok) {
-    let code = `http_${res.status}`;
-    try {
-      const body = (await res.json()) as { detail?: unknown };
-      if (typeof body.detail === "string") code = body.detail;
-      else if (Array.isArray(body.detail)) code = "invalid_input";
-    } catch {
-      /* 非 JSON 错误体 */
-    }
-    if (res.status === 401 && token) window.dispatchEvent(new CustomEvent(AUTH_LOST));
-    throw new ApiError(res.status, code);
-  }
-  return (await res.json()) as T;
+function call<T>(path: string, init: RequestInit = {}, timeoutMs = 20_000): Promise<T> {
+  // Preserve the import client's single-attempt behavior, including saves.
+  return request<T>(path, init, timeoutMs, undefined, 0);
 }
 
-async function callText(path: string, timeoutMs = 20_000): Promise<string> {
-  const token = getToken();
-  const headers = new Headers();
-  if (token) headers.set("Authorization", `Bearer ${token}`);
-  const ctrl = new AbortController();
-  const timer = window.setTimeout(() => ctrl.abort(), timeoutMs);
-  try {
-    const res = await fetch(apiBase() + path, { headers, signal: ctrl.signal });
-    if (!res.ok) throw new ApiError(res.status, `http_${res.status}`);
-    return await res.text();
-  } catch (exc) {
-    if (exc instanceof ApiError) throw exc;
-    throw new ApiError(0, "timeout");
-  } finally {
-    window.clearTimeout(timer);
-  }
-}
+const callText = requestText;
 
 /* ------------------------------------------------------- 服务端 → 前端 */
 

@@ -1,15 +1,5 @@
-/**
- * 每日计划的后端客户端。
- *
- * 为什么不直接塞进 `api.ts`：那份文件是别人在维护的公共客户端，动它会影响
- * 所有页面。这里复刻同一套约定（同一个 token、同一个 base、同一套 ApiError
- * 语义），只是把 path 前缀换成 `/v1/plan`。
- *
- * 注意：`api.ts` 的 `request` 没有导出，所以下面这份是照着它写的等价实现——
- * 15 秒超时、超时/网络错误自动重试一次、401 时广播 AUTH_LOST、非 2xx 把
- * `detail` 当错误码抛 `ApiError`。行为一致，错误码对 `errorText()` 同样适用。
- */
-import { ApiError, apiBase, getToken, AUTH_LOST } from "./api";
+/** Daily plan endpoints using the shared authenticated transport. */
+import { ApiError, request } from "./http";
 
 export interface Plan {
   id: string;
@@ -51,58 +41,6 @@ export interface PlanListParams {
 }
 
 const EMPTY_SUMMARY: PlanSummary = { today_total: 0, today_done: 0, today_open: 0, overdue: 0, upcoming: [] };
-
-async function request<T>(path: string, init: RequestInit = {}, timeoutMs = 15_000): Promise<T> {
-  const base = apiBase();
-  const token = getToken();
-  const headers = new Headers(init.headers);
-  headers.set("Accept", "application/json");
-  if (init.body) headers.set("Content-Type", "application/json");
-  if (token) headers.set("Authorization", `Bearer ${token}`);
-
-  const attempt = async (): Promise<Response> => {
-    const ctrl = new AbortController();
-    const timer = window.setTimeout(() => ctrl.abort(), timeoutMs);
-    try {
-      const res = await fetch(base + path, { ...init, headers, signal: ctrl.signal });
-      // fetch 只等到响应头；把 body 也读进内存，隧道抖动时才不会"头到了、体挂住"
-      const text = await res.text();
-      return new Response(text, { status: res.status, statusText: res.statusText, headers: res.headers });
-    } finally {
-      window.clearTimeout(timer);
-    }
-  };
-
-  let res: Response;
-  try {
-    res = await attempt();
-  } catch {
-    try {
-      res = await attempt();
-    } catch {
-      throw new ApiError(0, "timeout");
-    }
-  }
-
-  try {
-    if (!res.ok) {
-      let code = `http_${res.status}`;
-      try {
-        const body = (await res.json()) as { detail?: unknown };
-        if (typeof body.detail === "string") code = body.detail;
-        else if (Array.isArray(body.detail)) code = "invalid_input";
-      } catch {
-        /* 非 JSON 错误体 */
-      }
-      if (res.status === 401 && token) window.dispatchEvent(new CustomEvent(AUTH_LOST));
-      throw new ApiError(res.status, code);
-    }
-    return (await res.json()) as T;
-  } catch (exc) {
-    if (exc instanceof ApiError) throw exc;
-    throw new ApiError(0, "network");
-  }
-}
 
 function listQuery(params?: PlanListParams): string {
   const q = new URLSearchParams();
