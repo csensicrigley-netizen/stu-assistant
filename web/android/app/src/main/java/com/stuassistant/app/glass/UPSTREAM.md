@@ -1,10 +1,10 @@
-# AndroidLiquidGlass official bottom navigation source port
+# AndroidLiquidGlass official controls source port
 
 Upstream repository: [Kyant0 AndroidLiquidGlass](https://github.com/Kyant0/AndroidLiquidGlass).  
 Fixed revision: `65ab177e90e5c1d8c62e70cf7755841982da65f6` on `kmp`.  
 License: Apache 2.0, reproduced in `LICENSE-AndroidLiquidGlass.txt` and packaged with the APK at `src/main/assets/licenses/android-liquid-glass.txt`.
 
-The six files below are source ports of the official catalog, not independent recreations of its appearance. Original class names and method structure are retained. The Android app consumes the published Backdrop `2.0.1` and Shapes `1.2.1`; the renderer API was checked against the published `backdrop-android-2.0.1-sources.jar`.
+The nine component/helper files below are source ports of the official catalog, not independent recreations of its appearance. Original class names and method structure are retained. `LiquidDialogSurface` separately extracts the original dialog's container recipe. The Android app consumes the published Backdrop `2.0.1` and Shapes `1.2.1`; the renderer API was checked against the published `backdrop-android-2.0.1-sources.jar`.
 
 | Local file | Fixed upstream source |
 | --- | --- |
@@ -14,6 +14,10 @@ The six files below are source ports of the official catalog, not independent re
 | `InteractiveHighlight.kt` | [utils InteractiveHighlight.kt](https://github.com/Kyant0/AndroidLiquidGlass/blob/65ab177e90e5c1d8c62e70cf7755841982da65f6/app/src/commonMain/kotlin/com/kyant/backdrop/catalog/utils/InteractiveHighlight.kt) |
 | `DragGestureInspector.kt` | [utils DragGestureInspector.kt](https://github.com/Kyant0/AndroidLiquidGlass/blob/65ab177e90e5c1d8c62e70cf7755841982da65f6/app/src/commonMain/kotlin/com/kyant/backdrop/catalog/utils/DragGestureInspector.kt) |
 | `Coroutines.kt` | [Android utils Coroutines.kt](https://github.com/Kyant0/AndroidLiquidGlass/blob/65ab177e90e5c1d8c62e70cf7755841982da65f6/app/src/androidMain/kotlin/com/kyant/backdrop/catalog/utils/Coroutines.kt) |
+| `LiquidButton.kt` | [components LiquidButton.kt](https://github.com/Kyant0/AndroidLiquidGlass/blob/65ab177e90e5c1d8c62e70cf7755841982da65f6/app/src/commonMain/kotlin/com/kyant/backdrop/catalog/components/LiquidButton.kt) |
+| `LiquidToggle.kt` | [components LiquidToggle.kt](https://github.com/Kyant0/AndroidLiquidGlass/blob/65ab177e90e5c1d8c62e70cf7755841982da65f6/app/src/commonMain/kotlin/com/kyant/backdrop/catalog/components/LiquidToggle.kt) |
+| `LiquidSlider.kt` | [components LiquidSlider.kt](https://github.com/Kyant0/AndroidLiquidGlass/blob/65ab177e90e5c1d8c62e70cf7755841982da65f6/app/src/commonMain/kotlin/com/kyant/backdrop/catalog/components/LiquidSlider.kt) |
+| `LiquidDialogSurface.kt` (container extraction) | [destinations DialogContent.kt](https://github.com/Kyant0/AndroidLiquidGlass/blob/65ab177e90e5c1d8c62e70cf7755841982da65f6/app/src/commonMain/kotlin/com/kyant/backdrop/catalog/destinations/DialogContent.kt) |
 
 ## Rendering and physics retained
 
@@ -26,13 +30,23 @@ The six files below are source ports of the official catalog, not independent re
 
 ## Deliberate adaptations
 
-1. All six files use `com.stuassistant.app.glass`. Catalog-only imports between the copied files are removed because they now share one package. Each file carries its fixed source URL and license attribution.
+1. All source ports use `com.stuassistant.app.glass`. Catalog-only imports between the copied files are removed because they now share one package. Each file carries its fixed source URL and license attribution.
 2. `AppAppearance.kt` supplies optional dark-theme and accent overrides from the App. Without overrides, `LiquidBottomTabs` retains the upstream system-theme and blue-accent defaults. The original glass opacity, blur, lens, highlight and shadow recipes remain unchanged.
 3. A reduced-motion flag selects instant animation specs and removes scale, velocity deformation, panel displacement and captured-content enlargement. With the flag off, upstream numeric parameters are unchanged.
 4. `DampedDragAnimation` exposes `onDragCancelled` separately. Upstream calls `onDragStopped` for both completion and cancellation; the port restores the committed index on cancellation and emits no route or selection haptic. This preserves the App's cancel semantics.
 5. The navigation callback is emitted from the user's successful drag/tap confirmation, rather than from the observer that mirrors externally supplied selection. The observer still animates the indicator. This avoids a native click being echoed a second time when the Web route returns its new selected index.
 6. Geometry-dependent `remember` keys include tab width, direction and tab count so rotation or resizing uses current drag geometry. Appearance changes recreate the helpers needed by reduced-motion behavior.
 7. Android-only `Coroutines.kt` removes the multiplatform `actual` keyword and aliases the imported function as `awaitAndroidFrame`, keeping the frame wait without a same-name self-call.
+
+## Native V1 control additions
+
+- `LiquidButton` preserves the upstream 48 dp capsule, vibrancy, 2 dp blur, 12/24 dp lens, hue/surface fills, touch highlight, translation and drag-scale formula. Optional `enabled` and `interactionSource` parameters only expose disabled input and the existing clickable press/release stream to the host. Reduced motion disables geometric deformation and supplies the existing highlight helper's instant specs; disabled buttons do not start highlight gestures.
+- `LiquidToggle` preserves the 64 x 28 dp track, 40 x 24 dp thumb, 20 dp travel, 1.5 pressed scale, 8 dp rest blur, 5/10 dp pressed lens and the upstream combined track/backdrop recipe. It adds app appearance overrides, optional disabled input and switch state/action semantics. Latest-value/callback holders and geometry-dependent remember keys avoid stale closures. Each gesture resets `didDrag`; cancellation restores the externally committed selected value without calling `onSelect`. The existing reduced-motion helper removes scale/velocity motion when requested. Normal material constants are unchanged.
+- `LiquidSlider` preserves the 6 dp track, 40 x 24 dp thumb, 1.5 pressed scale, 8 dp rest blur, 10/14 dp pressed lens, combined track/backdrop, translation and velocity deformation. It adds app appearance overrides, optional disabled input, range/set-progress semantics and `onValueChangeFinished`. Value/range callbacks use their latest values; remember/pointer keys include current geometry, direction and range. Each gesture resets `didDrag`, fixing the demo's lingering flag across gestures. Cancellation emits no completion callback and settles to the current externally supplied value; already emitted live changes are not rolled back. Successful track taps, dragged release and accessibility adjustments emit completion once. The caller must supply a finite increasing range and positive finite visibility threshold. Reduced motion removes scale/velocity motion. Normal material constants are unchanged.
+- `LiquidDialogSurface` extracts only `DialogContent`'s `Column.drawBackdrop` block: original 48 dp default rounded rectangle, light/dark color controls, 16/8 dp blur, 24/48 dp depth lens, `Highlight.Plain` and 0.6/0.4-alpha surface. The caller may supply another supported rounded rectangle for the app's corner token. Demo title/body/buttons, dim overlay, screen positioning and fixed padding are omitted; the host owns real dialog focus, semantics and dismissal.
+- `ControlCenterContent` was reviewed at the same commit. Its sensor-driven transforms, reveal gesture and flight/music demo controls are not product components and were not copied. No generic always-glass card was introduced. Ordinary information surfaces can remain opaque; these optical controls require a real sibling backdrop.
+- The additions use only existing Compose foundation/UI, Shapes, Backdrop and existing `DampedDragAnimation`/`InteractiveHighlight` helpers. They introduce no Material3, icon, shader or haptics dependency. Haptics stay in the host: button interaction-source events, changed toggle selection, and slider live/final events. Segmented controls reuse the existing official `LiquidBottomTabs` and `LiquidBottomTab`; no new segmented-navigation implementation was added.
+- Helper remember keys also include `enabled`, so disabling and later re-enabling a control during a gesture does not retain a stranded pressed visual state. The toggle is not intended to be nested beneath another full-row click handler that would also submit the same gesture; the host can make the label region separately clickable. The host gives toggle/slider at least 48 dp touch clearance without changing the upstream visible track/thumb dimensions.
 
 ## App adapter boundary
 

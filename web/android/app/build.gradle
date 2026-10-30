@@ -16,6 +16,11 @@ android {
     buildFeatures {
         compose = true
     }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_21
+        targetCompatibility JavaVersion.VERSION_21
+        coreLibraryDesugaringEnabled true
+    }
     signingConfigs {
         release {
             if (signingFile.exists()) {
@@ -31,13 +36,15 @@ android {
         applicationId "com.stuassistant.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 32
-        versionName "1.0.31"
+        versionCode 33
+        versionName "1.0.32"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
              // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
-            ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+            // The native entry has no bundled web UI. Keep old assets on disk for
+            // rollback, but exclude them through the Android asset merger itself.
+            ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~:!public:!capacitor.config.json:!capacitor.plugins.json'
         }
     }
     buildTypes {
@@ -57,7 +64,7 @@ android {
             initWith release
             debuggable false
             applicationIdSuffix '.haptics'
-            versionNameSuffix '-gpu.1'
+            versionNameSuffix '-native.1'
             signingConfig signingConfigs.debug
             matchingFallbacks = ['release']
         }
@@ -71,10 +78,13 @@ repositories {
 }
 
 dependencies {
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'
+    implementation "androidx.activity:activity-compose:$androidxActivityVersion"
     implementation 'androidx.compose.ui:ui:1.12.0'
     implementation 'androidx.compose.foundation:foundation:1.12.0'
     implementation 'io.github.kyant0:backdrop:2.0.1'
     implementation 'io.github.kyant0:shapes:1.2.1'
+    implementation 'com.google.zxing:core:3.5.3'
     implementation files('libs/richtap-2.0.4-lite.aar')
     implementation fileTree(include: ['*.jar'], dir: 'libs')
     implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
@@ -83,6 +93,7 @@ dependencies {
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
     implementation project(':capacitor-android')
     testImplementation "junit:junit:$junitVersion"
+    testImplementation 'org.json:json:20250517'
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
     implementation project(':capacitor-cordova-android-plugins')
