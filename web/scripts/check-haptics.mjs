@@ -110,11 +110,69 @@ try {
   for (let i = 1; i < calls.length; i++) assert.ok(calls[i].at - calls[i - 1].at >= 55);
   await pause(200);
   assert.equal((await kinds()).length, calls.length);
+
+  // Real app navigation uses one committed selection, never a press/release pair.
+  const navPoint = (label) => page.$$eval('.tabbar__btn', (buttons, text) => {
+    const button = buttons.find(el => el.textContent.includes(text));
+    if (!button) throw new Error(`missing navigation: ${text}`);
+    const r = button.getBoundingClientRect();
+    return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+  }, label);
+  assert.equal(await page.evaluate(() => document.documentElement.dataset.nativeNavigation), undefined);
+  let nav = await navPoint('今天');
+  await reset(); await page.mouse.move(nav.x, nav.y); await page.mouse.down();
+  assert.deepEqual(await kinds(), [], 'navigation pointerdown is silent');
+  await page.mouse.up(); await pause(400);
+  assert.deepEqual(await kinds(), ['selection']);
+  assert.ok(await page.$('.page--today'));
+  await reset(); await page.mouse.click(nav.x, nav.y); await pause();
+  assert.deepEqual(await kinds(), [], 'reselecting current destination is silent');
+
+  nav = await navPoint('课表');
+  await reset(); await page.mouse.move(nav.x, nav.y); await page.mouse.down();
+  await page.mouse.move(nav.x - 30, nav.y); await page.mouse.move(nav.x, nav.y); await page.mouse.up();
+  await pause(200);
+  assert.deepEqual(await kinds(), [], 'cancelled navigation has no delayed feedback');
+  assert.ok(await page.$('.page--today'), 'cancelled navigation does not change route');
+  await reset(); await page.mouse.click(nav.x, nav.y); await pause(400);
+  assert.deepEqual(await kinds(), ['selection']);
+  assert.ok(await page.$('.page--week'));
+
+  const planButton = await page.$$('.tabbar__btn').then(async buttons => {
+    for (const button of buttons) if (await button.evaluate(el => el.textContent.includes('计划'))) return button;
+    throw new Error('missing plan destination');
+  });
+  await planButton.focus(); await reset(); await page.keyboard.press('Space'); await pause(400);
+  assert.deepEqual(await kinds(), ['selection'], 'keyboard navigation selects once');
+  await reset(); await page.keyboard.press('Enter'); await pause();
+  assert.deepEqual(await kinds(), [], 'keyboard repeat of current destination is silent');
+
+  // Both timetable subroutes retain the same selected parent and can return silently.
+  for (const label of ['手动导入课表', '用医学院教务账号自动同步']) {
+    nav = await navPoint('课表'); await page.mouse.click(nav.x, nav.y); await pause(400);
+    const cta = await page.$$('.cta').then(async buttons => {
+      for (const button of buttons) if (await button.evaluate((el, text) => el.textContent.includes(text), label)) return button;
+      throw new Error(`missing timetable action: ${label}`);
+    });
+    await cta.evaluate(el => el.scrollIntoView({ block: 'center', behavior: 'instant' }));
+    await pause(150); await cta.click(); await pause(400);
+    assert.equal(await page.$eval('.tabbar__btn[aria-current="page"]', el => el.textContent.trim()), '课表');
+    const subroute = await page.$eval('.page', el => el.className);
+    nav = await navPoint('课表'); await reset();
+    await page.mouse.move(nav.x, nav.y); await page.mouse.down();
+    await page.mouse.move(nav.x - 30, nav.y); await page.mouse.move(nav.x, nav.y); await page.mouse.up();
+    await pause(150);
+    assert.equal(await page.$eval('.page', el => el.className), subroute, 'cancelled current-parent tap stays on its subpage');
+    assert.deepEqual(await kinds(), []);
+    await page.mouse.click(nav.x, nav.y); await pause(400);
+    assert.ok(await page.$('.page--week'));
+    assert.deepEqual(await kinds(), [], 'returning within the selected parent does not vibrate');
+  }
   assert.deepEqual(errors, []);
 
   // The website stays silent and does not show an Android-only motor setting.
   const web = await browser.newPage();
   await web.goto(url, { waitUntil: 'networkidle0' });
   assert.equal(await web.$('.feedback'), null);
-  console.log('PASS: single slider, defaults, persistence, zero, pointer/keyboard cancellation, disabled/synthetic clicks, plugin failure, slider throttle, web fallback');
+  console.log('PASS: single slider, defaults, persistence, zero, ordinary button pairs, pointer/keyboard cancellation, disabled/synthetic clicks, plugin failure, slider throttle, navigation selection/reselection/cancellation, timetable subroutes, web fallback');
 } finally { await browser.close(); }

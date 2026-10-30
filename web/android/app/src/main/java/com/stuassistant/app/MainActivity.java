@@ -26,7 +26,13 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(LiveWindowPlugin.class);
         registerPlugin(InteractionHapticsPlugin.class);
+        registerPlugin(LiquidGlassNavigationPlugin.class);
         super.onCreate(savedInstanceState);
+        // Device-only rendering QA uses CDP in debuggable builds. Test/release
+        // APKs keep capacitor.config's WebView debugging disabled.
+        if ((getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0) {
+            android.webkit.WebView.setWebContentsDebuggingEnabled(true);
+        }
         // Draw behind the status and navigation bars on every Android version;
         // the page keeps clear of them with the safe-area insets.
         EdgeToEdge.enable(this);

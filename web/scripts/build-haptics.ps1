@@ -10,7 +10,7 @@ if (-not $env:JAVA_HOME) { $env:JAVA_HOME = [Environment]::GetEnvironmentVariabl
 if (-not $env:ANDROID_HOME) { $env:ANDROID_HOME = [Environment]::GetEnvironmentVariable("ANDROID_HOME", "User") }
 if (-not $env:ANDROID_HOME) { $env:ANDROID_HOME = "$env:LOCALAPPDATA/Android/Sdk" }
 if (-not $env:JAVA_HOME -or -not (Test-Path "$env:JAVA_HOME/bin/java.exe")) { throw "Install JDK 21 and set JAVA_HOME first" }
-if (-not (Test-Path "$env:ANDROID_HOME/platforms/android-36/android.jar")) { throw "Install Android SDK platform 36 first" }
+if (-not (Test-Path "$env:ANDROID_HOME/platforms/android-37.0/android.jar") -and -not (Test-Path "$env:ANDROID_HOME/platforms/android-37/android.jar")) { throw "Install Android SDK platform 37 first" }
 $env:Path = "$env:JAVA_HOME/bin;$env:Path"
 if ($Server -and $Server -notmatch '^https://') { throw "-Server must start with https://" }
 
@@ -41,7 +41,7 @@ if ($LASTEXITCODE -ne 0) { throw "subst failed" }
 try {
     Push-Location "$($letter):\web\android"
     try {
-        & .\gradlew.bat --no-daemon --console=plain --max-workers=2 assembleHaptics testHapticsUnitTest
+        & .\gradlew.bat --no-daemon --console=plain --max-workers=2 assembleHaptics :app:testDebugUnitTest
         if ($LASTEXITCODE -ne 0) { throw "gradle failed ($LASTEXITCODE)" }
     } finally { Pop-Location }
 } finally { subst "$($letter):" /d | Out-Null }

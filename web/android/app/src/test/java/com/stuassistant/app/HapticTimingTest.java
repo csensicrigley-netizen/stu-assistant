@@ -34,4 +34,15 @@ public class HapticTimingTest {
         assertEquals(0, timing.releaseDelay("release", 110));
         assertFalse(timing.throttled("press", 110));
     }
+
+    @Test public void navigationSelectionHasNoSecondPulseDelay() {
+        HapticTiming timing = new HapticTiming();
+        timing.played("selection", 100);
+        assertEquals(0, timing.releaseDelay("selection", 101));
+        assertTrue(timing.throttled("selection", 120));
+        assertFalse(timing.throttled("selection", 150));
+        // A later ordinary button still uses the mechanical pair.
+        timing.played("press", 200);
+        assertEquals(100, timing.releaseDelay("release", 210));
+    }
 }

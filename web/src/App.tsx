@@ -158,11 +158,11 @@ function Shell({ onSignOut, onConnect }: { onSignOut: () => void; onConnect: () 
   const go = useCallback(
     (next: TabKey, sub?: string) => {
       if (sub && next === "campus") setCampusView(sub);
-      if (next === tab) return;
-      const dir = dirOf(tab, next);
-      startTab(() => setNav({ tab: next, dir }));
+      // Resolve against queued navigation too: rapid native selections can arrive
+      // before the previous transition commits to the Web view.
+      startTab(() => setNav((prev) => next === prev.tab ? prev : { tab: next, dir: dirOf(prev.tab, next) }));
     },
-    [tab],
+    [startTab],
   );
 
   // a tab is a fresh context, not a continuation
