@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 樱粉深色的页面背景色，换算见 values/colors.xml 的注释 -->
+    <color name="paper">#1F161E</color>
+</resources>

@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Base application theme. -->
+    <style name="AppTheme" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/brand</item>
+        <item name="colorPrimaryDark">@color/brand_deep</item>
+        <item name="colorAccent">@color/accent</item>
+    </style>
+
+    <style name="AppTheme.NoActionBar" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+        <item name="android:windowBackground">@color/paper</item>
+        <!--
+          这一条原来是 @null，等于让窗口 decor 透明；透明意味着"露出系统底色"，
+          而那底下是黑的。上下两条黑边就是这么来的。现在把它也让给纸色。
+        -->
+        <item name="android:background">@color/paper</item>
+
+        <!--
+          系统栏直接涂纸色，不用 transparent。
+          transparent 的语义是"露出后面的东西"，而 edge-to-edge 下后面没东西可露；
+          Android 15 起系统强制 edge-to-edge，setStatusBarColor 更是被忽略。
+          涂成和页面一样的纸色最稳：无论系统听不听这一档，两条边都是纸，不是黑。
+        -->
+        <item name="android:statusBarColor">@color/paper</item>
+        <item name="android:navigationBarColor">@color/paper</item>
+        <!-- 浅纸配深图标；MainActivity 会按系统深浅色在运行时覆盖 -->
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
+    </style>
+
+    <!-- Launch: Android 12+ draws the system splash from these attributes;
+         older versions show @drawable/splash as the window background. -->
+    <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/paper</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_foreground</item>
+        <item name="windowSplashScreenIconBackgroundColor">@color/brand</item>
+        <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>
+        <item name="android:background">@drawable/splash</item>
+    </style>
+</resources>
