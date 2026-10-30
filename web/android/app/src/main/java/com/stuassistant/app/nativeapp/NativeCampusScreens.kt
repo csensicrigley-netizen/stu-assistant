@@ -145,7 +145,7 @@ private fun CampusNotices(store: NativeStore, s: NativeState, now: AcademicMomen
     LaunchedEffect(store, s.server, s.token, active) {
         if (!active) return@LaunchedEffect
         while (true) {
-            try { facts = academicObjects(store.request("/v1/facts", auth = false).optJSONArray("items")) }
+            try { facts = academicObjects(store.request("/v1/facts").optJSONArray("items")) }
             catch (cancel: CancellationException) { throw cancel }
             catch (_: Exception) { /* Same as JS: facts failure never hides school notices. */ }
             delay(30 * 60_000L)
@@ -478,7 +478,7 @@ private fun CampusBusBoard(store: NativeStore, s: NativeState, now: AcademicMome
     LaunchedEffect(store, s.server, s.token, active) {
         if (!active) return@LaunchedEffect
         while (true) {
-            try { data = store.request("/v1/bus", auth = false); error = false }
+            try { data = store.request("/v1/bus"); error = false }
             catch (cancel: CancellationException) { throw cancel }
             catch (_: Exception) { error = true }
             delay(30_000)
