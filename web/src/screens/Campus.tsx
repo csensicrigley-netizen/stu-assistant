@@ -31,8 +31,12 @@ import { Empty, ModePill, PageHead, Section } from "../components/Layout";
 
 type View = "notices" | "life" | "calendar";
 
-export function CampusScreen() {
-  const [view, setView] = useState<View>("notices");
+export function CampusScreen({ initialView }: { initialView?: string } = {}) {
+  const [view, setView] = useState<View>((initialView as View) || "notices");
+  // 从别的页面带进来的子视图要生效：useState 只认第一次，后续跳转得同步一次
+  useEffect(() => {
+    if (initialView) setView(initialView as View);
+  }, [initialView]);
   return (
     <>
       <PageHead eyebrow="汕头大学" title="校园" aside={<ModePill />} />

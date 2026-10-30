@@ -130,10 +130,40 @@ def collect_notices(vault, *, limit: int = OA_DAILY_LIMIT, include_oa: bool = Tr
         else:
             if records:
                 return CollectResult("public", CODE_OK, f"OA {len(records)} 条",
-                                     {"notice": records[:cap]})
+                                     {"notice": _pick_latest(records, cap)})
             oa_detail = "OA 今天没有新通知"
 
     return _notices_public_fallback(adapter, cap, oa_detail)
+
+
+def _pick_latest(records: list[dict], cap: int) -> list[dict]:
+    """合并多栏目的通知：按链接去重，新的排前面，最后才截断到 cap。
+
+    只做一次截断、而且截在排序之后，才不会"某一栏吃掉全部名额"。
+    发布时间字段各来源不一致（published / date / at），取到哪个用哪个；
+    都没有的就保持原有相对顺序排在后面，不硬塞一个假时间。
+    """
+    seen: set[str] = set()
+    merged: list[dict] = []
+    for row in records:
+        if not isinstance(row, dict):
+            continue
+        key = str(row.get("url") or row.get("link") or row.get("id") or "")
+        if key:
+            if key in seen:
+                continue
+            seen.add(key)
+        merged.append(row)
+
+    def stamp(row: dict) -> str:
+        for field in ("published", "published_at", "date", "at", "time"):
+            value = row.get(field)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+        return ""
+
+    merged.sort(key=stamp, reverse=True)
+    return merged[:cap]
 
 
 def _notices_public_fallback(adapter, cap: int, prefix: str) -> CollectResult:
@@ -158,7 +188,10 @@ def _notices_public_fallback(adapter, cap: int, prefix: str) -> CollectResult:
     detail = f"{len(PUBLIC_LISTINGS) - failed}/{len(PUBLIC_LISTINGS)} 个栏目（OA 兜底）"
     if prefix:
         detail = f"{prefix}；{detail}"
-    return CollectResult("public", CODE_OK, detail, {"notice": records[:cap]})
+    # 逐栏各取 cap 条之后再 [:cap] 截断，等于只留第一个栏目的内容：
+    # 四个栏目各十条时，返回的全是"学校要闻"，较新的"学生通知"整栏被丢
+    # （审查报告第 14 项）。先合并去重、按发布时间排好，再限额。
+    return CollectResult("public", CODE_OK, detail, {"notice": _pick_latest(records, cap)})
 
 
 # --------------------------------------------------------------------------

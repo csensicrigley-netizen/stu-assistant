@@ -304,12 +304,16 @@ def parse_timetable(html: str, semester: str) -> dict:
                     if key not in index:
                         # 明细里没有这条（比如明细行被跳过了）：跳过这个块，别把整份课表废掉
                         continue
-                    matched_details.add(key)
+                    skipped_time = 0
+    matched_details.add(key)
                     cid = index[key]
                     try:
                         weeks, runs = meeting_time(block["周次(节次)"])
                     except AppError:
-                        # 周次写法没认出来的那一条跳过，其余照常
+                        # 周次写法没认出来的那一条跳过，但**要记账**：
+                        # 静默跳过会让"漏了一门课"看起来像"完整课表"，
+                        # 然后 sync 拿它整份替换缓存（审查报告第 08 项）。
+                        skipped_time += 1
                         continue
                     if not set(sum(runs, [])).issubset(all_periods):
                         raise changed("授课节次与网格对应不一致。")
@@ -346,6 +350,8 @@ def parse_timetable(html: str, semester: str) -> dict:
                 for key in sorted(index.keys() - matched_details)]
     if unplaced:
         pending.append("部分已排课教师明细没有对应的网格安排，须在学校核对，不能认定这些安排为空。")
+    if skipped_time:
+        pending.append(f"有 {skipped_time} 条安排的周次写法没认出来，已跳过；这份课表不完整，别当成全部课。")
     unscheduled = {}
     for row in unarranged:
         cid = item_id("jw", "timetable", semester, row["course_code"], row["class_name"])
@@ -366,8 +372,10 @@ def parse_timetable(html: str, semester: str) -> dict:
             "courses": sorted(courses.values(), key=lambda c: c["id"]),
             "unarranged": sorted(unscheduled.values(), key=lambda c: c["id"]),
             "unplaced_details": unplaced, "pending": pending,
-            "coverage": {"kind": "theory", "weeks": "all", "complete": not unplaced,
+            "coverage": {"kind": "theory", "weeks": "all",
+                          "complete": not unplaced and skipped_time == 0,
                          "course_count": len(courses), "meeting_count": len(seen), "grid_arrangements": blocks,
                          "unarranged_count": len(unscheduled), "unplaced_detail_count": len(unplaced),
+                          "skipped_time_count": skipped_time,
                          "calendar_verified": False,
                          "period_times_verified": False, "experimental_timetable_included": False}}

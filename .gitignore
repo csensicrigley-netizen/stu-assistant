@@ -59,6 +59,3 @@ _bak_before_*/
 _probe/
 tmp/
 *.tmp
-web/android/app/src/main/assets/public/
-*.bak*
-*.orig

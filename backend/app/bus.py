@@ -87,7 +87,16 @@ def _schedule_eta(line: dict, now: datetime) -> tuple[int | None, int | None, st
     wait = (headway - offset) % headway
     if wait == 0:
         wait = headway
-    return int(wait * 60), int((wait + headway) * 60), "班次推算"
+    # 推算出来的这一班必须还落在运营区间内。
+    # 原来只判"当前是否晚于末班"，于是末班 20:30、现在 20:29 时会算出
+    # "660 秒后还有一班"，也就是 20:40 —— 末班之后凭空多出一趟车
+    # （审查报告第 29 项）。越过末班就按"末班已过"处理，给下一日首班。
+    if now_min + wait > last:
+        wait_next_day = (24 * 60 - now_min + first) * 60
+        return int(wait_next_day), None, "末班已过"
+    next_wait = wait + headway
+    next_sec = int(next_wait * 60) if now_min + next_wait <= last else None
+    return int(wait * 60), next_sec, "班次推算"
 
 
 def snapshot() -> dict:

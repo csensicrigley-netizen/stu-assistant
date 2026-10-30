@@ -147,7 +147,11 @@ def parse_timetable(payload: dict, *, semester: str) -> dict:
                 }
                 courses[cid] = course
 
-            mid = imp._meeting_id(cid, weekday, periods)
+            # 合并键必须带上**地点**。
+            # 原来只用 (课程, 星期, 节次)：周 1 在 A 教室、周 2 换到 B 教室时，
+            # 两条会被并成一条，周次 [1,2] 但地点只留了 A——学生按课表走到 A 教室，
+            # 结果那天在 B（审查报告第 16 项）。地点不同就是两个时间段。
+            mid = imp._meeting_id(cid, weekday, periods) + "-" + str(abs(hash(location)) % 10000)
             meeting = course["_by_meeting"].get(mid)
             if meeting is None:
                 meeting = {

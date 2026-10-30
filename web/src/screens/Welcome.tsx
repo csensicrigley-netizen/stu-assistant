@@ -240,6 +240,13 @@ function Account({
       }
       const res = mode === "login" ? await api.login(email.trim(), pass) : await api.register(email.trim(), pass);
       setToken(res.token);
+      // 记下「现在是哪个助手账号」。本机校园凭据按「服务器 + 这个账号」分区，
+      // 少了它就只能退化成服务器级分区，换人用同一台机器时会读到上一份。
+      try {
+        localStorage.setItem("stu.account", email.trim().toLowerCase());
+      } catch {
+        /* 隐私模式 */
+      }
       onDone();
     } catch (exc) {
       setError(errorText(exc));

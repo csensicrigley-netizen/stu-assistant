@@ -152,8 +152,12 @@ function Shell({ onSignOut, onConnect }: { onSignOut: () => void; onConnect: () 
    * 渲染任务挤掉了。放进 startTransition，React 会让动画先走、列表慢慢补上，
    * 手指看到的就是丝滑的位移，而不是先定住再跳。
    */
+  // campus 需要能带子视图：首页"查看校历"要落在校历那一栏，而不是通知列表
+  // （审查报告第 30 项）。sub 只在跳 campus 时有意义。
+  const [campusView, setCampusView] = useState<string | undefined>(undefined);
   const go = useCallback(
-    (next: TabKey) => {
+    (next: TabKey, sub?: string) => {
+      if (sub && next === "campus") setCampusView(sub);
       if (next === tab) return;
       const dir = dirOf(tab, next);
       startTab(() => setNav({ tab: next, dir }));
@@ -257,7 +261,7 @@ function Shell({ onSignOut, onConnect }: { onSignOut: () => void; onConnect: () 
               {tab === "import" && <ImportScreen />}
               {tab === "medbind" && <MedBindScreen />}
               {tab === "study" && <StudyScreen />}
-              {tab === "campus" && <CampusScreen />}
+              {tab === "campus" && <CampusScreen initialView={campusView} />}
               {tab === "me" && <MeScreen onSignOut={onSignOut} />}
             </Suspense>
           </motion.main>

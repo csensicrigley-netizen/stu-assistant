@@ -161,6 +161,11 @@ class DB:
     def conn(self) -> Iterator[sqlite3.Connection]:
         c = sqlite3.connect(self.path, timeout=30)
         c.row_factory = sqlite3.Row
+        # 每条新连接都要单独开外键。SQLite 的 PRAGMA 是「按连接」生效的，
+        # 建表那一条连接上开了，后面这些连接并不会继承——于是
+        # ON DELETE CASCADE 全是摆设，删账号只删掉 users 一行，
+        # 其余 9 张业务表都留着孤儿数据（审查报告第 05 项）。
+        c.execute("PRAGMA foreign_keys=ON")
         try:
             yield c
             c.commit()

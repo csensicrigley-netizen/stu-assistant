@@ -14,7 +14,7 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 API = "https://my.stu.edu.cn/v3/services/api"
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/131.0.0.0"
@@ -39,10 +39,16 @@ def _ms(value) -> int | None:
         return num * 1000 if num < 10_000_000_000 else num
     for pattern in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y/%m/%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S"):
         try:
-            return int(datetime.strptime(text[:19], pattern).replace(tzinfo=timezone.utc).timestamp() * 1000)
+            return int(datetime.strptime(text[:19], pattern).replace(tzinfo=SCHOOL_TZ).timestamp() * 1000)
         except ValueError:
             continue
     return None
+
+
+# 学校在汕头。接口和页面上给的日期都是**不带时区的本地时间**，
+# 按 UTC 解析会整整差 8 小时（2026-10-29 23:59 会被当成第二天 07:59），
+# 于是首页把「今晚截止」显示成「明天」。审查报告第 18 项。
+SCHOOL_TZ = timezone(timedelta(hours=8))
 
 
 _DUE_RE = re.compile(
@@ -68,7 +74,7 @@ def _due_from_page(client, url: str) -> int | None:
         if not match:
             return None
         year, month, day, hour, minute = (int(part) for part in match.groups())
-        return int(datetime(year, month, day, hour, minute, tzinfo=timezone.utc).timestamp() * 1000)
+        return int(datetime(year, month, day, hour, minute, tzinfo=SCHOOL_TZ).timestamp() * 1000)
     except (ValueError, OSError):
         return None
 
