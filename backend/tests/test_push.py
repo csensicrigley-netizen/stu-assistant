@@ -92,7 +92,10 @@ def no_env(monkeypatch):
 @pytest.fixture()
 def db_file(monkeypatch, tmp_path):
     path = tmp_path / "app.db"
-    DB(path)  # 建表
+    db = DB(path)
+    with db.conn() as c:
+        c.execute("INSERT INTO users(id,email,pass_hash,created_at) VALUES(?,?,?,?)",
+                  ("u-test", "push@example.invalid", "unused", 1))
     monkeypatch.setattr(router, "_db_path", lambda: path)
     return path
 
