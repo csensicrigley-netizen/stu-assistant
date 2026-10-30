@@ -4,12 +4,13 @@ import org.junit.Test;
 import static org.junit.Assert.*;
 
 public class HapticTimingTest {
-    @Test public void fastClickPreservesThirtyMillisecondOnsetSpacing() {
+    @Test public void fastClickPreserves110MillisecondOnsetSpacing() {
         HapticTiming timing = new HapticTiming();
         timing.played("press", 100);
         assertFalse(timing.throttled("release", 104));
-        assertEquals(26, timing.releaseDelay("release", 104));
-        assertEquals(0, timing.releaseDelay("release", 130));
+        assertEquals(106, timing.releaseDelay("release", 104));
+        assertEquals(1, timing.releaseDelay("release", 209));
+        assertEquals(0, timing.releaseDelay("release", 210));
     }
 
     @Test public void heldButtonReleasesImmediately() {
@@ -20,10 +21,10 @@ public class HapticTimingTest {
 
     @Test public void repeatedClicksAndSliderEventsDoNotBuildAQueue() {
         HapticTiming timing = new HapticTiming();
-        timing.played("release", 130);
-        assertTrue(timing.throttled("press", 140));
-        assertTrue(timing.throttled("selection", 179));
-        assertFalse(timing.throttled("selection", 180));
+        timing.played("release", 210);
+        assertTrue(timing.throttled("press", 220));
+        assertTrue(timing.throttled("selection", 259));
+        assertFalse(timing.throttled("selection", 260));
     }
 
     @Test public void cancellationResetsThePressPair() {

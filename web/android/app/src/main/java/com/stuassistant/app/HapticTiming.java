@@ -2,7 +2,7 @@ package com.stuassistant.app;
 
 /** Monotonic native scheduling. At most one release may be pending. */
 final class HapticTiming {
-    static final int MIN_SPACING_MS = 30;
+    static final int MIN_SPACING_MS = 110;
     private long lastAt = -1000;
     private String lastKind = "";
 
