@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      和 web/src/styles/tokens.css 的默认主题（樱粉）对齐。
+      paper 必须等于页面的背景色（CSS 变量 bg），否则系统栏那一条会露出跟页面
+      不同的颜色，看着就是"上下两条黑边"。
+
+        樱粉浅色  bg  oklch(96.9% 0.018 16)   =  #FFF0F1
+        樱粉深色  bg  oklch(21.5% 0.022 330)  =  #1F161E   （见 values-night）
+        sea           oklch(52% 0.15 288)     =  #6756B9   香芋紫，品牌色
+        sea 深一档    oklch(40% 0.13 288)     =  #473788
+        cinnabar      oklch(56% 0.15 22)      =  #BC484B
+
+      改这几个值要回头看一眼 tokens.css，两边必须同步。
+    -->
+    <color name="paper">#FFF0F1</color>
+    <color name="brand">#6756B9</color>
+    <color name="brand_deep">#473788</color>
+    <color name="accent">#BC484B</color>
+</resources>

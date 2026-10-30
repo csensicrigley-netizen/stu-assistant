@@ -1,0 +1,545 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>STU 事项助手 · 手机演示</title>
+    <link rel="icon" href="../web/dist/icon.svg" type="image/svg+xml" />
+    <style>
+      @font-face {
+        font-family: "Gloock";
+        src: url("../web/dist/fonts/gloock-latin-400.woff2") format("woff2");
+        font-weight: 400;
+        font-display: swap;
+      }
+      @font-face {
+        font-family: "Noto Serif SC UI";
+        src: url("../web/dist/fonts/noto-serif-sc-ui-400-700.woff2") format("woff2");
+        font-weight: 400 700;
+        font-display: swap;
+      }
+      @font-face {
+        font-family: "Noto Sans SC UI";
+        src: url("../web/dist/fonts/noto-sans-sc-ui-400-700.woff2") format("woff2");
+        font-weight: 400 700;
+        font-display: swap;
+      }
+
+      :root {
+        --bg: #14191c;
+        --panel: #1b2225;
+        --ink: #edf2ff;
+        --muted: #8b979c;
+        --gold: #f2d475;
+        --line: #2b3538;
+        --screen-w: 393px;
+        --screen-h: 852px;
+        --frame: 12px;
+        --radius-screen: 52px;
+        --radius-frame: 64px;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        min-height: 100vh;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: "Noto Sans SC UI", -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+        -webkit-font-smoothing: antialiased;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 56px 24px 72px;
+        position: relative;
+        overflow-x: hidden;
+      }
+
+      /* the room: a soft light and a 40px grid, like a showroom wall */
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background-image: linear-gradient(rgba(237, 242, 255, 0.035) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(237, 242, 255, 0.035) 1px, transparent 1px);
+        background-size: 40px 40px;
+        -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 10%, transparent 75%);
+        mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 10%, transparent 75%);
+        pointer-events: none;
+        z-index: 0;
+      }
+      body::after {
+        content: "";
+        position: fixed;
+        left: 50%;
+        top: -220px;
+        width: 900px;
+        height: 520px;
+        transform: translateX(-50%);
+        background: radial-gradient(
+          ellipse at center,
+          rgba(242, 212, 117, 0.14) 0%,
+          rgba(242, 212, 117, 0.03) 42%,
+          transparent 70%
+        );
+        pointer-events: none;
+        z-index: 0;
+      }
+
+      header,
+      .stage,
+      footer {
+        position: relative;
+        z-index: 1;
+      }
+
+      header {
+        text-align: center;
+        margin-bottom: 52px;
+        max-width: 720px;
+      }
+
+      .kicker {
+        font-family: "Noto Sans SC UI", sans-serif;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+        color: var(--gold);
+        opacity: 0.9;
+        margin-bottom: 14px;
+      }
+
+      h1 {
+        font-family: "Gloock", "Noto Serif SC UI", Georgia, serif;
+        font-size: clamp(34px, 5vw, 56px);
+        font-weight: 400;
+        line-height: 1.08;
+        letter-spacing: -0.03em;
+      }
+
+      .lede {
+        margin-top: 16px;
+        font-size: 15px;
+        line-height: 1.7;
+        color: var(--muted);
+      }
+
+      .lede strong {
+        color: var(--ink);
+        font-weight: 600;
+      }
+
+      .stage {
+        display: grid;
+        grid-template-columns: repeat(4, auto);
+        justify-content: center;
+        align-items: start;
+        gap: 48px 32px;
+      }
+
+      /* ---------------- the phone ---------------- */
+
+      .phone {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 18px;
+      }
+
+      .phone__body {
+        position: relative;
+        padding: var(--frame);
+        border-radius: var(--radius-frame);
+        /* brushed titanium: four stops that catch the light at the corners */
+        background: linear-gradient(
+          145deg,
+          #6f7b80 0%,
+          #b9c2c7 12%,
+          #4c565c 32%,
+          #2b3438 52%,
+          #5d686e 72%,
+          #aeb8bd 88%,
+          #6a757a 100%
+        );
+        box-shadow: 0 1px 0 rgba(255, 255, 255, 0.35) inset,
+          0 -1px 0 rgba(0, 0, 0, 0.5) inset, 0 40px 80px -30px rgba(0, 0, 0, 0.9),
+          0 10px 30px -10px rgba(0, 0, 0, 0.6);
+      }
+
+      /* the side buttons, drawn as pseudo-elements on the frame */
+      .phone__body::before,
+      .phone__body::after {
+        content: "";
+        position: absolute;
+        width: 3px;
+        border-radius: 2px;
+        background: linear-gradient(180deg, #7d898e, #3c464b 50%, #7d898e);
+        box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.4);
+      }
+      .phone__body::before {
+        left: -3px;
+        top: 148px;
+        height: 62px;
+      }
+      .phone__body::after {
+        right: -3px;
+        top: 190px;
+        height: 96px;
+      }
+
+      .phone__screen {
+        position: relative;
+        width: var(--screen-w);
+        height: var(--screen-h);
+        border-radius: var(--radius-screen);
+        overflow: hidden;
+        background: #000;
+        isolation: isolate;
+      }
+
+      .phone__screen iframe {
+        display: block;
+        width: 100%;
+        height: 100%;
+        border: 0;
+        background: #fff;
+      }
+
+      /* ---- status bar: real time, real glyphs ---- */
+
+      .status {
+        position: absolute;
+        inset: 0 0 auto 0;
+        height: 54px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 30px 0;
+        z-index: 40;
+        pointer-events: none;
+        font-family: "Schibsted Grotesk", "Noto Sans SC UI", sans-serif;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .status__time {
+        font-size: 15px;
+        font-weight: 600;
+        letter-spacing: 0.01em;
+      }
+
+      .status__icons {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .phone--light .status {
+        color: #101719;
+      }
+      .phone--dark .status {
+        color: #f4f7f8;
+      }
+
+      /* dynamic island */
+      .island {
+        position: absolute;
+        top: 11px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 125px;
+        height: 37px;
+        border-radius: 19px;
+        background: #000;
+        z-index: 45;
+        pointer-events: none;
+      }
+      .island::after {
+        content: "";
+        position: absolute;
+        right: 13px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        background: radial-gradient(circle at 35% 30%, #24313a 0%, #07090b 60%);
+        box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06);
+      }
+
+      /* home indicator */
+      .homebar {
+        position: absolute;
+        left: 50%;
+        bottom: 8px;
+        transform: translateX(-50%);
+        width: 140px;
+        height: 5px;
+        border-radius: 3px;
+        z-index: 45;
+        pointer-events: none;
+      }
+      .phone--light .homebar {
+        background: rgba(16, 23, 25, 0.28);
+      }
+      .phone--dark .homebar {
+        background: rgba(244, 247, 248, 0.34);
+      }
+
+      /* the glass sheen, very subtle, only on the top-left */
+      .phone__screen::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        pointer-events: none;
+        background: linear-gradient(
+          135deg,
+          rgba(255, 255, 255, 0.16) 0%,
+          rgba(255, 255, 255, 0.04) 18%,
+          transparent 34%
+        );
+        z-index: 50;
+        mix-blend-mode: screen;
+      }
+
+      .phone__caption {
+        text-align: center;
+      }
+
+      .phone__caption b {
+        display: block;
+        font-size: 14px;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+      }
+
+      .phone__caption span {
+        display: block;
+        margin-top: 3px;
+        font-size: 12px;
+        color: var(--muted);
+        font-variant-numeric: tabular-nums;
+      }
+
+      footer {
+        margin-top: 64px;
+        text-align: center;
+        font-size: 12.5px;
+        color: var(--muted);
+        line-height: 1.9;
+      }
+
+      footer code {
+        font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+        font-size: 12px;
+        color: var(--gold);
+        background: rgba(242, 212, 117, 0.08);
+        border: 1px solid rgba(242, 212, 117, 0.18);
+        border-radius: 5px;
+        padding: 1px 6px;
+      }
+
+      /* ---------------- responsive ---------------- */
+
+      /* four across only when four fit; otherwise a deliberate 2×2 */
+      :root {
+        --screen-w: 353px;
+        --screen-h: 766px;
+        --radius-screen: 47px;
+        --radius-frame: 58px;
+        --frame: 11px;
+      }
+
+      @media (max-width: 1699px) {
+        .stage {
+          grid-template-columns: repeat(2, auto);
+          gap: 48px 40px;
+        }
+      }
+
+      @media (min-width: 1900px) {
+        :root {
+          --screen-w: 393px;
+          --screen-h: 852px;
+          --radius-screen: 52px;
+          --radius-frame: 64px;
+          --frame: 12px;
+        }
+      }
+
+      /* one phone at a time on a real phone */
+      @media (max-width: 900px) {
+        body {
+          padding: 32px 16px 48px;
+        }
+        header {
+          margin-bottom: 32px;
+        }
+        .lede {
+          font-size: 14px;
+        }
+        .stage {
+          grid-template-columns: 1fr;
+          gap: 40px;
+        }
+        :root {
+          --screen-w: min(393px, calc(100vw - 56px));
+          --screen-h: min(852px, calc((100vw - 56px) * 2.168));
+          --radius-screen: 44px;
+          --radius-frame: 54px;
+          --frame: 10px;
+        }
+        .phone:not(:first-child) {
+          display: none;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          animation: none !important;
+          transition: none !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <p class="kicker">Interactive Prototype · 2026</p>
+      <h1>STU 事项助手</h1>
+      <p class="lede">
+        把散落在教务、MySTU、OA 里的通知和课表，收成一条时间线。<br />
+        <strong>块的高度就是真实时长</strong>——第二大节 150 分钟，比第一大节高 1.5 倍。
+      </p>
+    </header>
+
+    <main class="stage" id="stage"></main>
+
+    <footer>
+      真机渲染 · 状态栏、灵动岛、Home 条都是实时绘制的，屏幕里可直接滚动点击。<br />
+      手机访问：先在本机启动 <code>打开演示.cmd</code>，再用同一 WiFi 打开终端里显示的地址。
+    </footer>
+
+    <script>
+      /* ---------------------------------------------------------------
+         On a real phone the equipment already provides the frame, so the
+         shell would be a phone inside a phone. Jump straight into the app;
+         ?shell=1 forces the showroom if it is ever needed on mobile.
+         --------------------------------------------------------------- */
+      const onPhone = window.matchMedia("(max-width: 900px)").matches;
+      const forceShell = new URLSearchParams(location.search).has("shell");
+      if (onPhone && !forceShell) {
+        location.replace("../web/dist/index.html?preview=1&tab=today");
+      }
+    </script>
+    <script>
+      /* ---------------------------------------------------------------
+         Each phone is a real iframe running the built app. The shell only
+         draws the hardware: frame, screen, island, status bar, home bar.
+         --------------------------------------------------------------- */
+      const PHONES = [
+        { tab: "today", theme: "light", name: "今天", note: "下一节倒计时 · 今日动线" },
+        { tab: "week", theme: "light", name: "这周", note: "周条负载 · 真实时间轴" },
+        { tab: "inbox", theme: "dark", name: "消息", note: "通知与作业 · 按日归组" },
+        { tab: "life", theme: "dark", name: "生活", note: "公交到站 · 充电桩空位" },
+      ];
+
+      const wk = 1 - 0.005; // nothing; kept to avoid a magic number below
+
+      const ICONS = `
+        <svg width="18" height="12" viewBox="0 0 18 12" fill="currentColor" aria-hidden="true">
+          <rect x="0" y="8" width="3" height="4" rx="0.8"/>
+          <rect x="4.7" y="6" width="3" height="6" rx="0.8"/>
+          <rect x="9.4" y="3.4" width="3" height="8.6" rx="0.8"/>
+          <rect x="14.1" y="0.8" width="3" height="11.2" rx="0.8"/>
+        </svg>
+        <svg width="16" height="12" viewBox="0 0 16 12" fill="none" stroke="currentColor"
+             stroke-width="1.7" stroke-linecap="round" aria-hidden="true">
+          <path d="M1 4.3a10.5 10.5 0 0 1 14 0"/>
+          <path d="M3.5 6.9a7 7 0 0 1 9 0"/>
+          <path d="M6 9.4a3.5 3.5 0 0 1 4 0"/>
+          <circle cx="8" cy="11" r="0.7" fill="currentColor" stroke="none"/>
+        </svg>
+        <svg width="25" height="12" viewBox="0 0 25 12" fill="none" aria-hidden="true">
+          <rect x="0.6" y="0.6" width="21" height="10.8" rx="3.2"
+                stroke="currentColor" stroke-opacity="0.45" stroke-width="1.1"/>
+          <rect x="2.3" y="2.3" width="16.4" height="7.4" rx="1.9" fill="currentColor"/>
+          <path d="M23.2 4.2v3.6c0 .9-.6 1.4-1.4 1.4V2.8c.8 0 1.4.5 1.4 1.4Z"
+                fill="currentColor" fill-opacity="0.45"/>
+        </svg>`;
+
+      function clock() {
+        const d = new Date();
+        return `${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`;
+      }
+
+      const stage = document.getElementById("stage");
+
+      PHONES.forEach((p) => {
+        const phone = document.createElement("div");
+        phone.className = `phone phone--${p.theme}`;
+
+        const body = document.createElement("div");
+        body.className = "phone__body";
+
+        const screen = document.createElement("div");
+        screen.className = "phone__screen";
+
+        const frame = document.createElement("iframe");
+        frame.title = p.name;
+        frame.loading = "lazy";
+        frame.src = `../web/dist/index.html?preview=1&frame=1&tab=${p.tab}&theme=${p.theme}`;
+        // same-origin: hide the inner scrollbar so the screen reads as an app
+        frame.addEventListener("load", () => {
+          try {
+            const doc = frame.contentDocument;
+            if (!doc || doc.getElementById("frame-css")) return;
+            const style = doc.createElement("style");
+            style.id = "frame-css";
+            style.textContent = [
+              "::-webkit-scrollbar{display:none!important;width:0!important}",
+              "html{scrollbar-width:none}",
+              "body{overscroll-behavior:none}",
+            ].join("\n");
+            doc.head.appendChild(style);
+          } catch (_) {
+            /* cross-origin: leave it */
+          }
+        });
+
+        const status = document.createElement("div");
+        status.className = "status";
+        status.innerHTML = `
+          <span class="status__time">${clock()}</span>
+          <span class="status__icons">${ICONS}</span>`;
+
+        const island = document.createElement("div");
+        island.className = "island";
+
+        const home = document.createElement("div");
+        home.className = "homebar";
+
+        screen.append(frame, status, island, home);
+        body.append(screen);
+
+        const caption = document.createElement("div");
+        caption.className = "phone__caption";
+        caption.innerHTML = `<b>${p.name}</b><span>${p.note}</span>`;
+
+        phone.append(body, caption);
+        stage.append(phone);
+      });
+
+      // keep every clock honest
+      function tick() {
+        document.querySelectorAll(".status__time").forEach((el) => (el.textContent = clock()));
+      }
+      tick();
+      setInterval(tick, 20000);
+    </script>
+  </body>
+</html>
