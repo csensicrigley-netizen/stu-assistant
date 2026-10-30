@@ -77,7 +77,7 @@ pwsh -File deploy/make-native-release.ps1 -Variant Release -Server https://your-
 
 ## 补充设备验证与覆盖边界
 
-- Import：粘贴导入主链已通过上述限定验证；CSV、手动录入、预览修正、警告、覆盖及失败分支仍须在最终包中补齐 UI 验收。
+- Import：粘贴导入主链已通过上述限定验证；补测发现 Android DocumentsProvider 把 CSV 标为 `text/comma-separated-values`，已加入该类型及 `text/x-csv`，避免文件可见但不可选择。CSV／手动录入后续设备验证见 `release/` 验收回执；全部警告、覆盖及失败分支仍需对应场景。
 - Medical 已走通：Week 入口 → 切换本地口令 → 读取图片验证码 → 输入测试账号及 `1234` → 连接与同步 → 显示 1 门／1 段 → 解除绑定。此为本机假后端，未据此宣称真实医学院登录成功；SSO、验证码过期和全部失败分支仍需对应环境。
 - 事项中考试、成绩分段已设备切换核对：考试含未知时间条目，成绩保留等级成绩以及独立均分／绩点统计。个人计划与学校作业仍在同一事项入口下按来源筛选。
 - 最终资源排除通过 Android asset merger 的 `ignoreAssetsPattern` 执行，旧 `public/` 文件保留在工作目录供回退，但不打入原生 APK。普通 Gradle assets SourceSet 的 exclude 在本工具链中没有达到该目的，已移除，避免只根据配置声称资源已排除。

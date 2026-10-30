@@ -90,7 +90,7 @@ internal fun nativeImportDocument(doc:AcademicTimetableDoc):JSONObject = JSONObj
                         NText("Excel 里按「课程名称 / 星期 / 节次 / 周次 / 教师 / 地点」六列填，存成 CSV UTF-8 再选进来。先下模板最省事。",14,muted=true)
                         FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
                             NButton("下载模板",{scope.launch {try {template=store.requestText("/v1/timetable/import/template");saveTemplate.launch("课表模板-$semester.csv")}catch(e:CancellationException){throw e}catch(_:Exception){problem="模板没下载下来，检查一下网络再试一次。"}}},busy==null)
-                            NButton("选择文件",{file.launch(arrayOf("text/csv","text/plain","application/csv","application/vnd.ms-excel"))},busy==null)
+                            NButton("选择文件",{file.launch(arrayOf("text/csv","text/comma-separated-values","text/x-csv","text/plain","application/csv","application/vnd.ms-excel"))},busy==null)
                         }
                         if(text.isNotEmpty())NText("已读到 ${text.lines().count{it.isNotBlank()}} 行，点下面「解析」看看对不对。",14,muted=true)
                     }
