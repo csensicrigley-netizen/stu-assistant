@@ -76,6 +76,10 @@ const sleep = (ms: number) => new Promise((r) => window.setTimeout(r, ms));
 
 export function isPreview(): boolean {
   try {
+    // 有 token 就是真用户，不看 URL。原来 URL 上的 ?preview=1 优先级最高，
+    // 于是"从演示链接点登录、登录成功了"仍然被当成演示，refresh 直接退出、
+    // 界面停在样例数据上（审查报告第 32 项）。
+    if (getToken()) return false;
     if (new URLSearchParams(location.search).has("preview")) return true;
     if (sessionStorage.getItem(PREVIEW_KEY) === "1") return true;
   } catch {
@@ -105,6 +109,9 @@ export function forgetUser(): void {
   try {
     localStorage.removeItem(cacheKey(who));
     localStorage.removeItem(doneKey(who));
+    // 「现在是谁」也要清。留着的话，下一个人登录前，本机校园凭据的分区键
+    // 还指着上一个人的账号。
+    localStorage.removeItem("stu.account");
   } catch {
     /* ignore */
   }
@@ -328,15 +335,30 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<Store>(() => {
     const bound = me?.bound ?? [];
-    const connected = preview ? null : me ? bound.includes("jw") || bound.includes("mystu") : null;
-    // Signed in but no campus account yet: show the labelled samples (with
-    // the school's real public notices) instead of empty screens.
+    /*
+     * 这里原来只认 jw / mystu 为"已连接"，于是**只连了医学院、或只手动导入
+     * 课表**的账号被判成未绑定，整页被换成样例数据——真课表被演示课表盖掉
+     * （审查报告第 13 项）。医学院走的是 med_sessions，手动课表走
+     * manual_timetables，两者都不在 me.bound 里。
+     *
+     * 现在的判断分两层：
+     *   1. 真的连了主校区 → 全量真实数据；
+     *   2. 没连主校区，但**手里已经有真课表**（医学院同步来的或手动录的）
+     *      → 课表算真实，作业/成绩这些仍然没有，但不再拿样例去顶课表。
+     * 只有"既没绑定、也没有任何真课表"才整页用样例。
+     */
+    const campusBound = bound.includes("jw") || bound.includes("mystu");
+    const rawDoc = normalizeTimetable(raw.timetable);
+    const hasOwnTimetable = Boolean(rawDoc && rawDoc.courses.length > 0);
+    const connected = preview ? null : me ? campusBound || hasOwnTimetable : null;
     const sample = preview || connected === false;
     const src = sample ? { ...sampleRaw, notices: raw.notices.length ? raw.notices : sampleRaw.notices } : raw;
+    // 有真课表就别让样例课表盖它（即使作业/成绩还在样例状态）
+    const timetableSrc = hasOwnTimetable ? raw.timetable : src.timetable;
     return {
       mode,
       sample,
-      timetable: normalizeTimetable(src.timetable),
+      timetable: normalizeTimetable(timetableSrc),
       tasks: src.tasks.map(normalizeTask),
       exams: src.exams.map(normalizeExam),
       grades: src.grades.map(normalizeGrade),
@@ -371,7 +393,9 @@ export function useStore(): Store {
 /** Navigation actions any screen may trigger. */
 export interface ShellActions {
   // 与 TabBar 的 TabKey 对齐；import 是课表页的子页面，不是底栏一格。
-  go: (tab: "today" | "plan" | "week" | "study" | "campus" | "me" | "import" | "medbind") => void;
+  /** 跳页；campus 可以带一个子视图，比如从首页"查看校历"直接落到校历那一栏 */
+  go: (tab: "today" | "plan" | "week" | "study" | "campus" | "me" | "import" | "medbind",
+       sub?: string) => void;
   connect: () => void;
 }
 

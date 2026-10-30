@@ -98,13 +98,16 @@ def sync_user(uid: str, sources: list[str] | None = None, *, force: bool = False
             if source in SESSION_FOR:
                 service = SESSION_FOR.get(source, source)
                 try:
+                    # 只进一层 scope，复用同一个 vault。
+                    # 原来这里套了两层 tenant_scope，靠"外层已经拿住槽位"的注释
+                    # 来解释——但锁本身没变可重入，第二次进直接自己等自己，
+                    # 线程永久卡死、槽位不释放（审查报告第 06 项）。
                     with tenant_scope(uid) as tenant:
                         from .relogin import relogin
 
-                        if relogin(tenant.vault(), service):
-                            # 槽位已经在外面拿住了，这里不能再抢一次（会自己等自己）
-                            with tenant_scope(uid) as tenant2:
-                                healed = collect(tenant2.vault(), source)
+                        vault = tenant.vault()
+                        if relogin(vault, service):
+                            healed = collect(vault, source)
                             if healed.code == CODE_OK:
                                 healed.detail = f"{healed.detail}（已自动重登）"
                 except Exception:  # noqa: BLE001

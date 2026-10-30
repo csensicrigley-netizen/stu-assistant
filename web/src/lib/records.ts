@@ -33,15 +33,33 @@ export interface Task {
 
 export function normalizeTask(raw: unknown): Task {
   const r = rec(raw);
+
+  /*
+   * 后端 MySTU 采集器给的是 **dueMs（epoch 毫秒）**，而这里原来只读
+   * due_at / due 两个字符串字段——于是每条作业的截止时间都变成 null，
+   * 首页"快到截止"的提示、排序、角标全部失效，界面上写"没写截止时间"。
+   *
+   * 所以顺序是：先认后端已经算好的 dueMs，再退回字符串自己解析。
+   * 字符串一律按 **+08:00** 解释（学校在汕头，日期不带时区），
+   * 不能让它走浏览器本地时区，也不能当 UTC（差 8 小时）。
+   */
+  const rawMs = Number(r.dueMs);
   const due = str(r.due_at ?? r.due);
-  const parsed = due ? Date.parse(/T\d/.test(due) ? due : `${due}T23:59:00+08:00`) : NaN;
+  let dueMs: number | null = null;
+  if (Number.isFinite(rawMs) && rawMs > 0) {
+    dueMs = rawMs;
+  } else if (due) {
+    const parsed = Date.parse(/T\d/.test(due) ? due : `${due}T23:59:00+08:00`);
+    dueMs = Number.isNaN(parsed) ? null : parsed;
+  }
+
   return {
     id: str(r.id),
     title: str(r.title) || "未命名任务",
     course: str(r.course),
     source: str(r.source) || (str(r.id).startsWith("yuketang") ? "yuketang" : "mystu"),
     url: str(r.url) || null,
-    dueMs: Number.isNaN(parsed) ? null : parsed,
+    dueMs,
     dueRaw: due,
     schoolStatus: str(r.school_status),
   };

@@ -76,29 +76,26 @@ async function request<T>(path: string, init: RequestInit = {}, timeoutMs = 15_0
 
   // 手机网络切基站、隧道抖动时，一次 15 秒的超时很容易假报失败（注册尤其明显）。
   // 超时/网络错误自动重试一次，仍然失败才把错误交给界面。
-  const attempt = async (): Promise<Response> => {
+  //
+  // 注意 timer 必须活到 **body 读完**为止：fetch 只等到响应头就返回，
+  // 如果在这里就 clearTimeout，body 卡住时 signal 已经不再受控，
+  // loading 可以永久挂着（审查报告第 21 项）。所以 attempt 把 body 一起读进内存，
+  // timer 在读完（或失败）之后才清。
+  const once = async (): Promise<Response> => {
     const ctrl = new AbortController();
     const timer = window.setTimeout(() => ctrl.abort(), timeoutMs);
     try {
-      return await fetch(base + path, { ...init, headers, signal: ctrl.signal });
+      const res = await fetch(base + path, { ...init, headers, signal: ctrl.signal });
+      // 先把 body 读成 text 并缓存，后续 res.json() 走内存，不再等网络
+      const text = await res.text();
+      return new Response(text, {
+        status: res.status,
+        statusText: res.statusText,
+        headers: res.headers,
+      });
     } finally {
       window.clearTimeout(timer);
     }
-  };
-
-  // 关键：把"读响应体"也算进这一次尝试里。
-  // fetch() 只等到响应头就返回，body 可能在隧道抖动时卡住——那样响应头拿到了、
-  // 解析却挂住，用户看到的还是"服务器没有及时响应"。
-  const once = async (): Promise<Response> => {
-    const res = await attempt();
-    // 先把 body 读成 text 并缓存，后续 res.json() 走内存，不再等网络
-    const text = await res.text();
-    const replay = new Response(text, {
-      status: res.status,
-      statusText: res.statusText,
-      headers: res.headers,
-    });
-    return replay;
   };
 
   let res: Response;
@@ -123,7 +120,12 @@ async function request<T>(path: string, init: RequestInit = {}, timeoutMs = 15_0
       } catch {
         /* non-JSON error body */
       }
-      if (res.status === 401 && token && !path.startsWith("/v1/auth/")) {
+      // 401 只在「这个请求用的还是当前 token」时才算掉线。
+      // 原来只判断"发请求时抓到的 token 非空"，于是：A 的请求还在路上 →
+      // 用户切到 B 登录 → A 的请求回来 401 → 广播 AUTH_LOST 把刚登录的 B 踢掉
+      // （审查报告第 22 项）。这里再比一次当前 token，代次不同就当过期响应丢掉。
+      const stillCurrent = token !== null && token === getToken();
+      if (res.status === 401 && stillCurrent && !path.startsWith("/v1/auth/")) {
         window.dispatchEvent(new CustomEvent(AUTH_LOST));
       }
       throw new ApiError(res.status, code);

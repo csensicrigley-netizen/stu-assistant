@@ -175,7 +175,7 @@ export function TodayScreen() {
 
           {milestones.length > 0 && (
             <motion.div {...rise(4)}>
-              <Section title="校历" action={{ label: "查看校历", onClick: () => go("campus") }}>
+              <Section title="校历" action={{ label: "查看校历", onClick: () => go("campus", "calendar") }}>
                 <div className="milestones">
                   {milestones.map((m, i) => (
                     <motion.div
@@ -199,7 +199,7 @@ export function TodayScreen() {
 
           {notices.length > 0 && (
             <motion.div {...rise(5)}>
-              <Section title="新通知" action={{ label: "全部通知", onClick: () => go("campus") }}>
+              <Section title="新通知" action={{ label: "全部通知", onClick: () => go("campus", "notices") }}>
                 <ul className="list">
                   {notices.map((n, i) => (
                     <motion.li key={n.id} {...rise(i, { y: 6, scale: 1 })}>

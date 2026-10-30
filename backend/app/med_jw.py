@@ -82,9 +82,13 @@ class MedError(Exception):
     开发者需要的定位信息放在 `path` 之类的属性上，不混进给用户看的文案。
     """
 
-    def __init__(self, message: str, *, path: str = "") -> None:
+    def __init__(self, message: str, *, path: str = "", code: str = "") -> None:
         super().__init__(message)
         self.path = path
+        # 业务侧的错误码（med_expired / bad_credentials / med_unreachable …）。
+        # main.py 靠它决定"要不要把这份 token 清掉、让用户重新连一次"，
+        # 原来没有这个属性，那边永远走不到清 token 的分支（审查报告第 15 项）。
+        self.code = code
 
 
 # --------------------------------------------------------------------------
@@ -1016,6 +1020,18 @@ def fetch_timetable(
         body=timetable_body(zc=zc, jc=jc, teadm=teadm),
         timeout=timeout,
     )
+    # 先把"凭证失效 / 业务失败"认出来，再谈解析。
+    # 原来直接 parse，401 的响应里没有 kbList，解析出来是空课表，
+    # 界面就显示"新学期课表还没发布"——把过期说成没课，用户永远走不到重连。
+    code = payload.get("code")
+    if code not in (None, 200, "200"):
+        if str(code) in {"401", "501"}:
+            raise MedError("医学院的登录过期了，需要重新连一次。", path="Studentkb", code="med_expired")
+        raise MedError(
+            error_text(code, payload.get("msg")) or "医学院这次没有返回课表。",
+            path="Studentkb",
+            code="med_failed",
+        )
     return parse_timetable(payload, semester=semester)
 
 

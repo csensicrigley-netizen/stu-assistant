@@ -267,7 +267,9 @@ expect(meeting["weeks"] == [1], f"zc=1 → [1] ({meeting['weeks']})")
 expect("理433" in meeting["location"], f"地点含教室 ({meeting['location']})")
 expect(meeting["rawTime"].startswith("周一 第3-4节"), f"时间原文拼出来了 ({meeting['rawTime']})")
 expect(course["id"] == ti._course_id("细胞生物学实验", "", "BIO2101"), "课程 id 复用既有规则")
-expect(meeting["id"] == ti._meeting_id(course["id"], 1, [3, 4]), "meeting id 复用既有规则")
+# meeting id 现在带地点后缀：不同周次换教室必须能分成两段（审查报告第 16 项）
+expect(meeting["id"].startswith(ti._meeting_id(course["id"], 1, [3, 4])),
+       f"meeting id 以既有规则为前缀 ({meeting['id']})")
 
 checked = ti.validate_doc(one)
 expect(checked["ok"] is True and checked["errors"] == [],

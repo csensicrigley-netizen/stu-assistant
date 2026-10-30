@@ -72,7 +72,10 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=list(settings.cors_origins),
     allow_credentials=False,
-    allow_methods=["GET", "POST", "DELETE"],
+    # PATCH 是每日计划改条目用的。少了它，安卓 WebView 里（origin 是
+    # https://localhost）改计划会被预检直接挡成 400 Disallowed CORS method，
+    # 网页版因为同源反而看不出问题——所以这条必须在。
+    allow_methods=["GET", "POST", "PATCH", "DELETE"],
     allow_headers=["Authorization", "Content-Type", "Accept"],
     max_age=86400,
 )

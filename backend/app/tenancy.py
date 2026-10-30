@@ -19,15 +19,23 @@ from pathlib import Path
 
 from .config import settings
 
-_LOCKS: dict[str, threading.Lock] = {}
+_LOCKS: dict[str, threading.RLock] = {}
 _LOCKS_GUARD = threading.Lock()
 
 
-def _lock_for(user_id: str) -> threading.Lock:
+def _lock_for(user_id: str) -> threading.RLock:
+    """每个租户一把锁。
+
+    必须是 **RLock**（可重入）。sync 的异常恢复分支会在已经持锁的
+    `with tenant_scope(uid)` 里面再进一次同一个 scope，普通 Lock 会自己等
+    自己：线程永久停在那里，jw 的可用槽位从 3 掉到 2 且不再释放，
+    同一个用户后面的所有操作一起卡死（审查报告第 06 项）。
+    同一线程重入不算并发冲突，用 RLock 才是这里想要的语义。
+    """
     with _LOCKS_GUARD:
         lock = _LOCKS.get(user_id)
         if lock is None:
-            lock = _LOCKS[user_id] = threading.Lock()
+            lock = _LOCKS[user_id] = threading.RLock()
         return lock
 
 

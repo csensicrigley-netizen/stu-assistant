@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { motion } from "motion/react";
 import { IS_NATIVE, api, apiBase, setToken } from "../lib/api";
-import { clearSchool, readSchool } from "../lib/school";
+import { clearAllSchool, clearSchool, readSchool } from "../lib/school";
 import {
   APP_VERSION_NAME,
   apkHref,
@@ -68,6 +68,9 @@ export function MeScreen({ onSignOut }: { onSignOut: () => void }) {
   const signOut = () => {
     void api.logout().catch(() => undefined);
     forgetUser();
+    // 退出必须连本机的校园凭据一起清。否则换个人用这台机器时，上一份
+    // 校园账号密码还躺着，下一次自动续连就会拿新用户的 Bearer 去配旧账号。
+    clearAllSchool();
     setToken(null);
     onSignOut();
   };
@@ -77,6 +80,7 @@ export function MeScreen({ onSignOut }: { onSignOut: () => void }) {
     try {
       await api.deleteAccount();
       forgetUser();
+      clearAllSchool();
       setToken(null);
       onSignOut();
     } catch {

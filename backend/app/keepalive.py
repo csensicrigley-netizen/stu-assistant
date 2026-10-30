@@ -90,13 +90,23 @@ def _tenants() -> list[str]:
 
 def tick() -> dict:
     from . import tenancy
+    from .config import settings
+    from .db import DB
 
     out = _load()
     changed = False
+    # 授权是"本人点过同意"的凭据。撤回之后就不该再读 OA——
+    # 原来 tick 只看 WebVPN 会话在不在，撤回授权照样继续 protected_oa，
+    # 也就是后台还在替用户读他没授权的东西（审查报告第 12 项）。
+    # 这里每轮现查一次数据库，撤回立刻生效，不用重启。
+    db = DB(settings.db_path)
     for uid in _tenants():
         try:
             with tenancy.tenant_scope(uid) as t:
                 if not t.session_exists("webvpn"):
+                    continue
+                if not db.has_consent(uid, "oa"):
+                    # 没授权就不探：连"会话还活着吗"都不该用 OA 去试
                     continue
                 rec = out.setdefault(uid, {})
                 vault = t.vault()

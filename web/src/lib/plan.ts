@@ -26,6 +26,17 @@ export function planFor(doc: TimetableDoc | null, isoDate: string): DayPlan {
   if (!pos || status.kind === "closed") {
     return { date: isoDate, weekday, week: pos?.week ?? null, status, blocks: [] };
   }
+  /*
+   * 课表学期必须和目标日期所在学期对上。
+   *
+   * 原来只按目标日期算周次、不校验 doc.semester，于是上个学期的课表会被
+   * 原样套到新学期同一周次上——2026-2027-1 第一周的课排到了 2027-03-01
+   * （审查报告第 19 项）。学期对不上就当作"这一天没有课"，界面那边有
+   * "课表是旧学期的"提示，别拿旧数据假装新安排。
+   */
+  if (doc && doc.semester && doc.semester !== pos.term.id) {
+    return { date: isoDate, weekday, week: pos.week, status, blocks: [] };
+  }
   return { date: isoDate, weekday, week: pos.week, status, blocks: blocksOn(doc, pos.week, weekday) };
 }
 
