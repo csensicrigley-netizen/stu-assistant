@@ -136,8 +136,11 @@ public class InteractionHapticsPlugin extends Plugin {
                 played(call, kind, "preset"); return;
             } catch (RuntimeException | LinkageError ignored) { /* Try view feedback. */ }
         }
-        int constant = "press".equals(kind) ? HapticFeedbackConstants.VIRTUAL_KEY
-            : "release".equals(kind) ? HapticFeedbackConstants.VIRTUAL_KEY_RELEASE : HapticFeedbackConstants.CLOCK_TICK;
+        // VIRTUAL_KEY_RELEASE is only implemented from API 27. Older devices
+        // still need a recognized feedback constant for the second pulse.
+        int constant = "selection".equals(kind) ? HapticFeedbackConstants.CLOCK_TICK
+            : "release".equals(kind) && Build.VERSION.SDK_INT >= 27
+                ? HapticFeedbackConstants.VIRTUAL_KEY_RELEASE : HapticFeedbackConstants.VIRTUAL_KEY;
         if (getBridge().getWebView().performHapticFeedback(constant)) played(call, kind, "system");
         else reply(call, false, "system_off");
     }
