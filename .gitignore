@@ -13,6 +13,7 @@ dist/
 dist-android/
 build/
 .gradle/
+.kotlin/
 *.tsbuildinfo
 
 # ---- 安卓签名（绝不外传：这是发布身份，泄露等于别人能冒充你发版）----

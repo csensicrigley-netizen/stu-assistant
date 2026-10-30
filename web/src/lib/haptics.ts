@@ -2,6 +2,8 @@ import { Capacitor, registerPlugin } from "@capacitor/core";
 
 type HapticKind = "press" | "release" | "selection";
 const KEY = "stu.haptics.strength";
+export const HAPTIC_STRENGTH_CHANGED = "stu:haptics-strength";
+const cancelledClicks = new WeakSet<Event>();
 const native = registerPlugin<{
   play(options: { kind: HapticKind; strength: number }): Promise<void>;
   cancel(): Promise<void>;
@@ -22,11 +24,16 @@ try {
 export function getHapticStrength(): number { return strength; }
 
 export function setHapticStrength(value: number): number {
+  const previous = strength;
   strength = clampStrength(value);
   try { localStorage.setItem(KEY, String(strength)); } catch { /* In-memory choice. */ }
   if (strength === 0) cancelHaptics();
+  if (strength !== previous) window.dispatchEvent(new CustomEvent(HAPTIC_STRENGTH_CHANGED));
   return strength;
 }
+
+/** Navigation must not commit a click left over from a cancelled drag. */
+export function isCancelledInteraction(event: Event): boolean { return cancelledClicks.has(event); }
 
 export function cancelHaptics(): void {
   if (Capacitor.getPlatform() === "android") void native.cancel().catch(() => {});
@@ -40,14 +47,14 @@ export function haptic(kind: HapticKind): void {
 
 const CONTROL = 'button,a[href],[role="button"],[role="checkbox"],[role="switch"],[role="radio"],[role="tab"]';
 
-function control(target: EventTarget | null): HTMLElement | null {
+function control(target: EventTarget | null, includeSelected = false): HTMLElement | null {
   if (!(target instanceof Element)) return null;
   const el = target.closest<HTMLElement>(CONTROL);
   if (!el || el.closest('[data-haptic="none"],[data-haptic="manual"],[aria-disabled="true"],[aria-busy="true"],[inert]') || el.matches(":disabled")) return null;
-  if (el.matches('[role="radio"],[role="tab"],input[type="radio"]') &&
+  if (!includeSelected && el.matches('[role="radio"],[role="tab"],input[type="radio"]') &&
       (el.getAttribute("aria-checked") === "true" || el.getAttribute("aria-selected") === "true" ||
        (el instanceof HTMLInputElement && el.checked))) return null;
-  if (el.hasAttribute("aria-current") && el.getAttribute("aria-current") !== "false") return null;
+  if (!includeSelected && el.hasAttribute("aria-current") && el.getAttribute("aria-current") !== "false") return null;
   return el;
 }
 
@@ -61,9 +68,11 @@ export function installInteractionFeedback(): () => void {
   const down = (event: PointerEvent) => {
     if (!event.isTrusted || !event.isPrimary || event.button !== 0) return;
     pointer = null;
-    if (!control(event.target)) return;
+    const candidate = control(event.target, true);
+    const el = candidate?.closest('[data-haptic="selection"]') ? candidate : control(event.target);
+    if (!el) return;
     pointer = { id: event.pointerId, x: event.clientX, y: event.clientY, cancelled: false };
-    haptic("press");
+    if (!el.closest('[data-haptic="selection"]')) haptic("press");
   };
   const move = (event: PointerEvent) => {
     if (pointer?.id === event.pointerId && !pointer.cancelled && Math.hypot(event.clientX - pointer.x, event.clientY - pointer.y) > 12) {
@@ -83,7 +92,7 @@ export function installInteractionFeedback(): () => void {
     if (!el || (event.key === " " && el.matches("a[href]"))) return;
     keyHeld = true;
     keyClicked = false;
-    haptic("press");
+    if (!el.closest('[data-haptic="selection"]')) haptic("press");
   };
   const keyUp = (event: KeyboardEvent) => {
     if (event.key === "Enter" || event.key === " ") keyHeld = false;
@@ -93,12 +102,16 @@ export function installInteractionFeedback(): () => void {
     if (event.detail > 0) {
       const cancelled = pointer?.cancelled;
       pointer = null;
-      if (cancelled) return;
+      if (cancelled) {
+        cancelledClicks.add(event);
+        return;
+      }
     } else if (keyHeld) {
       if (keyClicked) return;
       keyClicked = true;
     }
-    if (control(event.target)) haptic("release");
+    const el = control(event.target);
+    if (el) haptic(el.closest('[data-haptic="selection"]') ? "selection" : "release");
   };
   const change = (event: Event) => {
     if (!event.isTrusted || !(event.target instanceof HTMLElement) ||

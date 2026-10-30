@@ -1,11 +1,13 @@
 import { motion } from "motion/react";
+import { useMemo } from "react";
 import { Icon, type IconName } from "./Icon";
 import { Logo } from "./Logo";
 import { ModePill } from "./Layout";
 import { PILL } from "../lib/motion";
+import { isCancelledInteraction } from "../lib/haptics";
+import { useNativeNavigation } from "../lib/native-navigation";
 
-// "import" 不是底栏的一格：它是课表页点进去的子页面，只参与路由与返回，
-// 所以不进 TABS。TabBar 只遍历 TABS，current 落在这里时不会有任何一格高亮。
+// Import and medical connection are timetable subpages, not extra destinations.
 export type TabKey = "today" | "plan" | "week" | "study" | "campus" | "me" | "import" | "medbind";
 
 export const TABS: { key: TabKey; label: string; icon: IconName }[] = [
@@ -16,6 +18,10 @@ export const TABS: { key: TabKey; label: string; icon: IconName }[] = [
   { key: "campus", label: "校园", icon: "campus" },
   { key: "me", label: "我的", icon: "me" },
 ];
+
+export function navigationTab(current: TabKey): TabKey {
+  return current === "import" || current === "medbind" ? "week" : current;
+}
 
 /**
  * Bottom navigation on phones and tablets. The indicator sits behind the icon
@@ -30,22 +36,28 @@ export function TabBar({
   onChange: (key: TabKey) => void;
   badges?: Partial<Record<TabKey, number>>;
 }) {
+  const active = navigationTab(current);
+  const items = useMemo(() => TABS.map((tab) => ({ ...tab, badge: badges[tab.key] })),
+    [badges.today, badges.plan, badges.week, badges.study, badges.campus, badges.me]);
+  const nativeMounted = useNativeNavigation(active, items, (key) => {
+    if (TABS.some((tab) => tab.key === key)) onChange(key as TabKey);
+  });
+  if (nativeMounted) return null;
   return (
-    <nav className="tabbar" aria-label="主导航">
+    <nav className="tabbar" aria-label="主导航" data-haptic="selection">
       <div className="tabbar__row">
         {TABS.map((tab) => {
-          const on = tab.key === current;
-          // 导入是课表的子页面：停在那一页时把「课表」保持点亮，
-          // 否则底栏会出现"一格都不亮"的空档，人不知道自己站在哪。
-          const lit = on || (current === "import" && tab.key === "week");
+          const lit = tab.key === active;
           const badge = badges[tab.key];
           return (
             <button
               key={tab.key}
               type="button"
               className={`tabbar__btn${lit ? " is-on" : ""}`}
-              onClick={() => onChange(tab.key)}
-              aria-current={on ? "page" : undefined}
+              onClick={(event) => {
+                if (!isCancelledInteraction(event.nativeEvent)) onChange(tab.key);
+              }}
+              aria-current={lit ? "page" : undefined}
               aria-label={badge ? `${tab.label}，${badge} 项待处理` : tab.label}
             >
               <span className="tabbar__icon">
@@ -68,7 +80,7 @@ export function TabBar({
   );
 }
 
-/** Left rail for wide browser windows: brand, the same five places, status. */
+/** Wide-browser navigation uses the same destinations and selection semantics. */
 export function SideNav({
   current,
   onChange,
@@ -89,16 +101,18 @@ export function SideNav({
           <p className="side__tag">汕头大学 · 学生自用</p>
         </div>
       </div>
-      <nav className="side__nav" aria-label="主导航">
+      <nav className="side__nav" aria-label="主导航" data-haptic="selection">
         {TABS.map((tab) => {
-          const on = tab.key === current;
+          const on = tab.key === navigationTab(current);
           const badge = badges[tab.key];
           return (
             <button
               key={tab.key}
               type="button"
               className={`side__item${on ? " is-on" : ""}`}
-              onClick={() => onChange(tab.key)}
+              onClick={(event) => {
+                if (!isCancelledInteraction(event.nativeEvent)) onChange(tab.key);
+              }}
               aria-current={on ? "page" : undefined}
             >
               {on && (

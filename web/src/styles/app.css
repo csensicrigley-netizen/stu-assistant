@@ -179,6 +179,16 @@ svg {
   padding-right: max(var(--gutter), calc(var(--safe-r) + 12px));
 }
 
+/* The native Compose dock is 64dp with 20dp of floating space above the system inset. */
+@media (max-width: 1079px) {
+  [data-native-navigation="true"] {
+    --tabbar-h: 84px;
+  }
+  [data-native-navigation="true"] .tabbar {
+    display: none;
+  }
+}
+
 /* 页面级的纵向节奏只有一个来源：tokens 里的 --rhythm-*。
    以前这里是 24 / 32 两档混着用，于是"今天"和"我的"看起来像两个 App。 */
 .page > * + * {

@@ -1,4 +1,5 @@
 apply plugin: 'com.android.application'
+apply plugin: 'org.jetbrains.kotlin.plugin.compose'
 
 // Release signing lives outside the web project so it can never be bundled
 // into the website: STU事项助手/android-signing/keystore.properties.
@@ -12,6 +13,9 @@ if (signingFile.exists()) {
 android {
     namespace = "com.stuassistant.app"
     compileSdk = rootProject.ext.compileSdkVersion
+    buildFeatures {
+        compose = true
+    }
     signingConfigs {
         release {
             if (signingFile.exists()) {
@@ -37,9 +41,13 @@ android {
         }
     }
     buildTypes {
+        debug {
+            applicationIdSuffix '.gpuqa'
+            versionNameSuffix '-gpuqa.1'
+        }
         release {
             minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             if (signingFile.exists()) {
                 signingConfig signingConfigs.release
             }
@@ -49,7 +57,7 @@ android {
             initWith release
             debuggable false
             applicationIdSuffix '.haptics'
-            versionNameSuffix '-haptics.7'
+            versionNameSuffix '-gpu.1'
             signingConfig signingConfigs.debug
             matchingFallbacks = ['release']
         }
@@ -63,6 +71,10 @@ repositories {
 }
 
 dependencies {
+    implementation 'androidx.compose.ui:ui:1.12.0'
+    implementation 'androidx.compose.foundation:foundation:1.12.0'
+    implementation 'io.github.kyant0:backdrop:2.0.1'
+    implementation 'io.github.kyant0:shapes:1.2.1'
     implementation files('libs/richtap-2.0.4-lite.aar')
     implementation fileTree(include: ['*.jar'], dir: 'libs')
     implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
@@ -74,6 +86,12 @@ dependencies {
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
     implementation project(':capacitor-cordova-android-plugins')
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21
+    }
 }
 
 apply from: 'capacitor.build.gradle'

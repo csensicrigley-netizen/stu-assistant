@@ -1,5 +1,11 @@
 # STU 事项助手 · 设计说明（2026-10-28 重做）
 
+当前原生 V1 按最新范围执行：**今天／课表／事项／校园／我的**，仅合并计划与作业；考试和成绩仍在事项入口内，其余页面按现有 JS 功能等价迁移。范围、实施顺序与暂缓的重设计见 [Compose 原生重写 V1](docs/Compose原生重写V1范围与实施顺序.md)，逐项能力见 [功能对照表](docs/Compose首版功能对照表.md)。以下保留 Web 版原设计记录。
+
+后续 Android 原生 UI 重构的设计规则、技术路线与开工检查见 [UI 重构设计与实施准备](docs/UI重构设计与实施准备.md)。下文保留现有 React／Capacitor 界面的设计记录。
+
+底栏已先行接入原 WebView 的 GPU 绘制图层，最新实现、实测与验证 APK 见 [WebView 实时 GPU 液态玻璃验证](docs/WebView实时GPU液态玻璃验证.md)。
+
 截图在 `web/shots/`（`node scripts/shoot.mjs`），可复现的检查在 `web/scripts/audit.mjs`。
 一手材料与依据在 `docs/phase0/`：数据契约、官方校历与作息、能力地图。
 

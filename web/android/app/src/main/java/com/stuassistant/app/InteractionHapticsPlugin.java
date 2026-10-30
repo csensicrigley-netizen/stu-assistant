@@ -50,6 +50,7 @@ public class InteractionHapticsPlugin extends Plugin {
     }
 
     private void reply(PluginCall call, boolean accepted, String route) {
+        if (call == null) return; // Native Compose navigation has no JavaScript call to resolve.
         JSObject result = new JSObject();
         result.put("accepted", accepted);
         result.put("route", route);
@@ -82,6 +83,19 @@ public class InteractionHapticsPlugin extends Plugin {
                     handler.postDelayed(pendingRelease, delay);
                 } else execute(call, kind, strength);
             } catch (RuntimeException | LinkageError ignored) { reply(call, false, "unavailable"); }
+        });
+    }
+
+    /** A committed navigation choice is one selection tick, never a press/release pair. */
+    public void playNavigationSelection(int value) {
+        final int strength = Math.max(0, Math.min(100, value));
+        getActivity().runOnUiThread(() -> {
+            if (strength == 0) { stopFeedback(); return; }
+            if (!foreground()) return;
+            // A new navigation gesture owns feedback; do not leave an old button release queued.
+            if (pendingRelease != null) stopFeedback();
+            long now = SystemClock.uptimeMillis();
+            if (!timing.throttled("selection", now)) execute(null, "selection", strength);
         });
     }
 
