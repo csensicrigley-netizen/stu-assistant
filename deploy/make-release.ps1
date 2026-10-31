@@ -65,6 +65,7 @@ if ($notes.Count -eq 0) { Write-Output "    note: 没有更新说明（notes 为
 # 前端拿它和页面里的版本比一比，发现旧了就弹「刷新页面」。
 # 必须写在 dist 里（会被一起发到 your-host），且不能被 service worker 缓存。
 $probe = [ordered]@{
+  channel     = "product"
   versionName = $appName
   versionCode = $appCode
   notes       = $notes
@@ -93,6 +94,7 @@ Copy-Item "$root\deploy\install.sh", "$root\deploy\stu-assistant.service", "$roo
 # 服务器端版本登记：跟这次打的包严格一致，旧客户端靠它知道自己该更新了
 # （$notes 已经在 1.5/4 那一步读好，这里直接复用，别再读一遍文件。）
 $latest = [ordered]@{
+  channel      = "product"
   versionName  = $appName
   versionCode  = $appCode
   apk          = "/download/stu-assistant.apk"

@@ -1,5 +1,7 @@
 # vivo 包身份对照验证
 
+本页是实验工具与实测记录，不是正式 App 新增原子岛功能的发布说明。产品版本和探针编号分别管理，见[版本与验证构建](版本与验证构建.md)。
+
 ## 目的和边界
 
 用户的 V2509A / OriginOS 6 / Android16 / PD2509E_A_16.0.30.15.W10 在普通进度、标准 Live Updates 以及自有包名的 SuperX 实验中均未出现原子岛。标准着色通知实际 eligible=true 但 promotionAllowed=false；纯扩展和混合扩展未读到严格会话匹配对象。
@@ -41,4 +43,4 @@
 
 ## 打包
 
-先提交源码并同步主线，再运行`deploy/make-native-release.ps1 -IdentityPair`。脚本只检查一次递增版本下限，同时构建和校验两种身份，全部通过后输出两个APK及各自源码SHA、包名、版本和文件哈希收据。APK留在本地release目录，GitHub仅提交源码。
+历史交付为上文 `1.0.60` / code61，两包及原始回执保持不变。后续实验先在 `deploy/probe-versions.json` 独立更新两种身份的版本，再提交源码并同步主线，运行 `deploy/make-native-release.ps1 -IdentityPair`。脚本按最终 applicationId 检查递增下限，同时构建和校验两种身份，全部通过后输出两个 APK 及各自源码 SHA、包名、版本、分类、产品基线和哈希收据。不能为生成探针修改产品 `defaultConfig`、Web 常量或正式更新说明。APK 留在本地 release 目录，GitHub 仅提交源码。

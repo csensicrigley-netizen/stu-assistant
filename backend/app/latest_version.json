@@ -1,12 +1,13 @@
 {
-  "versionName": "1.0.60",
-  "versionCode": 61,
+  "channel": "product",
+  "versionName": "1.0.54",
+  "versionCode": 55,
   "apk": "/download/stu-assistant.apk",
   "notes": [
-    "新增华为／卓易通独立验证 APK，提供本地实况窗计时请求与 Android 通知对照",
-    "诊断分别记录 APK 运行环境、通知扩展字段与请求状态，宿主实况窗由真机确认"
+    "底部抽屉玻璃背景连续铺到屏幕底边，仅保留顶部圆角，消除悬浮弹窗式空挡",
+    "系统手势安全距离移到内容内部，底栏仍在下层保留原位置和状态"
   ],
   "mandatory": false,
-  "releasedAt": "2026-10-31T07:03:11Z",
+  "releasedAt": "2026-10-31T05:17:29Z",
   "minSupported": "1.0.0"
 }

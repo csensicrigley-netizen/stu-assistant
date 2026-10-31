@@ -36,8 +36,9 @@ android {
         applicationId "com.stuassistant.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 61
-        versionName "1.0.60"
+        // Product version only. Capability probes have independent versions below.
+        versionCode 55
+        versionName "1.0.54"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -102,11 +103,44 @@ android {
     }
 }
 
-// Personal sideload experiment. The UI stays clearly branded as an STU probe.
-// Do not alter production identity, namespace, certificate, or vendor scene lists.
+// Probe versions are not product releases and never advance the web/update feed.
+// Preserve delivered probe identities/codes while the product version evolves.
+def probeVersionsFile = rootProject.file('../../deploy/probe-versions.json')
+def probeCatalog = new groovy.json.JsonSlurper().parse(probeVersionsFile, 'UTF-8')
+def probeVersions = probeCatalog.variants
+def expectedProbePackages = [
+    Liveprobe: 'com.stuassistant.app.liveprobe',
+    Huaweiprobe: 'com.stuassistant.app.huaweiprobe',
+    Vivoprobe: 'com.stuassistant.app.vivoprobe',
+    Vivoidentity: 'com.stuassistant.app.vivoprobe',
+    Vivomap: 'com.autonavi.minimap'
+]
+if (probeCatalog.schemaVersion != 1 || !(probeVersions instanceof Map) ||
+        probeVersions.keySet() != expectedProbePackages.keySet()) {
+    throw new GradleException('Invalid standalone probe version catalog')
+}
+probeVersions.each { key, value ->
+    def suffix = key == 'Vivomap' ? 'vivoidentity' : key.toLowerCase(Locale.ROOT)
+    if (value.applicationId != expectedProbePackages[key] || !(value.versionCode instanceof Integer) ||
+            value.versionCode < 1 || value.versionCode > 2100000000 ||
+            !(value.versionName ==~ /[\d.]+-${suffix}\.\d+/)) {
+        throw new GradleException("Invalid standalone probe identity/version: $key")
+    }
+}
+if (probeVersions.Vivoidentity.versionName != probeVersions.Vivomap.versionName ||
+        probeVersions.Vivoidentity.versionCode != probeVersions.Vivomap.versionCode) {
+    throw new GradleException('Vivo identity pair must share a probe version')
+}
 androidComponents {
-    onVariants(selector().withBuildType('vivomap')) { variant ->
-        variant.applicationId.set('com.autonavi.minimap')
+    onVariants(selector().all()) { variant ->
+        def probeVersion = probeVersions.find { key, value -> key.equalsIgnoreCase(variant.buildType) }?.value
+        if (probeVersion) {
+            variant.applicationId.set(probeVersion.applicationId)
+            variant.outputs.each { output ->
+                output.versionName.set(probeVersion.versionName)
+                output.versionCode.set(probeVersion.versionCode as Integer)
+            }
+        }
     }
 }
 

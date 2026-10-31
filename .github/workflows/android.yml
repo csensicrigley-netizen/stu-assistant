@@ -30,7 +30,9 @@ jobs:
           java-version: '21'
           cache: gradle
       - name: Check generated version numbers
-        run: python3 deploy/sync-version.py
+        run: |
+          python3 deploy/sync-version.py
+          python3 -m unittest discover -s deploy/tests -v
       - name: Prepare existing Capacitor build dependencies
         working-directory: web
         run: |

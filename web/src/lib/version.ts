@@ -1,5 +1,5 @@
 /**
- * 版本号 + 「有新版本」检查。
+ * 产品版本号 + 「有新版本」检查；独立机型探针不进入此更新通道。
  *
  * 这个文件里的两个常量必须和 android/app/build.gradle 里的 versionName /
  * versionCode 一致 —— `deploy/make-release.ps1` 会做这个校验，不一致直接中止，
@@ -14,8 +14,8 @@
  */
 import { api, apiBase, IS_NATIVE } from "./api";
 
-export const APP_VERSION_NAME = "1.0.60";
-export const APP_VERSION_CODE = 61;
+export const APP_VERSION_NAME = "1.0.54";
+export const APP_VERSION_CODE = 55;
 
 export type UpdateInfo = {
   versionName: string;
