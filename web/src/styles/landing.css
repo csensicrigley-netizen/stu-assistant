@@ -1,0 +1,812 @@
+/* ==========================================================================
+   STU 助手 · 落地页（2026-10-31 · 完全独立的一套，ld- 前缀）
+   --------------------------------------------------------------------------
+   为什么另起一套：之前几版都在改 app.css 里 .welcome / .intro / .stage 那些
+   老规则，改一处被另一处覆盖一处，越改越乱。这一套**不引用任何旧类名**，
+   只在 Landing.tsx 里用，互不干扰。
+
+   照参考图的结构：
+     外层 = 奶油纸底（暖白）
+     内层 = 一块深色圆角大板（近黑）
+     板上 = 一行小标签 + 一行标题 + 一列彩色竖卡 + 一行按钮
+
+   色值直接取自参考图（用户要求"颜色完全参考图片"）。
+   ========================================================================== */
+
+.ld {
+  /* ---- 参考图取色 ---- */
+  /* 外层纸底：**跟随系统明暗**（深色 → 全黑；浅色 → 暖奶油纸）。
+     深色时深色板与页底融成一片，只靠圆角和阴影分层；
+     浅色时奶油纸 + 深色板，就是参考图那个对比。
+     默认值给深色，浅色由下面 [data-theme="light"] 覆盖。 */
+  --ld-paper: #08080a;
+  --ld-paper-2: #0d0d11;
+  --ld-stage: #141418;
+  --ld-stage-2: #1b1b21;
+  --ld-ink: #f6f3ee;
+  --ld-ink-2: #a9a4a0;
+  --ld-credit: #6a6560;
+  --ld-glow-a: #f6b9cf;
+  --ld-glow-b: #cbb8f0;
+  --ld-glow-a-op: 0.16;
+  --ld-glow-b-op: 0.16;
+  --ld-on-stage: #f6f3ee;     /* 板上主文字 */
+  --ld-on-stage-2: #a9a4a0;   /* 板上次要文字 */
+
+  /* 六张卡的色：薰衣草 / 樱粉 / 天青 / 嫩绿 / 湖蓝 / 蜜桃 */
+  --ld-c1: #b9a7f0;
+  --ld-c2: #f2a7bd;
+  --ld-c3: #7ed2e6;
+  --ld-c4: #8fd99c;
+  --ld-c5: #85b0f0;
+  --ld-c6: #f6bd93;
+
+  /* 强调色：樱粉（去橘色，回到原来的樱粉） */
+  --ld-accent: #ef7ba6;
+  --ld-accent-2: #f2a0bd;
+
+  position: relative;
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: clamp(14px, 2.4vw, 34px);
+  background: var(--ld-paper);
+  color: var(--ld-ink);
+  font-family: var(--font-ui);
+  overflow: hidden;
+}
+
+/* 纸面上两团极淡的暖光，只为不死板 */
+.ld-glow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.ld-glow__a,
+.ld-glow__b {
+  position: absolute;
+  display: block;
+  border-radius: 50%;
+  filter: blur(90px);
+}
+.ld-glow__a {
+  width: 44vmax; height: 44vmax;
+  left: -18vmax; top: -20vmax;
+  background: radial-gradient(circle, var(--ld-glow-a), transparent 68%);
+  animation: ldDriftA 34s ease-in-out infinite;
+}
+.ld-glow__b {
+  width: 38vmax; height: 38vmax;
+  right: -16vmax; bottom: -18vmax;
+  background: radial-gradient(circle, var(--ld-glow-b), transparent 68%);
+  animation: ldDriftB 42s ease-in-out infinite;
+}
+@keyframes ldDriftA {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(2.4vmax, 1.8vmax, 0); }
+}
+@keyframes ldDriftB {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(-2.6vmax, -1.6vmax, 0); }
+}
+
+/* ---------- 深色板 ---------- */
+
+.ld__stage {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 1080px;
+  display: grid;
+  justify-items: center;
+  gap: 0;
+  padding: clamp(22px, 3vw, 40px) clamp(18px, 3vw, 40px) clamp(22px, 3vw, 34px);
+  border-radius: clamp(20px, 2.6vw, 32px);
+  background:
+    radial-gradient(80% 50% at 50% 0%, #26262e, transparent 62%),
+    var(--ld-stage);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    0 1px 2px rgba(30, 24, 16, 0.16),
+    0 18px 44px -18px rgba(30, 24, 16, 0.36),
+    0 40px 80px -40px rgba(30, 24, 16, 0.3);
+  overflow: hidden;
+  isolation: isolate;
+}
+
+/* 板上顶部一条极淡的光，让"上方"有方向 */
+.ld__stage::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 42%;
+  pointer-events: none;
+  background: radial-gradient(70% 100% at 50% 0%, rgba(255, 255, 255, 0.06), transparent 70%);
+}
+
+/* ---------- 顶部一行：标志 + 时钟 ---------- */
+
+.ld__bar {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: clamp(12px, 1.8vw, 20px);
+}
+
+.ld__logo {
+  filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.45));
+}
+
+.ld__clock {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 12px 5px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #cfc9c2;
+  background: rgba(255, 255, 255, 0.07);
+}
+.ld__clock i {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: #ef7ba6;
+  box-shadow: 0 0 0 3px rgba(239, 123, 166, 0.24);
+}
+
+/* ---------- 标题：**刻意做小** ----------
+   用户反馈"标题把下面截掉"。参考图里标题只占板上方约 1/5，
+   真正的主角是卡片。这里压到 1.5–2.1rem，绝不铺满屏。 */
+
+.ld__title {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  max-width: 20em;
+  text-align: center;
+  font-size: clamp(1.375rem, 0.95rem + 1.5vw, 2.1rem);
+  line-height: 1.22;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--ld-on-stage);
+  text-wrap: balance;
+}
+.ld__title em {
+  font-style: normal;
+  color: var(--ld-accent);
+}
+
+.ld__lead {
+  position: relative;
+  z-index: 1;
+  margin: 10px 0 0;
+  max-width: 34em;
+  text-align: center;
+  font-size: clamp(0.75rem, 0.7rem + 0.2vw, 0.8125rem);
+  line-height: 1.65;
+  color: var(--ld-on-stage-2);
+  text-wrap: pretty;
+}
+
+/* ---------- 卡组 ---------- */
+
+.ld__cards {
+  position: relative;
+  z-index: 1;
+  /* 关键：grid 子项默认 min-width:auto，会被内部横滑卡组撑到 1586px，
+     整页因此横向溢出、卡片飞到屏幕外。必须归零。 */
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
+  margin: clamp(16px, 2.4vw, 26px) 0 clamp(16px, 2.4vw, 24px);
+}
+
+.ld-fan {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* ==========================================================================
+   卡组本体
+   ========================================================================== */
+
+/* ---------- 卡组：桌面大幅叠压，手机横滑 ---------- */
+
+.ld-fan {
+  /* 大幅堆叠：卡宽 196，每张右错 112 → 只露左条 112px，像一叠牌摊开 */
+  --ld-w: 196px;
+  position: relative;
+  margin: 0;
+  /* 上下留白给"抬起"和阴影：overflow-x:auto 会连带裁掉纵向 */
+  padding: 26px 0 26px;
+  min-height: 300px;
+  transform-style: preserve-3d;
+}
+
+/* 单张卡：一块竖向的彩色软胶 */
+.ld-card {
+  position: absolute;
+  /* 底部对齐：卡底在一条线上，中间的靠"更高"跳出来，不是靠下沉 */
+  bottom: 0;
+  width: var(--ld-w);
+  height: calc(var(--ld-w) * 1.32);
+  display: grid;
+  grid-template-rows: auto 1fr;
+  align-content: stretch;
+  gap: 6px;
+  padding: 14px 14px 16px;
+  border: 0;
+  border-radius: 24px;
+  text-align: left;
+  cursor: pointer;
+  transform-origin: center 88%;
+  /* 卡就是那个颜色本身，白字直接压上去（参考图就是这样） */
+  background: var(--ld-card, #b9a7f0);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.45),
+    inset 0 -5px 0 rgba(0, 0, 0, 0.1),
+    0 2px 3px rgba(20, 16, 10, 0.22),
+    0 10px 18px -6px rgba(20, 16, 10, 0.3),
+    0 26px 44px -20px rgba(20, 16, 10, 0.46);
+  will-change: transform;
+  overflow: hidden;
+}
+
+/* 顶面高光：斜掠一道，让"软胶"有厚度 */
+/* 浮动层：卡片自己在动（不管有没有人操作）。
+   单独一层做 translate3d，避免和 motion 的 y/scale/rotate 抢同一个 transform。
+   它必须撑满卡片并接管卡内两行布局。 */
+.ld-card__float {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 6px;
+  height: 100%;
+  min-height: 0;
+  animation: ldFloat var(--float-dur, 7.6s) ease-in-out infinite;
+  animation-delay: calc(var(--i, 0) * -0.85s);
+  will-change: transform;
+}
+.ld-card.is-pinned .ld-card__float,
+.ld-card.is-active .ld-card__float {
+  animation-play-state: paused;
+}
+
+@keyframes ldFloat {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(0, -6px, 0); }
+}
+
+.ld-card__gloss {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 56%;
+  /* 必须继承圆角：不然直角会压在卡的圆角上，左上角露出一块深色直角 */
+  border-radius: inherit;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    176deg,
+    rgba(255, 255, 255, 0.4),
+    rgba(255, 255, 255, 0.07) 54%,
+    transparent 84%
+  );
+}
+
+/* 卡名在左上角（参考图就是这样），说明在下面一行小字 */
+.ld-card__head {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding-right: 4px;
+}
+.ld-card__name,
+.ld-card__sub {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ld-card.has-cta .ld-card__head {
+  /* 药丸占右上，卡名让出宽度 */
+  padding-right: 0;
+  max-width: calc(100% - 0px);
+}
+.ld-card__name {
+  font-size: 1.0625rem;
+  font-weight: 800;
+  letter-spacing: -0.015em;
+  line-height: 1.2;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  /* 有药丸的卡，卡名别伸到药丸下面 */
+  max-width: 100%;
+}
+.ld-card__sub {
+  font-size: 0.625rem;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.82);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.14);
+}
+
+/* 中间那坨软胶玩具：占满剩余空间，底部对齐（像站在卡上） */
+.ld-card__art {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: end center;
+  min-height: 0;
+  /* 不溢出卡外：给左右留一点，底部贴边 */
+  margin: 0;
+  padding: 0 2px;
+  overflow: hidden;
+}
+.ld-card__art svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 100%;
+  filter: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.24));
+}
+
+/* 白色药丸按钮：只有中间两张有（参考图） */
+.ld-card__pill {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px 5px 12px;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: #24211e;
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+}
+.ld-card__arrow {
+  display: grid;
+  place-items: center;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  font-size: 0.5625rem;
+  color: #fff;
+  background: #24211e;
+}
+
+/* 非激活卡"后退一档"：靠一层极淡的暗罩，不用 brightness 滤镜。
+   为什么：brightness(0.86) 在深底上会把彩卡压成黑块（手机暗色下就是这个毛病），
+   暗罩只降对比、不改色相，颜色仍然是彩的。 */
+.ld-card:not(.is-active)::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: rgba(10, 8, 14, 0.16);
+  pointer-events: none;
+  transition: opacity var(--t-base, 220ms) ease;
+}
+.ld-card.is-active::after,
+.ld-card.is-pinned::after {
+  opacity: 0;
+}
+
+/* 暗色主题：卡面提亮一点，抵消深底的"吸色" */
+[data-theme="dark"] .ld-card {
+  /* 深底会吃掉一层明度，这里补回来，让卡还是参考图那种亮彩 */
+  filter: brightness(1.06) saturate(1.02);
+}
+[data-theme="dark"] .ld-card.is-active,
+[data-theme="dark"] .ld-card.is-pinned {
+  filter: brightness(1.1) saturate(1.04);
+}
+
+.ld-card:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 3px;
+}
+
+/* ---------- 按钮 ---------- */
+
+.ld__actions {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ld__cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 46px;
+  padding: 0 26px;
+  border: 0;
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(180deg, var(--ld-accent-2), var(--ld-accent));
+  box-shadow:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.42),
+    inset 0 -3px 0 rgba(0, 0, 0, 0.14),
+    0 4px 14px -2px rgba(239, 123, 166, 0.46);
+  cursor: pointer;
+  transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.18s;
+}
+.ld__cta:hover { transform: translateY(-1px); }
+.ld__cta:active { transform: translateY(1px) scale(0.99); }
+
+.ld__ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 46px;
+  padding: 0 22px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--ld-on-stage);
+  background: rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+  transition: background 0.18s, transform 0.18s;
+}
+.ld__ghost:hover { background: rgba(255, 255, 255, 0.1); }
+.ld__ghost:active { transform: scale(0.99); }
+
+/* ---------- 板上页脚小字 ---------- */
+
+.ld__foot {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  margin: clamp(14px, 2vw, 20px) 0 0;
+  padding: 0;
+  list-style: none;
+}
+.ld__foot li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.6875rem;
+  color: #8b8681;
+}
+.ld__foot svg { flex: none; color: #ef7ba6; }
+
+/* 纸面上的署名（板外） */
+.ld__credits {
+  position: relative;
+  z-index: 1;
+  margin: 12px 0 0;
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--ld-credit);
+}
+
+/* ==========================================================================
+   响应式
+   ========================================================================== */
+
+/* 平板：卡窄一点，露出更多张 */
+@media (max-width: 899px) {
+  .ld-fan {
+    --ld-w: 148px;
+    --ld-gap: 10px;
+  }
+  .ld-card__disc { width: 72px; height: 72px; }
+  .ld-card__name { font-size: 0.875rem; }
+}
+
+/* 手机：横向卡组，一张立正、右侧探出下一张 */
+@media (max-width: 559px) {
+  .ld {
+    padding: 0;
+    align-content: stretch;
+    /* 手机上舞台已经铺满整屏，署名如果再压在纸底上就会露出一条"白条"。
+       直接把页底换成舞台色，署名就落在一块深色上，视觉是一整块。 */
+    background: var(--ld-stage);
+  }
+  .ld__stage {
+    border-radius: 0;
+    min-height: 100dvh;
+    padding: 20px 16px 24px;
+    max-width: none;
+  }
+  /* 手机：横向滑动卡组，一张立正、右侧探出下一张 */
+  .ld-fan {
+    --ld-w: 64vw;
+    display: flex;
+    align-items: stretch;
+    gap: 12px;
+    min-height: 0;
+    /* 必须同时加宽 32px 并放开 max-width：只写负 margin 是"左移"，
+       宽度还是父级那 358（被 base 里的 max-width:100% 夹住），
+       右边空 32px → 容器中心比屏幕中心偏左 16px，置顶卡永远居中不了。 */
+    width: calc(100% + 32px);
+    max-width: none;
+    margin-inline: -16px;
+    /* 上留 72px：置顶卡抬起 26 + 浮动 6 + scale 1.14 上溢 24 ≈ 56，
+       再留余量。之前 44px 不够，置顶时顶边会被 overflow 裁掉。 */
+    padding: 72px 0 28px;
+    overflow-x: auto;
+    overflow-y: visible;
+    scroll-snap-type: x mandatory;
+    scroll-padding-inline: calc((100% - var(--ld-w)) / 2);
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+  }
+  /* 有卡被置顶时关掉吸附：snap 会在平滑滚动结束时把卡重新吸回原位，
+     导致"点哪张哪张居中"永远差一截。 */
+  .ld-fan.has-pin { scroll-snap-type: none; }
+  .ld-fan::-webkit-scrollbar { display: none; }
+  .ld-fan::before,
+  .ld-fan::after {
+    content: "";
+    /* 必须和 scroll-padding-inline 完全一致（都减这 16px 就是那个偏差的来源）。
+       之前这里 -16px、scroll-padding 没减，两者差 16px → 置顶卡总偏左 16px。 */
+    flex: 0 0 calc((100% - var(--ld-w)) / 2);
+  }
+  .ld-card {
+    position: relative;
+    /* 桌面那套是 absolute + bottom:0，手机必须全部归零，否则卡片飞出屏幕 */
+    left: auto !important;
+    top: auto !important;
+    bottom: auto !important;
+    flex: 0 0 var(--ld-w);
+    width: var(--ld-w);
+    /* 高度按内容走，别硬算比例：算出来的高度会把卡名挤出去 */
+    height: auto;
+    min-height: calc(var(--ld-w) * 1.05);
+    border-radius: 24px;
+    padding: 13px 12px 12px;
+    scroll-snap-align: center;
+    transform-origin: center 80%;
+    overflow: visible;
+  }
+  .ld-card__name { font-size: 0.9375rem; }
+  .ld-card__sub { font-size: 0.5625rem; }
+  .ld-card__art { padding: 0 4px; }
+  .ld-card__art svg { max-height: 132px; }
+  .ld-card__pill { top: 9px; right: 9px; padding: 4px 8px 4px 10px; font-size: 0.5625rem; }
+  .ld__credits { color: #6f6a66; padding-bottom: 10px; }
+  .ld__title { font-size: 1.375rem; }
+  .ld__lead { font-size: 0.75rem; margin-top: 8px; }
+  .ld__actions {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+  }
+  .ld__cta, .ld__ghost { width: 100%; }
+  .ld__foot {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 7px;
+  }
+}
+
+/* ==========================================================================
+   动效：呼吸漂浮 · 光泽扫过 · 巡游呼吸
+   全部 CSS animation，只碰 transform / opacity / background-position。
+   手机端关掉呼吸（一屏多个无限动画是掉帧主因）。
+   ========================================================================== */
+
+/* 注意：这里**不要**给 .ld-card 加任何 animation。
+   理由：CSS animation 动 transform 的优先级高于 motion 写进 style 的 transform，
+   一旦加上，点击置顶的位移、让位、缩放会被整段覆盖（实测就是这样：z-index 变了但位置没动）。
+   浮动已经交给内层的 .ld-card__float（见上面的 ldFloat）。 */
+
+@keyframes ldSheen {
+  0% { background-position: -160% 0; opacity: 0; }
+  10% { opacity: 0.9; }
+  52% { background-position: 260% 0; opacity: 0; }
+  100% { background-position: 260% 0; opacity: 0; }
+}
+.ld-card__gloss::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background-image: linear-gradient(
+    104deg,
+    transparent 36%,
+    rgba(255, 255, 255, 0.28) 46%,
+    rgba(255, 255, 255, 0.48) 50%,
+    rgba(255, 255, 255, 0.28) 54%,
+    transparent 64%
+  );
+  background-size: 36% 100%;
+  background-repeat: no-repeat;
+  background-position: -160% 0;
+  opacity: 0;
+  mix-blend-mode: soft-light;
+}
+.ld-card.is-active .ld-card__gloss::after {
+  animation: ldSheen 5s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+
+@keyframes ldTour {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.003); }
+}
+.ld-fan.is-touring { animation: ldTour 5.4s ease-in-out infinite; }
+
+@media (max-width: 899px) {
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ld-card,
+  .ld-card.is-active .ld-card__gloss::after,
+  .ld-fan.is-touring,
+  .ld-glow__a,
+  .ld-glow__b {
+    animation: none !important;
+  }
+  .ld-card__gloss::after { opacity: 0 !important; }
+}
+
+/* ==========================================================================
+   顶部导航 + 浮动标签（2026-10-31 · 照参考图补）
+   ========================================================================== */
+
+.ld__nav {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  margin-bottom: clamp(14px, 2vw, 24px);
+}
+
+.ld__navLeft,
+.ld__navRight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ld__navRight { justify-content: flex-end; }
+
+/* 居中的胶囊：参考图那条 Home/How/Today/Join */
+.ld__navPill {
+  justify-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07);
+}
+.ld__navPill span {
+  padding: 5px 13px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #8f8a85;
+  white-space: nowrap;
+}
+.ld__navPill span.is-on {
+  color: #1c1a17;
+  background: #f3efe8;
+}
+
+/* 参考图里飘着的小气泡 */
+.ld__tag {
+  position: absolute;
+  z-index: 2;
+  padding: 5px 11px;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+.ld__tag--a {
+  left: 4%;
+  top: 26%;
+  color: #2a2436;
+  background: #cbb8f0;
+  transform: rotate(-4deg);
+}
+.ld__tag--b {
+  right: 6%;
+  top: 22%;
+  color: #3a1f2a;
+  background: #f6b9cf;
+  transform: rotate(3deg);
+}
+.ld__tag--c {
+  right: 2%;
+  top: 52%;
+  color: #1f2b3a;
+  background: #a9c6f5;
+  transform: rotate(-3deg);
+}
+
+/* 手机上标签会挡住卡片，隐藏 */
+@media (max-width: 899px) {
+  .ld__tag { display: none; }
+  .ld__navPill span { padding: 4px 9px; font-size: 0.6875rem; }
+  .ld__navPill span:nth-child(n + 4) { display: none; }
+}
+/* ==========================================================================
+   主题跟随系统（2026-10-31）
+   --------------------------------------------------------------------------
+   主题本身由 useTheme.ts 负责：pref = light | dark | system，
+   system 时监听 prefers-color-scheme，把结果写到 <html data-theme>。
+   这里只负责"浅色下落地页长什么样"，不重复做媒体查询——
+   否则 ?theme=light 这种强制值会跟系统值打架。
+   ========================================================================== */
+
+/* 浅色：暖奶油纸 + 深色板（就是参考图那个对比）。
+   深色（默认）已经在 .ld 里写好了。 */
+[data-theme="light"] .ld {
+  --ld-paper: #f3efe8;
+  --ld-paper-2: #ece6dc;
+  --ld-ink: #1c1a17;
+  --ld-ink-2: #5d5850;
+  --ld-credit: #8b8681;
+  --ld-glow-a-op: 0.5;
+  --ld-glow-b-op: 0.44;
+}
+
+/* 浅色下纸面要有那两道暖光，不然一整片米色太平 */
+[data-theme="light"] .ld {
+  background:
+    radial-gradient(90% 60% at 50% -10%, #fffdfa, transparent 60%),
+    radial-gradient(70% 50% at 100% 100%, var(--ld-paper-2), transparent 65%),
+    var(--ld-paper);
+}
+
+[data-theme="light"] .ld-glow__a { opacity: 0.5; }
+[data-theme="light"] .ld-glow__b { opacity: 0.44; }
+
+/* 深色板在两套主题下都是深色（参考图如此），浅色时阴影要更重才立得起来 */
+[data-theme="light"] .ld__stage {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    0 1px 2px rgba(30, 24, 16, 0.14),
+    0 22px 48px -20px rgba(30, 24, 16, 0.42),
+    0 48px 90px -46px rgba(30, 24, 16, 0.38);
+}
+/* 手机上署名落在舞台下方，页底如果还是奶色就会露出一条"白条"。
+   必须放在文件末尾：前面中间那条 .ld{background:var(--ld-stage)} 特异性只有 (0,1,0)，
+   会被上面 [data-theme="light"] .ld 的 (0,2,0) 盖掉，所以这里用同级选择器 + 更晚出现取胜。 */
+@media (max-width: 559px) {
+  .ld,
+  [data-theme="light"] .ld {
+    background: var(--ld-stage);
+  }
+  /* 署名区也铺成舞台色，滚到底时看不出接缝 */
+  .ld__credits {
+    margin: 0;
+    padding: 14px 16px calc(16px + env(safe-area-inset-bottom));
+    color: #6f6a66;
+    background: var(--ld-stage);
+  }
+}

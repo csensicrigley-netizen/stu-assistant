@@ -121,10 +121,12 @@
   --ink-3: oklch(49% 0.024 355);
   --ink-inverse: oklch(99.4% 0.005 18);
 
-  --sea: oklch(52% 0.15 288); /* 香芋紫 */
-  --sea-ink: oklch(99.4% 0.005 288);
-  --sea-soft: oklch(94.2% 0.035 288);
-  --sea-soft-ink: oklch(40% 0.13 288);
+  /* 2026-10-31：主色回到**樱粉**（用户要"取消橘色，改回原来的樱粉"）。
+     粉是这个 App 原本的调性：温柔、跟"学生日常"不冲突。 */
+  --sea: oklch(64% 0.16 355);
+  --sea-ink: oklch(100% 0 0);
+  --sea-soft: oklch(95.5% 0.03 355);
+  --sea-soft-ink: oklch(42% 0.15 355);
 
   --cinnabar: oklch(56% 0.15 22); /* 蜜桃珊瑚 */
   --cinnabar-soft: oklch(94.6% 0.028 22);
@@ -149,12 +151,13 @@
   --brand-ink-3: oklch(95% 0.02 20);
   --brand-bead: #ff9d7e;
   --brand-shadow: oklch(25% 0.08 300 / 0.55);
-  --logo-hi: #9d8bf2;
-  --logo-lo: #6a55b0;
-  --logo-paper: #fff7f4;
-  --logo-bead: #ff9d7e;
-  --logo-glow: oklch(45% 0.12 290 / 0.26);
-  --logo-shadow: oklch(30% 0.1 320 / 0.4);
+  /* 2026-10-31：改回樱粉（去橘色）。粉配深底不显闷，也不像夜店。 */
+  --logo-hi: #f7a8c4;
+  --logo-lo: #d95b8c;
+  --logo-paper: #fff6f9;
+  --logo-bead: #fff0f5;
+  --logo-glow: oklch(70% 0.13 355 / 0.32);
+  --logo-shadow: oklch(52% 0.13 355 / 0.44);
 }
 
 [data-theme="dark"] {
@@ -172,10 +175,10 @@
   --ink-3: oklch(75% 0.018 20);
   --ink-inverse: oklch(24% 0.022 330);
 
-  --sea: oklch(80% 0.1 288);
-  --sea-ink: oklch(22% 0.05 288);
-  --sea-soft: oklch(32% 0.045 288);
-  --sea-soft-ink: oklch(88% 0.06 288);
+  --sea: oklch(76% 0.14 355);
+  --sea-ink: oklch(24% 0.07 355);
+  --sea-soft: oklch(34% 0.06 355);
+  --sea-soft-ink: oklch(92% 0.07 355);
 
   --cinnabar: oklch(78% 0.1 22);
   --cinnabar-soft: oklch(32% 0.045 22);
@@ -267,12 +270,12 @@
   --brand-ink-3: oklch(90% 0.04 230);
   --brand-bead: #f5714e;
   --brand-shadow: oklch(5% 0.05 260 / 0.6);
-  --logo-hi: #2a7ae0;
-  --logo-lo: #0b3586;
+  --logo-hi: #4fb8e8;
+  --logo-lo: #1565a8;
   --logo-paper: #f9f6f1;
-  --logo-bead: #f5714e;
-  --logo-glow: oklch(30% 0.12 258 / 0.3);
-  --logo-shadow: oklch(10% 0.08 260 / 0.45);
+  --logo-bead: #ffd166;
+  --logo-glow: oklch(52% 0.12 235 / 0.32);
+  --logo-shadow: oklch(28% 0.1 235 / 0.44);
 }
 
 [data-theme="dark"][data-palette="classic"] {
