@@ -117,8 +117,10 @@ class NativeStore(context: Context) {
     }
 
     fun setServer(server: String) {
-        val normalized = try { NativeApi.normalizeServer(server) }
-            catch (error: Exception) { setError(message(error)); return }
+        val normalized = try {
+            val candidate = NativeApi.normalizeServer(server)
+            if (candidate.isNotBlank()) candidate else NativeApi.normalizeServer(configuredServer())
+        } catch (error: Exception) { setError(message(error)); return }
         synchronized(lock) {
             if (closed || (normalized == state.value.server && !state.value.preview)) return
             if (!prefs.edit().putString("server", normalized).commit()) {
@@ -503,10 +505,16 @@ class NativeStore(context: Context) {
         }
     }
 
+    /** 打包时写进 assets/native-config.json 的服务器；用户不必手填。 */
+    private fun configuredServer(): String = try {
+        app.assets.open("native-config.json").bufferedReader(Charsets.UTF_8).use { JSONObject(it.readText()).optString("server") }
+    } catch (_: Exception) { "" }
+
     private fun initialState(): NativeState {
-        val configured = try { app.assets.open("native-config.json").bufferedReader(Charsets.UTF_8).use { JSONObject(it.readText()).optString("server") } }
-            catch (_: Exception) { "" }
-        val server = try { NativeApi.normalizeServer(prefs.getString("server", configured) ?: configured) } catch (_: Exception) { "" }
+        // 本机存过的地址优先；但空值不能把打包进去的地址盖掉，
+        // 否则装过早期空配置包的用户会被要求手填服务器。
+        val stored = prefs.getString("server", null)?.takeIf { it.isNotBlank() }
+        val server = try { NativeApi.normalizeServer(stored ?: configuredServer()) } catch (_: Exception) { "" }
         return loadSession(server)
     }
 
