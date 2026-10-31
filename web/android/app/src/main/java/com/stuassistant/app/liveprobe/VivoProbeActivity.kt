@@ -215,6 +215,7 @@ private fun VivoProbeMode.label() = when (this) {
     VivoProbeMode.SUPERX -> "C  vivo SuperX · 私有扩展"
     VivoProbeMode.CONTROL -> "D  普通进度通知 · 对照"
     VivoProbeMode.SUPERX_HYBRID -> "E  标准 + vivo 扩展 · 混合协议"
+    VivoProbeMode.SUPERX_NAVIGATION -> "NAVIGATION 包身份验证"
 }
 
 private class VivoColors(dark: Boolean) {

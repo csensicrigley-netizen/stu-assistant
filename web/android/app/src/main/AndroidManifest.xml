@@ -49,6 +49,10 @@
             android:name=".liveprobe.VivoProbeActivity"
             android:exported="false"
             android:theme="@style/AppTheme.NoActionBar" />
+        <activity
+            android:name=".liveprobe.VivoIdentityProbeActivity"
+            android:exported="false"
+            android:theme="@style/AppTheme.NoActionBar" />
         <receiver
             android:name=".liveprobe.VivoProbeDismissReceiver"
             android:exported="false" />

@@ -1,9 +1,14 @@
 param(
-    [ValidateSet('Haptics','Release','Liveprobe','Huaweiprobe','Vivoprobe')][string]$Variant = 'Haptics',
+    [ValidateSet('Haptics','Release','Liveprobe','Huaweiprobe','Vivoprobe','Vivoidentity','Vivomap')][string]$Variant = 'Haptics',
     [string]$Server = '',
-    [switch]$Online
+    [switch]$Online,
+    [switch]$IdentityPair
 )
 $ErrorActionPreference = 'Stop'
+$taskVariants = if ($IdentityPair) {
+    if ($PSBoundParameters.ContainsKey('Variant')) { throw 'Use IdentityPair without Variant.' }
+    @('Vivoidentity', 'Vivomap')
+} else { @($Variant) }
 $taskRoot = (Resolve-Path "$PSScriptRoot/..").Path
 $androidRoot = Join-Path $taskRoot 'web/android'
 $configPath = Join-Path $androidRoot 'app/src/main/assets/native-config.json'
@@ -63,11 +68,8 @@ if (-not $effectiveServer -or -not [Uri]::TryCreate($effectiveServer, [UriKind]:
 if (-not $env:JAVA_HOME) { $env:JAVA_HOME = [Environment]::GetEnvironmentVariable('JAVA_HOME','User') }
 $driveLetter = [char[]](70..90) | Where-Object { -not (Test-Path "$($_):\") } | Select-Object -First 1
 if (-not $driveLetter) { throw 'No free ASCII drive is available for the Android tools.' }
-$variantLower = $Variant.ToLowerInvariant()
-$suffix = switch ($Variant) { 'Haptics' { '-native.1' } 'Liveprobe' { '-liveprobe.1' } 'Huaweiprobe' { '-huaweiprobe.1' } 'Vivoprobe' { '-vivoprobe.1' } default { '' } }
 $releaseDirectory = Join-Path $taskRoot 'release'
 New-Item -ItemType Directory -Path $releaseDirectory -Force | Out-Null
-$artifactPath = Join-Path $releaseDirectory "STU-assistant-$taskVersion$suffix.apk"
 $logPath = Join-Path $releaseDirectory "native-$taskVersion-build.log"
 subst "$($driveLetter):" "$taskRoot"
 if ($LASTEXITCODE -ne 0) { throw 'subst failed' }
@@ -80,33 +82,56 @@ try {
     Push-Location "$($driveLetter):\web\android"
     try {
         [string[]]$networkArgs = if ($Online) { @() } else { @('--offline') }
-        & ./gradlew.bat @networkArgs --no-daemon --console=plain --max-workers=2 ":app:assemble$Variant" *> $logPath
+        [string[]]$buildTasks = $taskVariants | ForEach-Object { ":app:assemble$_" }
+        & ./gradlew.bat @networkArgs --no-daemon --console=plain --max-workers=2 @buildTasks *> $logPath
         if ($LASTEXITCODE -ne 0) { Get-Content -LiteralPath $logPath -Tail 35; throw 'Native APK build failed' }
     } finally { Pop-Location }
-    $builtApk = Join-Path $androidRoot "app/build/outputs/apk/$variantLower/app-$variantLower.apk"
     Add-Type -AssemblyName System.IO.Compression.FileSystem
-    $archive = [IO.Compression.ZipFile]::OpenRead($builtApk)
-    try {
-        if ($archive.Entries.FullName | Where-Object { $_ -like 'assets/public/*' -or $_ -like 'assets/*.js' }) { throw 'A web UI bundle unexpectedly entered the native APK' }
-        $packagedConfig = $archive.GetEntry('assets/native-config.json')
-        if (-not $packagedConfig) { throw 'Native configuration is missing from the APK' }
-        $configReader = [IO.StreamReader]::new($packagedConfig.Open(), [Text.Encoding]::UTF8)
-        try { $packagedServer = ($configReader.ReadToEnd() | ConvertFrom-Json).server } finally { $configReader.Dispose() }
-        if ($packagedServer -cne $effectiveServer) { throw 'Packaged backend differs from the intended deployment configuration.' }
-    } finally { $archive.Dispose() }
+    $deliveries = @()
+    foreach ($taskVariant in $taskVariants) {
+        $variantLower = $taskVariant.ToLowerInvariant()
+        $suffix = switch ($taskVariant) { 'Haptics' { '-native.1' } 'Liveprobe' { '-liveprobe.1' } 'Huaweiprobe' { '-huaweiprobe.1' } 'Vivoprobe' { '-vivoprobe.1' } 'Vivoidentity' { '-vivoidentity.1' } 'Vivomap' { '-vivoidentity.1' } default { '' } }
+        $fileSuffix = switch ($taskVariant) { 'Vivoidentity' { '-vivoidentity-control.1' } 'Vivomap' { '-vivoidentity-amap.1' } default { $suffix } }
+        $artifactPath = Join-Path $releaseDirectory "STU-assistant-$taskVersion$fileSuffix.apk"
+        $builtApk = Join-Path $androidRoot "app/build/outputs/apk/$variantLower/app-$variantLower.apk"
+        $archive = [IO.Compression.ZipFile]::OpenRead($builtApk)
+        try {
+            if ($archive.Entries.FullName | Where-Object { $_ -like 'assets/public/*' -or $_ -like 'assets/*.js' }) { throw 'A web UI bundle unexpectedly entered the native APK' }
+            $packagedConfig = $archive.GetEntry('assets/native-config.json')
+            if (-not $packagedConfig) { throw 'Native configuration is missing from the APK' }
+            $configReader = [IO.StreamReader]::new($packagedConfig.Open(), [Text.Encoding]::UTF8)
+            try { $packagedServer = ($configReader.ReadToEnd() | ConvertFrom-Json).server } finally { $configReader.Dispose() }
+            if ($packagedServer -cne $effectiveServer) { throw 'Packaged backend differs from the intended deployment configuration.' }
+        } finally { $archive.Dispose() }
+        $packageName = ''
+        if ($taskVariant -in @('Vivoidentity', 'Vivomap')) {
+            if (-not $aaptPath) { throw 'aapt is required to verify the identity experiment.' }
+            $heading = (& $aaptPath dump badging $builtApk 2>&1 | Select-String -Pattern '^package:' | Select-Object -First 1).Line
+            $expectedPackage = if ($taskVariant -eq 'Vivomap') { 'com.autonavi.minimap' } else { 'com.stuassistant.app.vivoprobe' }
+            if ($LASTEXITCODE -ne 0 -or $heading -notmatch "name='([^']+)' versionCode='([^']+)' versionName='([^']+)'") { throw 'APK identity metadata could not be read.' }
+            $packageName = $Matches[1]
+            if ($packageName -cne $expectedPackage -or $Matches[2] -ne $taskCode -or $Matches[3] -cne "$taskVersion$suffix") { throw 'Identity APK does not match intended package/version.' }
+        }
+        $hash = (Get-FileHash -LiteralPath $builtApk -Algorithm SHA256).Hash
+        $receipt = @{versionName="$taskVersion$suffix";versionCode=[int]$taskCode;variant=$taskVariant;package=$packageName;apk=(Split-Path $artifactPath -Leaf);bytes=(Get-Item -LiteralPath $builtApk).Length;sha256=$hash;builtAt=[DateTime]::UtcNow.ToString('o');source=$taskSource;sourceClean=$true;server=$packagedServer;webBundleIncluded=$false}
+        $deliveries += @{builtApk=$builtApk;artifactPath=$artifactPath;receipt=$receipt}
+    }
     $configHash = (Get-FileHash -LiteralPath $configPath -Algorithm SHA256).Hash
     [IO.File]::WriteAllBytes($configPath,$savedConfig)
     $sourceAfterBuild = git -C $taskRoot rev-parse HEAD
     if ($LASTEXITCODE -ne 0 -or $sourceAfterBuild -ne $taskSource) { throw 'Source commit changed during the build.' }
     $changesAfterBuild = git -C $taskRoot status --porcelain
     if ($LASTEXITCODE -ne 0 -or $changesAfterBuild) { throw 'Source changed during the build; commit and rebuild before delivery.' }
-    $hash = (Get-FileHash -LiteralPath $builtApk -Algorithm SHA256).Hash
-    $receipt = @{versionName="$taskVersion$suffix";versionCode=[int]$taskCode;variant=$Variant;apk=(Split-Path $artifactPath -Leaf);bytes=(Get-Item -LiteralPath $builtApk).Length;sha256=$hash;builtAt=[DateTime]::UtcNow.ToString('o');source=$taskSource;sourceClean=$true;server=$packagedServer;nativeConfigSha256=$configHash;webBundleIncluded=$false}
-    # Failed validation must leave any earlier delivery APK and its receipt intact.
-    [IO.File]::WriteAllText("$artifactPath.json.tmp",($receipt | ConvertTo-Json),[Text.UTF8Encoding]::new($false))
-    Copy-Item -LiteralPath $builtApk -Destination $artifactPath
-    Move-Item -LiteralPath "$artifactPath.json.tmp" -Destination "$artifactPath.json" -Force
-    Write-Output "$artifactPath`nSHA256 $hash"
+    # Validate the entire pair before publishing either artifact. Version-floor
+    # checks happen once, so the two identities intentionally share one version.
+    foreach ($delivery in $deliveries) {
+        $artifactPath = $delivery.artifactPath
+        $delivery.receipt.nativeConfigSha256 = $configHash
+        [IO.File]::WriteAllText("$artifactPath.json.tmp",($delivery.receipt | ConvertTo-Json),[Text.UTF8Encoding]::new($false))
+        Copy-Item -LiteralPath $delivery.builtApk -Destination $artifactPath
+        Move-Item -LiteralPath "$artifactPath.json.tmp" -Destination "$artifactPath.json" -Force
+        Write-Output "$artifactPath`nSHA256 $($delivery.receipt.sha256)"
+    }
 } finally {
     [IO.File]::WriteAllBytes($configPath,$savedConfig)
     subst "$($driveLetter):" /d | Out-Null
