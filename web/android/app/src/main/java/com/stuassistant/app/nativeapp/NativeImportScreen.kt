@@ -40,7 +40,6 @@ internal fun nativeImportDocument(doc:AcademicTimetableDoc):JSONObject = JSONObj
 @Composable fun NativeImportScreen(store:NativeStore,s:NativeState,onNavigate:(String)->Unit) {
     val context=LocalContext.current
     val scope=rememberCoroutineScope()
-    val rejectFeedback=nHapticFeedback("reject")
     val semester=remember {(AcademicCalendar.position()?.term?:AcademicCalendar.currentOrNext(AcademicClock.moment().date)).id}
     var step by remember {mutableStateOf(0)}
     var school by remember {mutableStateOf<String?>(null)}
@@ -74,7 +73,7 @@ internal fun nativeImportDocument(doc:AcademicTimetableDoc):JSONObject = JSONObj
     }}
     LaunchedEffect(store,semester) {try {val result=store.request("/v1/timetable/manual?semester=$semester");if(result.optJSONObject("doc")!=null)existing=result.optString("school")}catch(e:CancellationException){throw e}catch(_:Exception){}}
     BackHandler {onNavigate("week")}
-    NPage("导入课表","手动录入 · $semester",actions={NButton("返回课表",{onNavigate("week")})}) {
+    NPage("导入课表","手动录入 · $semester",actions={NButton("返回课表",{onNavigate("week")},haptic=NativeButtonHaptic.Navigation)}) {
         NText("医学院的教务系统和主校区不是一套，没法自动同步，只能自己录。录完和自动同步的课表一样显示。",14,muted=true)
         Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {listOf("选校区","录入","核对","完成").forEachIndexed {i,label->NText("${if(i<step)"✓"else i+1} $label",14,bold=i==step,muted=i!=step)}}
         when(step) {
@@ -83,25 +82,25 @@ internal fun nativeImportDocument(doc:AcademicTimetableDoc):JSONObject = JSONObj
                 if(existing!=null)NText("这个学期已经有一份手动课表（${importSchools.firstOrNull{it.first==existing}?.second?:existing}）。再导入会整份覆盖，不会留两份。",14,muted=true)
             }
             1->{
-                NButton("‹ 换校区",{go(0)})
+                NButton("‹ 换校区",{go(0)},haptic=NativeButtonHaptic.Navigation)
                 NChips(importMethods,method,{method=it})
                 when(method) {
                     "paste"->{NField("把课表粘在这里",text,{text=it},multiline=true,placeholder="细胞生物学实验 | 周四 6-9节 | 1-16周 | 何昭明 | 桑浦山-细胞生物学实验室-理433\n高等数学 | 周一 1-2节,周三 3-4节 | 1-16周 | 张三 | 桑浦山-E305",minHeight=190);NText("一行一门课，竖线或制表符分隔。从 Excel 直接复制也行。",14,muted=true);ImportHowTo()}
                     "csv"->NCard {
                         NText("Excel 里按「课程名称 / 星期 / 节次 / 周次 / 教师 / 地点」六列填，存成 CSV UTF-8 再选进来。先下模板最省事。",14,muted=true)
                         FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-                            NButton("下载模板",{scope.launch {try {template=store.requestText("/v1/timetable/import/template");saveTemplate.launch("课表模板-$semester.csv")}catch(e:CancellationException){throw e}catch(_:Exception){problem="模板没下载下来，检查一下网络再试一次。"}}},busy==null)
-                            NButton("选择文件",{file.launch(arrayOf("text/csv","text/comma-separated-values","text/x-csv","text/plain","application/csv","application/vnd.ms-excel"))},busy==null)
+                            NButton("下载模板",{scope.launch {try {template=store.requestText("/v1/timetable/import/template");saveTemplate.launch("课表模板-$semester.csv")}catch(e:CancellationException){throw e}catch(_:Exception){problem="模板没下载下来，检查一下网络再试一次。"}}},busy==null,haptic=NativeButtonHaptic.Utility)
+                            NButton("选择文件",{file.launch(arrayOf("text/csv","text/comma-separated-values","text/x-csv","text/plain","application/csv","application/vnd.ms-excel"))},busy==null,haptic=NativeButtonHaptic.Utility)
                         }
                         if(text.isNotEmpty())NText("已读到 ${text.lines().count{it.isNotBlank()}} 行，点下面「解析」看看对不对。",14,muted=true)
                     }
                     "manual"->ImportManual(busy!=null) {drafts->scope.launch {parse("paste",drafts.joinToString("\n",transform=::importLine))}}
                 }
                 NError(problem)
-                if(method!="manual")NButton(if(busy=="parse")"正在解析…"else"解析",{scope.launch{parse(if(method=="csv")"csv"else"paste",text)}},busy==null&&text.isNotBlank(),true,Modifier.fillMaxWidth())
+                if(method!="manual")NButton(if(busy=="parse")"正在解析…"else"解析",{scope.launch{parse(if(method=="csv")"csv"else"paste",text)}},busy==null&&text.isNotBlank(),true,Modifier.fillMaxWidth(),haptic=NativeButtonHaptic.Submit)
             }
             2->{
-                NButton("‹ 返回修改",{go(1)},busy==null)
+                NButton("‹ 返回修改",{go(1)},busy==null,haptic=NativeButtonHaptic.Navigation)
                 val courses=doc?.courses.orEmpty()
                 val meetings=courses.sumOf {it.meetings.size}
                 val weeks=courses.flatMap {it.meetings}.flatMap {it.weeks}
@@ -121,13 +120,13 @@ internal fun nativeImportDocument(doc:AcademicTimetableDoc):JSONObject = JSONObj
                 NError(problem)
                 NButton(if(busy=="save")"正在导入…"else if(errors.isNotEmpty())"先导入读懂的 ${courses.size} 门"else"确认导入",{scope.launch {
                     busy="save";problem=null
-                    try {val res=store.request("/v1/timetable/import/save","POST",JSONObject().put("doc",nativeImportDocument(doc!!)).put("school",school).put("note",note));if(res.optBoolean("ok")){savedAt=res.optString("semester",semester);go(3);store.reloadAfterMutation()}else{raw=JSONObject(raw.toString()).put("errors",res.optJSONArray("errors")?:JSONArray().put("导入没有成功，再试一次"));problem="这份课表没通过服务端校验，看看下面红字。";rejectFeedback()}}
-                    catch(e:CancellationException){throw e}catch(_:Exception){problem="导入没有送出去，检查一下网络再试一次。";rejectFeedback()}finally{busy=null}
-                }},courses.isNotEmpty()&&busy==null,true,Modifier.fillMaxWidth(),mechanical=true)
+                    try {val res=store.request("/v1/timetable/import/save","POST",JSONObject().put("doc",nativeImportDocument(doc!!)).put("school",school).put("note",note));if(res.optBoolean("ok")){savedAt=res.optString("semester",semester);go(3);store.reloadAfterMutation()}else{raw=JSONObject(raw.toString()).put("errors",res.optJSONArray("errors")?:JSONArray().put("导入没有成功，再试一次"));problem="这份课表没通过服务端校验，看看下面红字。"}}
+                    catch(e:CancellationException){throw e}catch(_:Exception){problem="导入没有送出去，检查一下网络再试一次。"}finally{busy=null}
+                }},courses.isNotEmpty()&&busy==null,true,Modifier.fillMaxWidth(),haptic=NativeButtonHaptic.Submit)
                 if(courses.isEmpty())NText("一门课都没解析出来，先回去改一下。每一行至少要有课程名和「周几 第几节」。",14,muted=true)
                 else if(errors.isNotEmpty())NText("也可以先导进去，回头把那几行改好再导入一次 —— 同一学期是整份覆盖，不会留两份。",14,muted=true)
             }
-            3->{NCard {NText("✓ 课表已经存好了",18,true);NText("$savedAt · ${importSchools.firstOrNull{it.first==school}?.second.orEmpty()} · ${doc?.courses?.size?:0} 门课。从这一秒起它和自动同步的课表走同一套页面、同一套作息时间，不用再做什么。",14,muted=true)};NButton("去看课表 →",{onNavigate("week")},primary=true,modifier=Modifier.fillMaxWidth());NText("录错了随时回来重录：同一学期再导入一次就是整份覆盖，不会留两份。",14,muted=true)}
+            3->{NCard {NText("✓ 课表已经存好了",18,true);NText("$savedAt · ${importSchools.firstOrNull{it.first==school}?.second.orEmpty()} · ${doc?.courses?.size?:0} 门课。从这一秒起它和自动同步的课表走同一套页面、同一套作息时间，不用再做什么。",14,muted=true)};NButton("去看课表 →",{onNavigate("week")},primary=true,modifier=Modifier.fillMaxWidth(),haptic=NativeButtonHaptic.Navigation);NText("录错了随时回来重录：同一学期再导入一次就是整份覆盖，不会留两份。",14,muted=true)}
         }
         NText("节次时刻按教务处作息表算：13 节、5 个大节，第二、四、五大节各 155 分钟，晚课 19:20 开始。录进去的课只存在你自己的账号里。",14,muted=true)
     }
@@ -167,7 +166,7 @@ internal fun nativeImportDocument(doc:AcademicTimetableDoc):JSONObject = JSONObj
             val a=from.toIntOrNull()?:0;val b=to.toIntOrNull()?:0
             warn=when {title.trim().isEmpty()->"先写课程名。";days.isEmpty()->"至少选一个星期。";periods.isEmpty()->"至少选一节。";a<1||b>30||a>b->"周次要在 1–30 之间，而且开始不能晚于结束。";else->null}
             if(warn==null){drafts=drafts+ImportDraft(title=title.trim(),days=days,periods=periods,from=a,to=b,teacher=teacher.trim(),location=location.trim());title="";teacher="";location="";days=emptyList();periods=emptyList()}
-        },!busy,modifier=Modifier.fillMaxWidth())
+        },!busy,modifier=Modifier.fillMaxWidth(),haptic=NativeButtonHaptic.Utility)
     }
     if(drafts.isNotEmpty())NCard {
         NText("已经加了 ${drafts.size} 门",14,true)
@@ -179,7 +178,7 @@ internal fun nativeImportDocument(doc:AcademicTimetableDoc):JSONObject = JSONObj
             NIconButton("删掉 ${d.title}",{drafts=drafts.filter{it.id!=d.id}},!busy)
         }}
     }
-    NButton("用这 ${drafts.size} 门课生成预览",{onSubmit(drafts)},drafts.isNotEmpty()&&!busy,true,Modifier.fillMaxWidth())
+    NButton("用这 ${drafts.size} 门课生成预览",{onSubmit(drafts)},drafts.isNotEmpty()&&!busy,true,Modifier.fillMaxWidth(),haptic=NativeButtonHaptic.Submit)
 }
 
 @Composable private fun ImportChoice(label:String,selected:Boolean,description:String=label,onClick:()->Unit) {

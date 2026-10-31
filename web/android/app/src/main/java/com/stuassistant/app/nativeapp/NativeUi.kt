@@ -31,14 +31,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kyant.backdrop.Backdrop
 import com.kyant.shapes.RoundedRectangle
-import com.stuassistant.app.NativeFeedback
+import com.stuassistant.app.NativeFeedbackSink
 import com.stuassistant.app.R
 import com.stuassistant.app.glass.*
 
 data class NativeColors(val bg:Color,val surface:Color,val ink:Color,val muted:Color,val brand:Color,val danger:Color,val border:Color,val onBrand:Color=Color.White)
 val LocalNativeColors = staticCompositionLocalOf { NativeColors(Color(0xFFFFF0F1),Color(0xFFFFFCFC),Color(0xFF35212D),Color(0xFF76636D),Color(0xFF6756B9),Color(0xFFAB3A47),Color(0xFFE8DCE0)) }
 val LocalNativeBackdrop = staticCompositionLocalOf<Backdrop> { error("Native backdrop owner missing") }
-val LocalNativeFeedback = staticCompositionLocalOf<NativeFeedback?> { null }
+val LocalNativeFeedback = staticCompositionLocalOf<NativeFeedbackSink?> { null }
 val LocalNativeStrength = staticCompositionLocalOf { 100 }
 val LocalNativeConnect = staticCompositionLocalOf<()->Unit> { {} }
 val LocalNativePalette = staticCompositionLocalOf { "sweet" }
@@ -95,35 +95,55 @@ val NativeFontFamily=FontFamily(Font(R.font.stu_regular,FontWeight.Normal),Font(
     }
 }
 
-@Composable fun NButton(label:String,onClick:()->Unit,enabled:Boolean=true,primary:Boolean=false,modifier:Modifier=Modifier,mechanical:Boolean=false) {
-    val source=remember { MutableInteractionSource() }
-    val commitMechanical = if(mechanical)NativePressFeedback(source,enabled)else null
+enum class NativeButtonHaptic(val press:String,val release:String) {
+    Navigation("navigate_press","navigate_release"),
+    Submit("press","release"),
+    Utility("utility_press","utility_release"),
+    Destructive("destructive_press","destructive_release"),
+}
+
+@Composable fun NButton(label:String,onClick:()->Unit,enabled:Boolean=true,primary:Boolean=false,modifier:Modifier=Modifier,haptic:NativeButtonHaptic=if(primary)NativeButtonHaptic.Submit else NativeButtonHaptic.Utility) {
     val c=LocalNativeColors.current
-    LiquidButton({commitMechanical?.invoke();onClick()},LocalNativeBackdrop.current,modifier=modifier,enabled=enabled,interactionSource=source,
+    NativeGlassButton(onClick,modifier,enabled,haptic,
         surfaceColor=if(primary)c.brand.copy(alpha=if(enabled).93f else .35f)else c.surface.copy(alpha=if(enabled).5f else .2f)) {
         BasicText(label,style=TextStyle(color=if(primary)c.onBrand else c.ink.copy(alpha=if(enabled)1f else .45f),fontSize=16.sp,lineHeight=22.sp,fontWeight=FontWeight.SemiBold,fontFamily=NativeFontFamily))
     }
 }
-/** Only explicit commit buttons opt into the existing two-phase preset. */
-@Composable internal fun NativePressFeedback(source:MutableInteractionSource,enabled:Boolean=true):()->Unit {
+
+/** All application LiquidButtons share one two-phase gesture owner, including slot cards. */
+@Composable internal fun NativeGlassButton(onClick:()->Unit,modifier:Modifier=Modifier,enabled:Boolean=true,haptic:NativeButtonHaptic,surfaceColor:Color,content:@Composable RowScope.()->Unit) {
+    val source=remember { MutableInteractionSource() }
+    val commitRelease=NativePressFeedback(source,enabled,haptic)
+    LiquidButton({commitRelease();onClick()},LocalNativeBackdrop.current,modifier=modifier,enabled=enabled,
+        interactionSource=source,surfaceColor=surfaceColor,content=content)
+}
+private data class NativeAcceptedPress(val interaction:PressInteraction.Press,val profile:NativeButtonHaptic,val strength:Int)
+
+/** A gesture locks its profile and strength; commit pairs release before a callback can dispose it. */
+@Composable internal fun NativePressFeedback(source:MutableInteractionSource,enabled:Boolean=true,haptic:NativeButtonHaptic=NativeButtonHaptic.Submit):()->Unit {
     val engine=LocalNativeFeedback.current
     val strength by rememberUpdatedState(LocalNativeStrength.current)
     val latestEnabled by rememberUpdatedState(enabled)
-    val pressed=remember(source,engine) {arrayOfNulls<PressInteraction.Press>(1)}
+    val profile by rememberUpdatedState(haptic)
+    val pressed=remember(source,engine) {arrayOfNulls<NativeAcceptedPress>(1)}
     val release=remember(source,engine) {{
-        if(pressed[0]!=null) {
-            pressed[0]=null
-            if(strength>0)engine?.play("release",strength)
-        }
+        val accepted=pressed[0]
+        pressed[0]=null
+        // Turning feedback off mutes even an already accepted gesture. Other changes
+        // apply to the next gesture, so a busy/disabled recomposition cannot lose release.
+        if(accepted!=null&&strength>0)engine?.play(accepted.profile.release,accepted.strength)
     }}
     DisposableEffect(pressed) {onDispose {pressed[0]=null}}
     LaunchedEffect(source,engine) {
         source.interactions.collect { interaction ->
             when(interaction) {
-                is PressInteraction.Press -> if(latestEnabled&&strength>0) {pressed[0]=interaction;engine?.play("press",strength)}
-                is PressInteraction.Release -> if(pressed[0]===interaction.press)release()
+                is PressInteraction.Press -> if(latestEnabled&&strength>0&&pressed[0]==null) {
+                    pressed[0]=NativeAcceptedPress(interaction,profile,strength)
+                    engine?.play(profile.press,strength)
+                }
+                is PressInteraction.Release -> if(pressed[0]?.interaction===interaction.press)release()
                 // Cancel only this gesture's pairing; do not interrupt other feedback.
-                is PressInteraction.Cancel -> if(pressed[0]===interaction.press)pressed[0]=null
+                is PressInteraction.Cancel -> if(pressed[0]?.interaction===interaction.press)pressed[0]=null
                 else -> Unit
             }
         }
@@ -192,7 +212,7 @@ val NativeFontFamily=FontFamily(Font(R.font.stu_regular,FontWeight.Normal),Font(
 
 @Composable fun NError(text:String?,retry:(()->Unit)?=null) {
     if(text.isNullOrEmpty())return
-    Column(verticalArrangement=Arrangement.spacedBy(8.dp),modifier=Modifier.semantics{liveRegion=LiveRegionMode.Polite}) { BasicText(text,style=TextStyle(color=LocalNativeColors.current.danger,fontSize=14.sp,lineHeight=22.sp));if(retry!=null)NButton("重试",retry) }
+    Column(verticalArrangement=Arrangement.spacedBy(8.dp),modifier=Modifier.semantics{liveRegion=LiveRegionMode.Polite}) { BasicText(text,style=TextStyle(color=LocalNativeColors.current.danger,fontSize=14.sp,lineHeight=22.sp));if(retry!=null)NButton("重试",retry,haptic=NativeButtonHaptic.Submit) }
 }
 @Composable fun NLoading() { NText("正在读取…",14,muted=true) }
 @Composable fun NDivider() { Box(Modifier.fillMaxWidth().height(1.dp).background(LocalNativeColors.current.border)) }

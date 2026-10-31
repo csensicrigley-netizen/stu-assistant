@@ -6,7 +6,7 @@ import android.view.HapticFeedbackConstants;
 import android.view.View;
 
 /** Activity-owned semantic feedback, with the opt-in mechanical preset kept intact. */
-public final class NativeFeedback implements AutoCloseable {
+public final class NativeFeedback implements NativeFeedbackSink, AutoCloseable {
     private final Activity activity;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final HapticTiming timing = new HapticTiming();
@@ -52,10 +52,10 @@ public final class NativeFeedback implements AutoCloseable {
         if (profile == null || !active()) return;
         // A semantic gesture owns feedback, including an explicit rejection of a
         // mechanical action. Remove its tail before admission; reject bypasses other kinds.
-        if (!profile.legacy()) cancelPendingRelease();
+        if (!profile.mechanical()) cancelPendingRelease();
         long now = SystemClock.uptimeMillis();
         if (pendingRelease != null || timing.throttled(kind, now)) return;
-        long delay = profile.legacy() ? timing.releaseDelay(kind, now) : 0;
+        long delay = profile.mechanical() ? timing.releaseDelay(kind, now) : 0;
         if (delay > 0) {
             pendingRelease = () -> { pendingRelease = null; execute(profile); };
             handler.postDelayed(pendingRelease, delay);
@@ -67,8 +67,9 @@ public final class NativeFeedback implements AutoCloseable {
             if (!active()) return;
             Vibrator motor = motor();
             if (motor == null || !motor.hasVibrator()) return;
-            if (profile.legacy()) {
-                executeLegacy(profile, motor);
+            if (profile.mechanical()) {
+                if (profile.legacy()) executeLegacy(profile, motor);
+                else executeTypedMechanical(profile, motor);
                 return;
             }
             // A prior vendor SDK request must not outlive a new Android composition.
@@ -76,15 +77,15 @@ public final class NativeFeedback implements AutoCloseable {
             // Android submissions replace an existing effect. Errors also stop an old
             // mechanical effect if a later fallback is view feedback.
             if ("reject".equals(profile.kind)) motor.cancel();
-            if (playSemanticPrimitive(profile, motor)) { played(profile.kind); return; }
             if (playRichTap(profile, motor)) { played(profile.kind); return; }
+            if (playPrimitive(profile, motor)) { played(profile.kind); return; }
             if (Build.VERSION.SDK_INT >= 26 && motor.hasAmplitudeControl()) try {
                 vibrate(motor, VibrationEffect.createWaveform(profile.waveformTimings(), profile.waveformAmplitudes(), -1));
                 played(profile.kind); return;
             } catch (RuntimeException | LinkageError ignored) { }
             if (Build.VERSION.SDK_INT >= 29) try {
                 int preset = "reject".equals(profile.kind) ? VibrationEffect.EFFECT_DOUBLE_CLICK
-                    : "selection".equals(profile.kind) || "toggle".equals(profile.kind)
+                    : "selection".equals(profile.kind) || "navigation".equals(profile.kind) || "toggle".equals(profile.kind)
                         ? VibrationEffect.EFFECT_TICK : VibrationEffect.EFFECT_CLICK;
                 vibrate(motor, VibrationEffect.createPredefined(preset));
                 played(profile.kind); return;
@@ -101,7 +102,7 @@ public final class NativeFeedback implements AutoCloseable {
         } catch (RuntimeException | LinkageError ignored) { }
     }
 
-    private boolean playSemanticPrimitive(HapticProfile profile, Vibrator motor) {
+    private boolean playPrimitive(HapticProfile profile, Vibrator motor) {
         // Individual primitive support is reliably queryable from API 31.
         if (Build.VERSION.SDK_INT < 31) return false;
         int chosen = -1;
@@ -135,6 +136,29 @@ public final class NativeFeedback implements AutoCloseable {
         return false;
     }
 
+    private void executeTypedMechanical(HapticProfile profile, Vibrator motor) {
+        if (playRichTap(profile, motor)) { played(profile.kind); return; }
+        if (playPrimitive(profile, motor)) { played(profile.kind); return; }
+        if (Build.VERSION.SDK_INT >= 26 && motor.hasAmplitudeControl()) try {
+            vibrate(motor, VibrationEffect.createWaveform(profile.waveformTimings(), profile.waveformAmplitudes(), -1));
+            played(profile.kind); return;
+        } catch (RuntimeException | LinkageError ignored) { }
+        // Keep each typed stage's duration even on older/no-amplitude-control motors.
+        // This is one stage, not a newly scheduled second vibration.
+        try {
+            if (Build.VERSION.SDK_INT >= 26)
+                vibrate(motor, VibrationEffect.createWaveform(profile.unscaledTimings(), -1));
+            else motor.vibrate(profile.unscaledTimings(), -1);
+            played(profile.kind); return;
+        } catch (RuntimeException | LinkageError ignored) { }
+        int constant = HapticProfile.isRelease(profile.kind) && Build.VERSION.SDK_INT >= 27
+            ? HapticFeedbackConstants.VIRTUAL_KEY_RELEASE
+            : profile.kind.startsWith("navigate_") ? HapticFeedbackConstants.CLOCK_TICK
+                : profile.kind.startsWith("destructive_") ? HapticFeedbackConstants.LONG_PRESS
+                    : HapticFeedbackConstants.VIRTUAL_KEY;
+        if (view().performHapticFeedback(constant)) played(profile.kind);
+    }
+
     /** Preserve RichTap priority, primitive choice, gain, waveform and fallback of the tuned preset. */
     private void executeLegacy(HapticProfile profile, Vibrator motor) {
         String kind = profile.kind;
@@ -163,7 +187,7 @@ public final class NativeFeedback implements AutoCloseable {
     }
 
     private int systemFeedback(String kind) {
-        if ("selection".equals(kind)) return Build.VERSION.SDK_INT >= 34
+        if ("selection".equals(kind) || "navigation".equals(kind)) return Build.VERSION.SDK_INT >= 34
             ? HapticFeedbackConstants.SEGMENT_FREQUENT_TICK : HapticFeedbackConstants.CLOCK_TICK;
         if (Build.VERSION.SDK_INT >= 30) {
             if ("confirm".equals(kind)) return HapticFeedbackConstants.CONFIRM;

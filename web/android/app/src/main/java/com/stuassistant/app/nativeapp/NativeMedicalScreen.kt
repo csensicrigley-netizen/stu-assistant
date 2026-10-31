@@ -37,8 +37,6 @@ private fun medError(error:Throwable):String=when((error as? NativeApiError)?.co
 @Composable fun NativeMedicalScreen(store:NativeStore,s:NativeState,onNavigate:(String)->Unit) {
     val semester=remember { (AcademicCalendar.position()?.term?:AcademicCalendar.currentOrNext(AcademicClock.moment().date)).id }
     val scope=rememberCoroutineScope()
-    val confirmFeedback=nHapticFeedback("confirm")
-    val rejectFeedback=nHapticFeedback("reject")
     var status by remember {mutableStateOf<JSONObject?>(null)}
     var checking by remember {mutableStateOf(true)}
     var mode by remember {mutableStateOf("sso")}
@@ -60,15 +58,15 @@ private fun medError(error:Throwable):String=when((error as? NativeApiError)?.co
     }
     suspend fun sync() {
         busy="sync";problem=null;done=null
-        try { val res=store.request("/v1/med/sync","POST",JSONObject().put("semester",semester));store.reloadAfterMutation();done="已同步 ${res.optString("semester")}：${res.optInt("courses")} 门课、${res.optInt("meetings")} 个上课时间。";confirmFeedback() }
-        catch(e:CancellationException){throw e}catch(e:Exception){problem=medError(e);rejectFeedback()}finally{busy=null}
+        try { val res=store.request("/v1/med/sync","POST",JSONObject().put("semester",semester));store.reloadAfterMutation();done="已同步 ${res.optString("semester")}：${res.optInt("courses")} 门课、${res.optInt("meetings")} 个上课时间。" }
+        catch(e:CancellationException){throw e}catch(e:Exception){problem=medError(e)}finally{busy=null}
     }
     LaunchedEffect(store,mode) {
         try {status=store.request("/v1/med/status");if(status?.optBoolean("linked")!=true&&mode=="local")refreshCaptcha()}
         catch(e:CancellationException){throw e}catch(_:Exception){status=JSONObject().put("linked",false);refreshCaptcha()}
         finally{checking=false}
     }
-    NPage("连接医学院教务","医学院 · 自动同步",actions={NButton("返回课表",{onNavigate("week")})}) {
+    NPage("连接医学院教务","医学院 · 自动同步",actions={NButton("返回课表",{onNavigate("week")},haptic=NativeButtonHaptic.Navigation)}) {
         NText("连上以后，课表、成绩、考试都会自己同步过来，不用再一门一门录。",14,muted=true)
         if(checking)NCard {NText("正在看这个账号连过没有…",14,muted=true)}
         else if(status?.optBoolean("linked")==true)NCard {
@@ -76,31 +74,31 @@ private fun medError(error:Throwable):String=when((error as? NativeApiError)?.co
             NText(listOf(status?.optString("name").orEmpty(),status?.optString("username").orEmpty()).filter{it.isNotBlank()}.joinToString(" · "),14,muted=true)
             NText("存下来的只是一个会话凭证，密码没有留下。凭证过期时会提示你重新连一次。",14,muted=true)
             FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
-                NButton(if(busy=="sync")"正在同步…"else"立即同步",{scope.launch {sync()}},busy==null,true)
-                NButton(if(busy=="unlink")"正在解除…"else"解除绑定",{scope.launch {busy="unlink";problem=null;done=null;try {store.request("/v1/med/session","DELETE");status=JSONObject().put("linked",false);done="已经解除绑定，服务端那份登录凭证删掉了。";confirmFeedback();refreshCaptcha()}catch(e:CancellationException){throw e}catch(e:Exception){problem=medError(e);rejectFeedback()}finally{busy=null}}},busy==null)
+                NButton(if(busy=="sync")"正在同步…"else"立即同步",{scope.launch {sync()}},busy==null,true,haptic=NativeButtonHaptic.Submit)
+                NButton(if(busy=="unlink")"正在解除…"else"解除绑定",{scope.launch {busy="unlink";problem=null;done=null;try {store.request("/v1/med/session","DELETE");status=JSONObject().put("linked",false);done="已经解除绑定，服务端那份登录凭证删掉了。";refreshCaptcha()}catch(e:CancellationException){throw e}catch(e:Exception){problem=medError(e)}finally{busy=null}}},busy==null,haptic=NativeButtonHaptic.Destructive)
             }
         } else NCard {
             NText("医学院教务系统（jwgl.med.stu.edu.cn）和主校区不是一套，登录要填图形验证码。",14,muted=true)
             NField("学号 / 账号",username,{username=it})
             NField("密码",password,{password=it},password=true)
             NText("只用这一次换会话凭证，用完就丢，不保存。",14,muted=true)
-            NButton(if(mode=="sso")"统一认证进不去？换教务本地口令"else"改用学校统一认证",{mode=if(mode=="sso")"local"else"sso";problem=null},busy==null)
+            NButton(if(mode=="sso")"统一认证进不去？换教务本地口令"else"改用学校统一认证",{mode=if(mode=="sso")"local"else"sso";problem=null},busy==null,haptic=NativeButtonHaptic.Utility)
             if(mode=="local") {
                 NText("图形验证码",14,true)
                 Row(Modifier.fillMaxWidth(),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
                     Box(Modifier.weight(1f)){NField("",code,{code=it},placeholder="照着右边图片敲")}
                     Box(Modifier.widthIn(max=140.dp)) {if(captcha!=null&&!loadingImage)NativeDataImage(captcha!!.optString("image"),"图形验证码，点一下换一张") {scope.launch {refreshCaptcha()}}
-                    else NButton(if(loadingImage)"读取中…"else"点这里取图",{scope.launch {refreshCaptcha()}},!loadingImage)}
+                    else NButton(if(loadingImage)"读取中…"else"点这里取图",{scope.launch {refreshCaptcha()}},!loadingImage,haptic=NativeButtonHaptic.Utility)}
                 }
                 NText("验证码一两分钟就过期，停留太久就点图片换一张。",14,muted=true)
             }
             NButton(if(busy=="login")"正在连接…"else"连接并同步",{
-                when {mode=="local"&&(captcha==null||loadingImage)->{problem="验证码还没取到，点一下图片换一张。";rejectFeedback()};username.trim().isEmpty()||password.isEmpty()->{problem="账号和密码都要填。";rejectFeedback()};mode=="local"&&code.trim().length<3->{problem="验证码看着不像对的，照着图片再敲一遍。";rejectFeedback()};else->scope.launch {
+                when {mode=="local"&&(captcha==null||loadingImage)->{problem="验证码还没取到，点一下图片换一张。"};username.trim().isEmpty()||password.isEmpty()->{problem="账号和密码都要填。"};mode=="local"&&code.trim().length<3->{problem="验证码看着不像对的，照着图片再敲一遍。"};else->scope.launch {
                     busy="login";problem=null;done=null
                     try {val res=store.request("/v1/med/login","POST",JSONObject().put("mode",mode).put("username",username.trim()).put("password",password).put("verify_code",if(mode=="local")code.trim()else"").put("yzm_code",if(mode=="local")captcha?.optString("yzm_code").orEmpty()else""));password="";status=JSONObject().put("linked",true).put("username",username.trim()).put("name",res.optString("name"));sync()}
-                    catch(e:CancellationException){throw e}catch(e:Exception){problem=medError(e);rejectFeedback();refreshCaptcha()}finally{busy=null}
+                    catch(e:CancellationException){throw e}catch(e:Exception){problem=medError(e);refreshCaptcha()}finally{busy=null}
                 }}
-            },busy==null,true,Modifier.fillMaxWidth())
+            },busy==null,true,Modifier.fillMaxWidth(),haptic=NativeButtonHaptic.Submit)
         }
         NError(problem)
         if(done!=null)NText("✓ $done",14)

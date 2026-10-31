@@ -112,7 +112,7 @@ private fun AcademicSection(title: String, note: String = "", action: String? = 
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Box(Modifier.weight(1f)) { NText(title, 18, true) }
             if (note.isNotEmpty()) NText(note, 12, muted = true)
-            if (action != null && onAction != null) NButton(action, onAction)
+            if (action != null && onAction != null) NButton(action, onAction, haptic = NativeButtonHaptic.Navigation)
         }
         content()
     }
@@ -166,7 +166,7 @@ private fun AcademicProgress(value: Float, color: Color, modifier: Modifier = Mo
 
 @Composable
 private fun AcademicBlockButton(label: String, onClick: () -> Unit, enabled: Boolean = true, primary: Boolean = false) {
-    NButton(label, onClick, enabled, primary, modifier = Modifier.fillMaxWidth())
+    NButton(label, onClick, enabled, primary, modifier = Modifier.fillMaxWidth(), haptic = NativeButtonHaptic.Utility)
 }
 
 @Composable
@@ -282,7 +282,7 @@ private fun AcademicMode(store: NativeStore, s: NativeState, onConnect: () -> Un
     Column {
         NButton(label, {
             if (s.sample) onConnect() else scope.launch { try { store.refresh("sync") } catch (e: Exception) { error = academicError(e) } }
-        }, enabled = !s.loading && !s.syncing)
+        }, enabled = !s.loading && !s.syncing, haptic = if (s.sample) NativeButtonHaptic.Navigation else NativeButtonHaptic.Submit)
         NError(error)
     }
 }
@@ -375,7 +375,7 @@ fun NativeTodayScreen(store: NativeStore, s: NativeState, onNavigate: (String) -
         val reconnect = academicReconnect(s)
         if (reconnect.isNotEmpty()) NCard {
             NText("${reconnect.joinToString("、")}的登录已过期，课表和作业暂时停在上次同步。", 14)
-            NButton("重新连接", onConnect)
+            NButton("重新连接", onConnect, haptic = NativeButtonHaptic.Navigation)
         }
         if (waiting) NCard {
             val busy = s.syncing || s.loading
@@ -383,10 +383,10 @@ fun NativeTodayScreen(store: NativeStore, s: NativeState, onNavigate: (String) -
             NText(if (busy) "第一次同步通常要半分钟左右" else if (s.error != null) "这次同步没有完成" else "学校系统还没有返回课表", 18, true)
             NText(if (busy) "读完后这里会显示你现在该去的教室。可以先切到别的页面。" else "可能是学校系统在维护（夜间常见），也可能是网络问题。稍后再试一次。", 14, muted = true)
             if (busy) NLoading() else {
-                NButton("再同步一次", { scope.launch { try { store.refresh("force") } catch (e: Exception) { error = academicError(e) } } })
+                NButton("再同步一次", { scope.launch { try { store.refresh("force") } catch (e: Exception) { error = academicError(e) } } }, haptic = NativeButtonHaptic.Submit)
                 NText("医学院的同学：教务系统和主校区不是一套，主同步拿不到课表，走下面这条路。", 13, muted = true)
-                NButton("连医学院教务", { onNavigate("medical") }, primary = true)
-                NButton("手动导入课表", { onNavigate("import") })
+                NButton("连医学院教务", { onNavigate("medical") }, primary = true, haptic = NativeButtonHaptic.Navigation)
+                NButton("手动导入课表", { onNavigate("import") }, haptic = NativeButtonHaptic.Navigation)
             }
         } else AcademicNowCard(current, next, later, blocks, now.minutes, plan.status, { open = it })
         NError(error)
@@ -562,15 +562,15 @@ fun NativeWeekScreen(store: NativeStore, s: NativeState, onNavigate: (String) ->
     val colors = LocalNativeColors.current
     NPage("课表", term.label, actions = { AcademicMode(store, s, onConnect) }) {
         if (!s.sample && doc == null) AcademicEmpty(if (s.syncing || s.loading) "正在读取课表…" else "还没有课表", if (s.syncing || s.loading) "第一次同步通常要半分钟左右。" else "连接校园账号并同步后，这里会显示你每周的理论课。") {
-            if (!s.syncing && !s.loading) { NButton("连医学院教务", { onNavigate("medical") }, primary = true); NButton("手动导入课表", { onNavigate("import") }) }
+            if (!s.syncing && !s.loading) { NButton("连医学院教务", { onNavigate("medical") }, primary = true, haptic = NativeButtonHaptic.Navigation); NButton("手动导入课表", { onNavigate("import") }, haptic = NativeButtonHaptic.Navigation) }
         }
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            NButton("‹", { week = (week - 1).coerceAtLeast(1) }, enabled = week > 1)
+            NButton("‹", { week = (week - 1).coerceAtLeast(1) }, enabled = week > 1, haptic = NativeButtonHaptic.Utility)
             Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                 NText("第 $week 周${AcademicCalendar.phase(term, week)?.let { " · ${it.label}" }.orEmpty()}", 20, true)
                 NText("${AcademicClock.slash(AcademicCalendar.monday(term, week))} – ${AcademicClock.slash(AcademicCalendar.dateOf(term, week, 7))}" + if (total > 0) " · ${AcademicClock.span(total)}" else "", 12, muted = true)
             }
-            NButton("›", { week = (week + 1).coerceAtMost(term.totalWeeks) }, enabled = week < term.totalWeeks)
+            NButton("›", { week = (week + 1).coerceAtMost(term.totalWeeks) }, enabled = week < term.totalWeeks, haptic = NativeButtonHaptic.Utility)
         }
         if (position != null && !isCurrent) AcademicBlockButton("回到本周", { week = position.week; day = now.weekday })
         Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(colors.surface).border(1.dp, colors.border, RoundedCornerShape(20.dp)).padding(8.dp)) {
@@ -651,7 +651,6 @@ fun NativeItemsScreen(store: NativeStore, s: NativeState, onNavigate: (String) -
     var pending by remember { mutableStateOf<Set<String>>(emptySet()) }
     val selected = day ?: now.date
     val scope = rememberCoroutineScope()
-    val reject = nHapticFeedback("reject")
     val tasks = s.tasks.map(AcademicRecords::task)
     val exams = s.exams.map(AcademicRecords::exam)
     val openTasks = tasks.filter { it.id !in s.done && AcademicRecords.bucket(it, now.ms) != "expired" }
@@ -680,9 +679,9 @@ fun NativeItemsScreen(store: NativeStore, s: NativeState, onNavigate: (String) -
                                 AcademicDateChoice(date, now.date, selected) { day = date }
                             }
                         }
-                        NButton("今天", { day = null }, enabled = selected != now.date)
+                        NButton("今天", { day = null }, enabled = selected != now.date, haptic = NativeButtonHaptic.Utility)
                     }
-                    if (s.preview) AcademicEmpty("登录后就能写计划", "计划只属于你自己的账号，换设备也还在。上面的日期条可以先看看。") { NButton("登录 / 注册", onConnect, primary = true) }
+                    if (s.preview) AcademicEmpty("登录后就能写计划", "计划只属于你自己的账号，换设备也还在。上面的日期条可以先看看。") { NButton("登录 / 注册", onConnect, primary = true, haptic = NativeButtonHaptic.Navigation) }
                     else {
                         val sum = s.planSummary
                         AcademicScoreboard(listOf("今天" to "today_total", "已完成" to "today_done", "还剩" to "today_open").map { (label, key) -> label to sum.optInt(key).toString() })
@@ -695,7 +694,7 @@ fun NativeItemsScreen(store: NativeStore, s: NativeState, onNavigate: (String) -
                         AcademicSection(if (selected == now.date) "今天的安排" else "${AcademicClock.monthDay(selected)} ${AcademicClock.weekdayText(AcademicClock.weekday(selected))}", if (!loadingPlans) "${plans.size} 项" else "") {
                             when {
                                 loadingPlans -> NLoading()
-                                plans.isEmpty() -> AcademicEmpty(if (selected == now.date) "今天还空着" else "这一天还空着", if (selected == now.date) "把想做的事写下来，完成一件勾一件。" else "想给这天加点什么？") { NButton("加一条", { formOpen = true }) }
+                                plans.isEmpty() -> AcademicEmpty(if (selected == now.date) "今天还空着" else "这一天还空着", if (selected == now.date) "把想做的事写下来，完成一件勾一件。" else "想给这天加点什么？") { NButton("加一条", { formOpen = true }, haptic = NativeButtonHaptic.Utility) }
                                 else -> plans.forEachIndexed { index, plan ->
                                     val id = plan.optString("id")
                                     val done = doneOverrides[id] ?: plan.optBoolean("done")
@@ -750,13 +749,13 @@ fun NativeItemsScreen(store: NativeStore, s: NativeState, onNavigate: (String) -
                                                 // The write succeeded; a later read failure is not a rejected save.
                                                 try { load(true) } catch (e: CancellationException) { throw e } catch (_: Exception) { }
                                             } catch (e: CancellationException) { throw e }
-                                            catch (e: Exception) { formError = academicError(e); reject() }
+                                            catch (e: Exception) { formError = academicError(e) }
                                             finally { busy = false }
                                         }
-                                    } else reject()
-                                }, enabled = !busy, primary = true, mechanical = true)
+                                    }
+                                }, enabled = !busy, primary = true, haptic = NativeButtonHaptic.Submit)
                                 }
-                                Box(Modifier.weight(1f), propagateMinConstraints = true) { NButton("取消", { formOpen = false; formError = null }, enabled = !busy) }
+                                Box(Modifier.weight(1f), propagateMinConstraints = true) { NButton("取消", { formOpen = false; formError = null }, enabled = !busy, haptic = NativeButtonHaptic.Utility) }
                             }
                         }
                         if (!formOpen) AcademicBlockButton("＋ 加一条", { formOpen = true })
@@ -778,8 +777,8 @@ fun NativeItemsScreen(store: NativeStore, s: NativeState, onNavigate: (String) -
                     finally { removed = removed - id; busy = false }
                 }
             }
-        }, enabled = !busy, primary = true)
-        NButton("取消", { deletePlan = null }, enabled = !busy)
+        }, enabled = !busy, primary = true, haptic = NativeButtonHaptic.Destructive)
+        NButton("取消", { deletePlan = null }, enabled = !busy, haptic = NativeButtonHaptic.Utility)
     } }
 }
 
@@ -791,8 +790,8 @@ private fun AcademicTimeField(label: String, value: String, onValue: (String) ->
         NButton(value.ifEmpty { "选择时间" }, {
             val parts = value.split(':')
             TimePickerDialog(context, { _, hour, minute -> onValue(AcademicClock.clock(hour * 60 + minute)) }, parts.getOrNull(0)?.toIntOrNull() ?: 12, parts.getOrNull(1)?.toIntOrNull() ?: 0, true).show()
-        })
-        if (value.isNotEmpty()) NButton("清除", { onValue("") })
+        }, haptic = NativeButtonHaptic.Utility)
+        if (value.isNotEmpty()) NButton("清除", { onValue("") }, haptic = NativeButtonHaptic.Utility)
     }
 }
 
@@ -828,13 +827,13 @@ private fun AcademicPlanRow(plan: JSONObject, done: Boolean, busy: Boolean, canU
                 if (start.isNotEmpty()) NText(start + if (end.isNotEmpty()) "–$end" else "", 12, true)
                 if (plan.optInt("priority") > 0) AcademicText("●", if (plan.optInt("priority") == 2) c.danger else Color(0xff9b750b), 12, modifier = Modifier.semantics { contentDescription = if (plan.optInt("priority") == 2) "紧急" else "重要" })
             }
-            if (!armed) NButton("⋯", { armed = true }, enabled = !busy)
+            if (!armed) NButton("⋯", { armed = true }, enabled = !busy, haptic = NativeButtonHaptic.Utility)
         }
         if (armed) Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            NButton("上移", { onMove(-1) }, enabled = canUp && !busy)
-            NButton("下移", { onMove(1) }, enabled = canDown && !busy)
-            NButton("删除", onDelete, enabled = !busy)
-            NButton("收起", { armed = false })
+            NButton("上移", { onMove(-1) }, enabled = canUp && !busy, haptic = NativeButtonHaptic.Utility)
+            NButton("下移", { onMove(1) }, enabled = canDown && !busy, haptic = NativeButtonHaptic.Utility)
+            NButton("删除", onDelete, enabled = !busy, haptic = NativeButtonHaptic.Utility)
+            NButton("收起", { armed = false }, haptic = NativeButtonHaptic.Utility)
         }
     }
 }

@@ -27,7 +27,10 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.stuassistant.app.NativeActivity
+import com.stuassistant.app.NativeFeedbackSink
 import java.util.UUID
+import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.atomic.AtomicInteger
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -43,6 +46,12 @@ class NativeFeedbackSettingsInstrumentedTest {
     private lateinit var context: IsolatedSettingsContext
     private lateinit var store: NativeStore
     private lateinit var scenario: ActivityScenario<NativeActivity>
+    private val hapticEvents = CopyOnWriteArrayList<Pair<String, Int>>()
+    private val cancellations = AtomicInteger()
+    private val feedback = object : NativeFeedbackSink {
+        override fun play(kind: String, strength: Int) { hapticEvents.add(kind to strength) }
+        override fun cancel() { cancellations.incrementAndGet() }
+    }
 
     @Before fun setUp() {
         context = IsolatedSettingsContext(instrumentation.targetContext)
@@ -56,7 +65,7 @@ class NativeFeedbackSettingsInstrumentedTest {
                 val backdrop = rememberLayerBackdrop()
                 Box(Modifier.fillMaxSize()) {
                     Box(Modifier.fillMaxSize().layerBackdrop(backdrop).background(Color.White))
-                    CompositionLocalProvider(LocalNativeBackdrop provides backdrop) {
+                    CompositionLocalProvider(LocalNativeBackdrop provides backdrop, LocalNativeFeedback provides feedback) {
                         Column(Modifier.fillMaxSize().padding(horizontal = 32.dp, vertical = 80.dp)) {
                             NativeFeedbackSettings(store, s)
                         }
@@ -92,11 +101,14 @@ class NativeFeedbackSettingsInstrumentedTest {
             val draft = awaitSliderValue(expected, 2.1f * 100f / bounds.width())
             assertEquals("Dragging must not publish global settings", 50, savedStrength())
             assertEquals(50, persistedStrength())
+            assertTrue("Dragging must not play repeated previews", hapticEvents.isEmpty())
 
             gesture.send(MotionEvent.ACTION_UP)
             awaitSavedStrength(draft.roundToInt())
             awaitSliderValue(draft.roundToInt().toFloat())
             assertEquals(draft.roundToInt(), persistedStrength())
+            instrumentation.waitForIdleSync()
+            assertEquals(listOf("preview" to draft.roundToInt()), hapticEvents.toList())
         } finally { gesture.cancelIfActive() }
     }
 
@@ -108,13 +120,35 @@ class NativeFeedbackSettingsInstrumentedTest {
             gesture.send(MotionEvent.ACTION_DOWN)
             instrumentation.waitForIdleSync()
             repeat(pixels) { gesture.moveByOnePixel() }
-            awaitSliderValue(50f + pixels * 100f / bounds.width(), 2.1f * 100f / bounds.width())
+            // Roll back an actual unsaved draft; exact displacement is checked
+            // independently by the release test and pure accumulator tests.
+            awaitUnsavedDraft()
             assertEquals(50, savedStrength())
 
             gesture.send(MotionEvent.ACTION_CANCEL)
             awaitSliderValue(50f)
             assertEquals("Cancellation must leave global settings unchanged", 50, savedStrength())
             assertEquals(50, persistedStrength())
+            assertTrue("Cancellation must not play a preview", hapticEvents.isEmpty())
+        } finally { gesture.cancelIfActive() }
+    }
+
+    @Test fun draggingToZeroStopsFeedbackImmediatelyAndReleaseDoesNotPreview() {
+        val bounds = sliderBounds()
+        val gesture = PointerGesture(bounds.exactCenterX(), bounds.exactCenterY())
+        try {
+            gesture.send(MotionEvent.ACTION_DOWN)
+            instrumentation.waitForIdleSync()
+            gesture.moveBy(-bounds.width() / 2f)
+            awaitSliderValue(0f)
+            assertEquals(50, savedStrength())
+            assertTrue("Zero must immediately stop playback", cancellations.get() > 0)
+            assertTrue(hapticEvents.isEmpty())
+            gesture.send(MotionEvent.ACTION_UP)
+            awaitSavedStrength(0)
+            instrumentation.waitForIdleSync()
+            assertTrue("Zero must not play a release preview", hapticEvents.isEmpty())
+            assertEquals(0, persistedStrength())
         } finally { gesture.cancelIfActive() }
     }
 
@@ -148,6 +182,17 @@ class NativeFeedbackSettingsInstrumentedTest {
         return actual ?: Float.NaN
     }
 
+    private fun awaitUnsavedDraft() {
+        val saved = savedStrength().toFloat()
+        val deadline = SystemClock.uptimeMillis() + 5000
+        while (SystemClock.uptimeMillis() < deadline) {
+            val draft = sliderNode()?.rangeInfo?.current
+            if (draft != null && kotlin.math.abs(draft - saved) > .01f) return
+            SystemClock.sleep(30)
+        }
+        throw AssertionError("Drag never produced an unsaved draft to cancel")
+    }
+
     private fun sliderBounds(): Rect {
         val node = requireNotNull(sliderNode()) { "Strength slider missing" }
         return Rect().also { node.getBoundsInScreen(it) }
@@ -171,6 +216,11 @@ class NativeFeedbackSettingsInstrumentedTest {
         fun moveByOnePixel() {
             SystemClock.sleep(16)
             x += 1f
+            send(MotionEvent.ACTION_MOVE)
+        }
+        fun moveBy(deltaPixels: Float) {
+            SystemClock.sleep(16)
+            x += deltaPixels
             send(MotionEvent.ACTION_MOVE)
         }
         fun cancelIfActive() {

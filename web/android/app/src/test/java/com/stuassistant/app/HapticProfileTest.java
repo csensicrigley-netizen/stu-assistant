@@ -6,26 +6,33 @@ import org.junit.Test;
 import static org.junit.Assert.*;
 
 public class HapticProfileTest {
-    private static final String[] SEMANTIC = { "selection", "toggle", "confirm", "reject", "preview" };
+    private static final String[] SEMANTIC = { "selection", "toggle", "confirm", "reject", "preview", "navigation" };
+    private static final String[] KINDS = { "selection", "toggle", "confirm", "reject", "preview", "navigation",
+        "press", "release", "navigate_press", "navigate_release", "utility_press", "utility_release",
+        "destructive_press", "destructive_release" };
 
-    @Test public void semanticRolesHaveDistinctBoundedGains() {
-        float[] gains = { .16f, .30f, .46f, .22f, .32f };
+    @Test public void onlyNavigationUsesAWeakerGainAndOtherProfilesStayAtFullGain() {
         for (int i = 0; i < SEMANTIC.length; i++) {
             HapticProfile full = HapticProfile.forKind(SEMANTIC[i], 100);
             HapticProfile clipped = HapticProfile.forKind(SEMANTIC[i], 500);
             assertNotNull(full);
             assertTrue(HapticProfile.isSemantic(SEMANTIC[i]));
             assertFalse(full.legacy());
-            assertEquals(gains[i], full.primitiveScale(0), .000001f);
+            assertFalse(full.mechanical());
+            float gain = "navigation".equals(SEMANTIC[i]) ? .8f : 1f;
+            assertEquals(gain, full.primitiveScale(0), .000001f);
             assertEquals(full.primitiveScale(0), clipped.primitiveScale(0), .000001f);
-            assertEquals(Math.round(gains[i] * 100), full.richTapIntensity(0));
+            assertEquals(Math.round(gain * 100), full.richTapIntensity(0));
         }
-        assertTrue(HapticProfile.forKind("selection", 100).primitiveScale(0)
-            < HapticProfile.forKind("confirm", 100).primitiveScale(0));
+        for (String kind : KINDS) {
+            HapticProfile full = HapticProfile.forKind(kind, 100);
+            for (int pulse = 0; pulse < full.pulseCount(); pulse++)
+                assertEquals(kind, "navigation".equals(kind) ? .8f : 1f, full.primitiveScale(pulse), .000001f);
+        }
     }
 
     @Test public void gainIsMonotonicAcrossEveryStrengthAndZeroIsSilentInEveryBackend() {
-        for (String kind : new String[] { "selection", "toggle", "confirm", "reject", "preview", "press", "release" }) {
+        for (String kind : KINDS) {
             HapticProfile zero = HapticProfile.forKind(kind, -1);
             assertTrue(zero.silent());
             for (int amplitude : zero.waveformAmplitudes()) assertEquals(0, amplitude);
@@ -71,7 +78,10 @@ public class HapticProfileTest {
         assertEquals(2, reject.pulseCount());
         assertEquals(0, reject.onsetMs(0));
         assertEquals(60, reject.onsetMs(1));
-        assertEquals(.85f, reject.primitiveScale(1) / reject.primitiveScale(0), .000001f);
+        assertEquals(1f, reject.primitiveScale(0), 0f);
+        assertEquals(1f, reject.primitiveScale(1), 0f);
+        assertEquals(100, reject.richTapIntensity(0));
+        assertEquals(100, reject.richTapIntensity(1));
         assertArrayEquals(new long[] { 0 }, amplitudePulseOnsets(confirm));
         assertArrayEquals(new long[] { 0 }, unscaledPulseOnsets(confirm.unscaledTimings()));
         assertArrayEquals(new long[] { 0, 60 }, amplitudePulseOnsets(reject));
@@ -82,11 +92,12 @@ public class HapticProfileTest {
             assertEquals(60, duration + reject.primitiveGapMs(1, duration));
         }
         assertEquals(0, reject.primitiveGapMs(1, 80));
-        assertTrue(reject.waveformAmplitudes()[6] < reject.waveformAmplitudes()[2]);
+        for (int amplitude : reject.waveformAmplitudes())
+            assertTrue("Neither reject pulse may be attenuated", amplitude == 0 || amplitude == 255);
     }
 
     @Test public void ordinarySemanticFallbacksDoNotInventAnExtraPulse() {
-        for (String kind : new String[] { "selection", "toggle", "confirm", "preview" }) {
+        for (String kind : new String[] { "selection", "toggle", "confirm", "preview", "navigation" }) {
             HapticProfile profile = HapticProfile.forKind(kind, 100);
             assertEquals(1, profile.pulseCount());
             assertArrayEquals(new long[] { 0 }, amplitudePulseOnsets(profile));
@@ -113,11 +124,82 @@ public class HapticProfileTest {
     }
 
     @Test public void unknownKindsDoNotResolveToAnyPlayableProfile() {
-        for (String kind : new String[] { null, "", "unknown", "CONFIRM", "selection " }) {
+        for (String kind : new String[] { null, "", "unknown", "CONFIRM", "selection ", "submit_press", "navigation_press" }) {
             assertNull(HapticProfile.forKind(kind, 100));
             assertFalse(HapticProfile.isSemantic(kind));
             assertFalse(HapticProfile.isLegacy(kind));
+            assertFalse(HapticProfile.isMechanical(kind));
+            assertFalse(HapticProfile.isPress(kind));
+            assertFalse(HapticProfile.isRelease(kind));
         }
+    }
+
+    @Test public void typedMechanicalFamiliesHaveExplicitPairsAndTheirOwnReleaseIntervals() {
+        String[] presses = { "press", "navigate_press", "utility_press", "destructive_press" };
+        String[] releases = { "release", "navigate_release", "utility_release", "destructive_release" };
+        int[] intervals = { 110, 80, 110, 150 };
+        for (int family = 0; family < presses.length; family++) {
+            HapticProfile press = HapticProfile.forKind(presses[family], 100);
+            HapticProfile release = HapticProfile.forKind(releases[family], 100);
+            assertTrue(press.mechanical());
+            assertTrue(release.mechanical());
+            assertTrue(HapticProfile.isMechanical(presses[family]));
+            assertTrue(HapticProfile.isPress(presses[family]));
+            assertFalse(HapticProfile.isRelease(presses[family]));
+            assertTrue(HapticProfile.isRelease(releases[family]));
+            assertFalse(HapticProfile.isPress(releases[family]));
+            assertEquals(family == 0, press.legacy());
+            assertEquals(family == 0, release.legacy());
+            assertTrue(HapticProfile.isMatchingPair(presses[family], releases[family]));
+            assertEquals(intervals[family], HapticProfile.releaseIntervalMs(presses[family]));
+            assertEquals(intervals[family], HapticProfile.releaseIntervalMs(releases[family]));
+            for (int other = 0; other < releases.length; other++)
+                assertEquals(family == other, HapticProfile.isMatchingPair(presses[family], releases[other]));
+        }
+    }
+
+    @Test public void newProfilesDoNotHideAnExtraWaveformGainMultiplier() {
+        for (String kind : KINDS) {
+            if (HapticProfile.isLegacy(kind)) continue;
+            for (int strength : new int[] { 1, 25, 50, 100 }) {
+                HapticProfile profile = HapticProfile.forKind(kind, strength);
+                int expected = Math.max(1, Math.round(profile.primitiveScale(0) * 255f));
+                for (int amplitude : profile.waveformAmplitudes())
+                    assertTrue(kind + " waveform must use zero or its full selected gain", amplitude == 0 || amplitude == expected);
+            }
+        }
+    }
+
+    @Test public void mechanicalFamiliesDifferByRhythmAndPrimitiveShapeAtTheSameGain() {
+        String[] typed = { "navigate_press", "navigate_release", "utility_press", "utility_release",
+            "destructive_press", "destructive_release" };
+        long[][] timings = { { 0, 5 }, { 0, 7 }, { 0, 7 }, { 0, 11 }, { 0, 14 }, { 0, 8 } };
+        int[][] candidates = { { 8, 7, 1 }, { 7, 8, 1 }, { 7, 8, 1 }, { 1, 7, 8 }, { 1, 7, 8 }, { 8, 1, 7 } };
+        for (int i = 0; i < typed.length; i++) {
+            HapticProfile profile = HapticProfile.forKind(typed[i], 100);
+            assertEquals(1f, profile.primitiveScale(0), 0f);
+            assertArrayEquals(timings[i], profile.waveformTimings());
+            assertArrayEquals(timings[i], profile.unscaledTimings());
+            assertArrayEquals(new int[] { 0, 255 }, profile.waveformAmplitudes());
+            assertArrayEquals(candidates[i], profile.primitiveCandidates());
+        }
+        // Equal gains must still produce different press/release time pairs across families.
+        assertTrue(timings[0][1] < timings[2][1]);
+        assertTrue(timings[2][1] < timings[4][1]);
+        assertNotEquals(timings[1][1], timings[3][1]);
+        assertNotEquals(timings[3][1], timings[5][1]);
+        assertNotEquals(timings[1][1], timings[5][1]);
+    }
+
+    @Test public void previewAndSelectionUseTheTickReferenceWithNoEnvelopeAttenuation() {
+        for (String kind : new String[] { "preview", "selection", "navigation" }) {
+            assertArrayEquals(new int[] { 7, 8, 1 }, HapticProfile.forKind(kind, 100).primitiveCandidates());
+            assertEquals(100, HapticProfile.forKind(kind, 100).richTapSharpness());
+        }
+        HapticProfile preview = HapticProfile.forKind("preview", 100);
+        assertArrayEquals(new long[] { 0, 11 }, preview.waveformTimings());
+        assertArrayEquals(new int[] { 0, 255 }, preview.waveformAmplitudes());
+        assertEquals(1, preview.pulseCount());
     }
 
     private static long[] amplitudePulseOnsets(HapticProfile profile) {

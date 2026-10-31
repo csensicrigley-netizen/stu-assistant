@@ -13,7 +13,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import com.stuassistant.app.glass.LiquidSlider
-import com.stuassistant.app.glass.LiquidButton
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -57,7 +56,7 @@ fun NativeMeScreen(store: NativeStore, s: NativeState, onConnect: () -> Unit, on
             NCard {
                 NText("登录后换成你自己的课表", 20, true)
                 NText("现在看到的是一份真实课表快照和示例作业、成绩。创建账号并连接校园账号后，课表、作业、考试和成绩都会换成你的。", 16)
-                NButton("登录 / 注册", onConnect, primary = true, modifier = Modifier.fillMaxWidth())
+                NButton("登录 / 注册", onConnect, primary = true, modifier = Modifier.fillMaxWidth(), haptic = NativeButtonHaptic.Navigation)
             }
         } else {
             Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
@@ -81,7 +80,7 @@ fun NativeMeScreen(store: NativeStore, s: NativeState, onConnect: () -> Unit, on
             if (connected == false) NativeMeConnectCard("连接校园账号", "读取你的课表、作业、考试和成绩", onConnect)
             if (expired.isNotEmpty()) Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 NText("${expired.joinToString("、") { sourceNames[it.optString("source")] ?: it.optString("source") }}的学校登录已过期。请重新连接。", 16)
-                NButton("重新连接", onConnect)
+                NButton("重新连接", onConnect, haptic = NativeButtonHaptic.Navigation)
             }
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
@@ -92,7 +91,7 @@ fun NativeMeScreen(store: NativeStore, s: NativeState, onConnect: () -> Unit, on
                             store.refresh("force")
                             message = "同步结束，下面是每个来源这次的结果。为了不打扰学校系统，同一来源一分钟内只同步一次。"
                         }
-                    })
+                    }, haptic = NativeButtonHaptic.Submit)
                 }
                 s.syncedAt?.let { NText("${AcademicClock.ago(it)}读取", 14, muted = true) }
                 message?.let { NText(it, 14) }
@@ -126,7 +125,7 @@ fun NativeMeScreen(store: NativeStore, s: NativeState, onConnect: () -> Unit, on
                             withContext(Dispatchers.IO) { store.clearSchool() }
                             if (store.state.value.rememberSchool) throw NativeApiError("secure_storage", 0, store.state.value.error ?: "本机学校密码未能清除")
                         }
-                    }, enabled = !busy)
+                    }, enabled = !busy, haptic = NativeButtonHaptic.Destructive)
                 }
             }
         }
@@ -179,19 +178,19 @@ fun NativeMeScreen(store: NativeStore, s: NativeState, onConnect: () -> Unit, on
         }
         NText("个人项目，与学校官方无关。学校原文和通知始终优先。", 14, muted = true)
         if (signedIn) {
-            NButton("退出登录", { action { store.logout(); onSignOut() } }, enabled = !busy, modifier = Modifier.fillMaxWidth())
+            NButton("退出登录", { action { store.logout(); onSignOut() } }, enabled = !busy, modifier = Modifier.fillMaxWidth(), haptic = NativeButtonHaptic.Destructive)
             if (confirmDelete) NCard {
                 NText("删除后服务器上的会话、课表和缓存会被清空，无法恢复。")
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     CompositionLocalProvider(LocalNativeColors provides LocalNativeColors.current.let { it.copy(brand = it.danger) }) {
                         NButton(if (busy) "正在删除…" else "确认删除", {
                             action { store.deleteAccount(); confirmDelete = false; onSignOut() }
-                        }, enabled = !busy, primary = true)
+                        }, enabled = !busy, primary = true, haptic = NativeButtonHaptic.Destructive)
                     }
-                    NButton("取消", { confirmDelete = false }, enabled = !busy)
+                    NButton("取消", { confirmDelete = false }, enabled = !busy, haptic = NativeButtonHaptic.Utility)
                 }
             } else CompositionLocalProvider(LocalNativeColors provides LocalNativeColors.current.let { it.copy(ink = it.danger) }) {
-                NButton("删除账号和数据", { confirmDelete = true }, enabled = !busy, modifier = Modifier.fillMaxWidth())
+                NButton("删除账号和数据", { confirmDelete = true }, enabled = !busy, modifier = Modifier.fillMaxWidth(), haptic = NativeButtonHaptic.Utility)
             }
         }
     }
@@ -199,7 +198,7 @@ fun NativeMeScreen(store: NativeStore, s: NativeState, onConnect: () -> Unit, on
 
 @Composable
 private fun NativeMeConnectCard(title: String, subtitle: String, onClick: () -> Unit) {
-    LiquidButton(onClick, LocalNativeBackdrop.current,
+    NativeGlassButton(onClick, haptic = NativeButtonHaptic.Navigation,
         modifier = Modifier.fillMaxWidth(), surfaceColor = LocalNativeColors.current.surface.copy(alpha = .5f)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {

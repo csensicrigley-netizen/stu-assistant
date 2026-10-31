@@ -108,8 +108,8 @@ fun NativeWelcomeScreen(
                     NText("作业按截止时间排好，考试倒数")
                     NText("只读不代办，账号密码由你本人输入、加密存在你自己的空间")
                 }
-                NButton("开始使用", { step = "account" }, primary = true, modifier = Modifier.fillMaxWidth())
-                NButton("先看看示例", { store.enterPreview(); done() }, modifier = Modifier.fillMaxWidth())
+                NButton("开始使用", { step = "account" }, primary = true, modifier = Modifier.fillMaxWidth(), haptic = NativeButtonHaptic.Navigation)
+                NButton("先看看示例", { store.enterPreview(); done() }, modifier = Modifier.fillMaxWidth(), haptic = NativeButtonHaptic.Navigation)
                 NText("个人项目，与汕头大学官方无关。", 14, muted = true)
             }
         }
@@ -134,8 +134,6 @@ private fun NativeAccountForm(
 ) {
     val scope = rememberCoroutineScope()
     val authenticated by rememberUpdatedState(onAuthenticated)
-    val confirmFeedback = nHapticFeedback("confirm")
-    val rejectFeedback = nHapticFeedback("reject")
     val back by rememberUpdatedState(onBack)
     val expired = s.error?.let { it.contains("登录") && it.contains("过期") } == true
     var notice by remember { mutableStateOf<String?>(if (expired) "登录已过期，请重新登录。" else null) }
@@ -159,7 +157,7 @@ private fun NativeAccountForm(
     }
     BackHandler { leave() }
     NativeAccountSurface {
-        NButton("返回", leave)
+        NButton("返回", leave, haptic = NativeButtonHaptic.Navigation)
         NText(if (mode == "login") "登录助手账号" else "创建助手账号", 28, true)
         NText("这是助手自己的账号，换手机时用它找回设置。和学校账号分开。", muted = true)
         if (notice != null) Column(Modifier.semantics { liveRegion = LiveRegionMode.Polite }) { NText(notice!!, 14) }
@@ -170,7 +168,7 @@ private fun NativeAccountForm(
             NText("由部署这个助手的人提供。", 14, muted = true)
         } else {
             NText("连接到 ${try { java.net.URI(server).host ?: server } catch (_: Exception) { server }}", 14, muted = true)
-            NButton("更改", { editServer = true })
+            NButton("更改", { editServer = true }, haptic = NativeButtonHaptic.Utility)
         }
         NField("邮箱", email, { email = it.take(200) }, enabled = !busy)
         NField("口令", password, { password = it.take(200) }, password = true, enabled = !busy)
@@ -180,8 +178,8 @@ private fun NativeAccountForm(
             if (!busy) {
                 val address = email.trim()
                 when {
-                    address.length < 3 || !address.contains('@') || address.startsWith('@') || address.endsWith('@') -> { problem = "请填写完整的邮箱地址。"; rejectFeedback() }
-                    password.length < 8 -> { problem = "填写的内容格式不对，检查一下邮箱和口令（至少 8 位）。"; rejectFeedback() }
+                    address.length < 3 || !address.contains('@') || address.startsWith('@') || address.endsWith('@') -> { problem = "请填写完整的邮箱地址。" }
+                    password.length < 8 -> { problem = "填写的内容格式不对，检查一下邮箱和口令（至少 8 位）。" }
                     else -> {
                         busy = true
                         problem = null
@@ -206,20 +204,18 @@ private fun NativeAccountForm(
                                 currentCoroutineContext().ensureActive()
                                 password = ""
                                 editServer = false
-                                confirmFeedback()
                                 authenticated()
                             } catch (error: CancellationException) {
                                 throw error
                             } catch (error: Exception) {
                                 problem = accountError(error)
-                                rejectFeedback()
                             } finally { busy = false }
                         }
                     }
                 }
             }
-        }, enabled = !busy, primary = true, modifier = Modifier.fillMaxWidth())
-        if (onPreview != null) NButton("先看看示例", { if (busy) requestJob?.cancel(); onPreview() }, modifier = Modifier.fillMaxWidth())
+        }, enabled = !busy, primary = true, modifier = Modifier.fillMaxWidth(), haptic = NativeButtonHaptic.Submit)
+        if (onPreview != null) NButton("先看看示例", { if (busy) requestJob?.cancel(); onPreview() }, modifier = Modifier.fillMaxWidth(), haptic = NativeButtonHaptic.Navigation)
     }
 }
 
@@ -230,8 +226,6 @@ private val BIND_TERMINAL = setOf("ok", "failed", "cancelled")
 private fun NativeCampusBind(store: NativeStore, s: NativeState, onDone: () -> Unit, onCancel: (() -> Unit)?) {
     val scope = rememberCoroutineScope()
     val done by rememberUpdatedState(onDone)
-    val confirmFeedback = nHapticFeedback("confirm")
-    val rejectFeedback = nHapticFeedback("reject")
     val cancel by rememberUpdatedState(onCancel)
     val serial = remember { Mutex() }
     var account by remember { mutableStateOf(s.schoolId) }
@@ -316,7 +310,6 @@ private fun NativeCampusBind(store: NativeStore, s: NativeState, onDone: () -> U
                         store.reloadAfterMutation()
                         if (rememberProblem != null) problem = rememberProblem
                         ready = true
-                        if ((errors?.length() ?: 0) == 0) confirmFeedback()
                         if ((errors?.length() ?: 0) == 0 && problem == null && !leaving) done()
                         return@LaunchedEffect
                     }
@@ -325,7 +318,6 @@ private fun NativeCampusBind(store: NativeStore, s: NativeState, onDone: () -> U
                         pending = null
                         answers.clear()
                         problem = bindFailure(snapshot)
-                        rejectFeedback()
                         return@LaunchedEffect
                     }
                     "cancelled" -> {
@@ -372,7 +364,7 @@ private fun NativeCampusBind(store: NativeStore, s: NativeState, onDone: () -> U
     val running = !ready && jobId != null && state !in BIND_TERMINAL && !pollingFinished
     val busy = starting || running || leaving || (state == "ok" && !ready)
     NativeAccountSurface {
-        if (onCancel != null && !busy) NButton("返回", { stop(true) })
+        if (onCancel != null && !busy) NButton("返回", { stop(true) }, haptic = NativeButtonHaptic.Navigation)
         NText("连接校园账号", 28, true)
         NText("本人授权使用：这里的账号密码由你本人输入，只用于替你读你自己的教务和 MySTU 数据。助手不代你提交任何东西，也不保存学校数据的副本到别人的空间。", 14, muted = true)
             NField("学号 / 校园账号", account, { if (!busy) account = it.take(40) }, enabled = !busy)
@@ -417,11 +409,11 @@ private fun NativeCampusBind(store: NativeStore, s: NativeState, onDone: () -> U
                                         answers.remove(challengeId)
                                     }
                                 } catch (error: CancellationException) { throw error }
-                                catch (error: Exception) { problem = accountError(error); rejectFeedback() }
+                                catch (error: Exception) { problem = accountError(error) }
                                 finally { submitting = null }
                             }
                         }
-                    }, enabled = submitting == null && answers[challengeId].orEmpty().isNotBlank(), primary = true)
+                    }, enabled = submitting == null && answers[challengeId].orEmpty().isNotBlank(), primary = true, haptic = NativeButtonHaptic.Submit)
                 }
             }
         }
@@ -436,15 +428,15 @@ private fun NativeCampusBind(store: NativeStore, s: NativeState, onDone: () -> U
             val bound = result?.optJSONArray("bound")
             NText("已连接：${jsonStrings(bound).joinToString("、") { serviceLabel(it) }}", bold = true)
             if (failed != null) for (key in failed.keys()) NError("${serviceLabel(key)}：${accountError(NativeApiError(failed.optString(key)))}")
-            NButton("继续使用", { done() }, primary = true)
+            NButton("继续使用", { done() }, primary = true, haptic = NativeButtonHaptic.Navigation)
             if (failed != null && failed.length() > 0) NButton("重新连接", {
                     jobId = null; job = null; ready = false; problem = null
-                })
+                }, haptic = NativeButtonHaptic.Utility)
         } else if (!running && state != "ok") {
             NButton(if (starting) "连接中…" else "连接", {
                 when {
-                    !agree -> { problem = "请先确认本人只读授权。"; rejectFeedback() }
-                    account.trim().length < 3 || password.isEmpty() -> { problem = "请填写校园账号和学校统一认证密码。"; rejectFeedback() }
+                    !agree -> { problem = "请先确认本人只读授权。" }
+                    account.trim().length < 3 || password.isEmpty() -> { problem = "请填写校园账号和学校统一认证密码。" }
                     else -> {
                         starting = true; problem = null; ready = false; pollingFinished = false; answers.clear()
                         val credentials = PendingSchool(account.trim(), password, rememberPassword)
@@ -459,15 +451,15 @@ private fun NativeCampusBind(store: NativeStore, s: NativeState, onDone: () -> U
                                 job = checked
                                 jobId = checked.getString("job_id")
                             } catch (error: CancellationException) { pending = null; throw error }
-                            catch (error: Exception) { pending = null; problem = accountError(error); rejectFeedback() }
+                            catch (error: Exception) { pending = null; problem = accountError(error) }
                             finally { starting = false }
                         }
                     }
                 }
-            }, enabled = !busy, primary = true, modifier = Modifier.fillMaxWidth())
+            }, enabled = !busy, primary = true, modifier = Modifier.fillMaxWidth(), haptic = NativeButtonHaptic.Submit)
         }
-        if ((starting || running) && !leaving) NButton("取消这次连接", { stop(false) })
-        NButton(if (leaving) "正在取消…" else if (busy) "取消并返回" else "稍后再连", { stop(true) }, enabled = !leaving, modifier = Modifier.fillMaxWidth())
+        if ((starting || running) && !leaving) NButton("取消这次连接", { stop(false) }, haptic = NativeButtonHaptic.Utility)
+        NButton(if (leaving) "正在取消…" else if (busy) "取消并返回" else "稍后再连", { stop(true) }, enabled = !leaving, modifier = Modifier.fillMaxWidth(), haptic = NativeButtonHaptic.Navigation)
     }
 }
 
@@ -519,7 +511,7 @@ private fun AccountQrContent(content: String, encoded: String) {
             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
             clipboard?.setPrimaryClip(ClipData.newPlainText("学校验证", content))
             copied = clipboard != null
-        })
+        }, haptic = NativeButtonHaptic.Utility)
         if (content.startsWith("https://", true) || content.startsWith("http://", true)) NOpenLink("打开验证链接", content)
     }
 }

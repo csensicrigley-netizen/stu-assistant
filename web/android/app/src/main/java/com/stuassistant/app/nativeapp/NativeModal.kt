@@ -321,7 +321,7 @@ private fun NativeSheetLayer(entry: NativeSheetEntry, active: Boolean, backdrop:
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Box(Modifier.weight(1f).semantics { heading() }) { NText(entry.title.value, 24, true) }
-                    NButton("关闭", onDismiss)
+                    NButton("关闭", onDismiss, haptic = NativeButtonHaptic.Utility)
                 }
                 Column(
                     Modifier.fillMaxWidth().weight(1f, fill = false)
