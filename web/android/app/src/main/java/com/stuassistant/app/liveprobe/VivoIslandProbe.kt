@@ -69,7 +69,7 @@ class VivoIslandProbe(context: Context) {
             savedMode()?.let { mode ->
                 val n = current.notification
                 val eligible = if (Build.VERSION.SDK_INT >= 36) runCatching { n.hasPromotableCharacteristics() }.getOrNull() else null
-                prefs.edit().putString("readback_${mode.name}", "capturedAt=${System.currentTimeMillis()}; postTime=${current.postTime}; progress=${prefs.getInt("progress", 0)}; flags=${n.flags}; requestPromoted=${n.extras.getBoolean(LiveUpdateProbe.REQUEST_PROMOTED_EXTRA, false)}; colorized=${n.extras.getBoolean(Notification.EXTRA_COLORIZED, false)}; postedEligible=$eligible; superx=${n.extras.containsKey("notification.superx.operation")}").apply()
+                prefs.edit().putString("readback_${mode.name}", "capturedAt=${System.currentTimeMillis()}; postTime=${current.postTime}; requestedProgress=${prefs.getInt("progress", 0)}; flags=${n.flags}; requestPromoted=${n.extras.getBoolean(LiveUpdateProbe.REQUEST_PROMOTED_EXTRA, false)}; colorized=${n.extras.getBoolean(Notification.EXTRA_COLORIZED, false)}; postedEligible=$eligible; superx=${n.extras.containsKey("notification.superx.operation")}").apply()
             }
         }
         VivoProbeSnapshot(
