@@ -1,0 +1,147 @@
+
+# 后端在数据中心，经 SSH 隧道过来。必须做连接池：
+# 每请求新建一条 SSH 通道会在并发时被重置（nginx 报 104 Connection reset by peer），
+# 用户看到的就是"服务器暂时没有响应"。
+upstream stu_api {
+    server 127.0.0.1:8100;
+    keepalive 64;
+    keepalive_timeout 60s;
+    keepalive_requests 1000;
+}
+
+# oyishi.icu — 汕头大学事项助手
+# 静态网页放在这台（只做转发，不做计算）；/v1 反代到数据中心的 8100
+# 数据中心通过 SSH 隧道映射到本机 127.0.0.1:8100（stu-tunnel.service）
+server {
+    server_name stu.oyishi.asia oyishi.icu www.oyishi.icu;
+
+    root /opt/stu-web;
+    index index.html;
+
+    # 安全响应头（每个自带 add_header 的 location 需再 include 一次）
+    include snippets/stu-headers.conf;
+
+    # 全站粗粒度限流；/v1/ 与敏感接口各自覆盖
+    limit_req zone=stu_page burst=40 nodelay;
+    limit_conn stu_conn 30;
+    limit_req_status 429;
+
+    # 慢速攻击（slowloris 类）超时收敛；nginx 默认 60s 偏宽
+    client_header_timeout 12s;
+    client_body_timeout 12s;
+    send_timeout 30s;
+
+    gzip on;
+    gzip_types text/css application/javascript application/json image/svg+xml text/plain application/xml;
+    gzip_min_length 1024;
+
+    # 证书签发用
+    location /.well-known/acme-challenge/ { root /var/www/stu-acme; }
+
+    # 扫描器黑洞：常见探针路径直接断连（444 不回包，日志里 wp-admin/redoc 探针实测存在）
+    location ~* ^/(\.env|\.git|\.svn|\.hg|\.aws|\.ssh|\.DS_Store|wp-(admin|login|content|includes)|phpmyadmin|xmlrpc\.php|cgi-bin) { return 444; }
+    location ~* \.(sql|bak|old|conf|cnf|ini|log|sh|swp|pem|key|crt|yml|yaml)$ { return 444; }
+
+    # 注册/登录/重登等敏感入口：单独更严限流
+    # 正则 location 优先于前缀 /v1/ 命中；代理配置完整复制（嵌套 location 继承 proxy_pass 不可靠）
+    location ~ ^/v1/(auth|webvpn/login|med/login|relogin|bind) {
+        limit_req zone=stu_login burst=5 nodelay;
+        limit_req_status 429;
+        proxy_pass http://stu_api;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header Connection "";
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 120s;
+        proxy_next_upstream error timeout http_502 http_503;
+        proxy_next_upstream_tries 2;
+        proxy_next_upstream_timeout 10s;
+        proxy_connect_timeout 5s;
+        proxy_send_timeout 120s;
+        client_max_body_size 25m;
+    }
+
+    # 后端接口 → 数据中心
+    location /v1/ {
+        limit_req zone=stu_api burst=16 nodelay;
+        proxy_pass http://stu_api;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header Connection "";
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 120s;
+        # 隧道偶发重置时自动重试一次，用户不会看到失败
+        proxy_next_upstream error timeout http_502 http_503;
+        proxy_next_upstream_tries 2;
+        proxy_next_upstream_timeout 10s;
+        proxy_connect_timeout 5s;
+        proxy_send_timeout 120s;
+        client_max_body_size 25m;
+    }
+
+    location /assets/ {
+        expires 30d;
+        add_header Cache-Control "public, immutable";
+        include snippets/stu-headers.conf;
+        try_files $uri =404;
+    }
+
+    location /download/ {
+        expires 1h;
+    }
+
+
+    # 旧离线缓存的自毁开关（一次性）：以前注册过的 service worker 取到这份
+    # 新脚本后会自己 unregister + 清缓存 + 刷新所有页面，之后站点再不用 SW。
+    # 直接返回 404 也行，但那要等浏览器自己想起来做更新检查，太慢。
+    location = /sw.js {
+        default_type application/javascript;
+        add_header Cache-Control "no-store" always;
+        include snippets/stu-headers.conf;
+        return 200 'self.addEventListener("install",function(e){self.skipWaiting();});
+self.addEventListener("activate",function(e){e.waitUntil((async function(){
+  try{var k=await caches.keys();await Promise.all(k.map(function(x){return caches.delete(x);}));}catch(_){}
+  try{await self.registration.unregister();}catch(_){}
+  try{var cs=await self.clients.matchAll({type:"window"});cs.forEach(function(c){try{c.navigate(c.url);}catch(_){}});}catch(_){}
+})());});';
+    }
+
+    # 页面本体不缓存：每次导航都拿最新的那份 js 清单
+    location = /index.html {
+        add_header Cache-Control "no-store" always;
+        include snippets/stu-headers.conf;
+    }
+
+    # 单页应用：别的路径都交给 index.html
+    location / {
+        try_files $uri $uri/ /index.html;
+        add_header Cache-Control "no-cache";
+        include snippets/stu-headers.conf;
+    }
+
+    listen [::]:443 ssl http2; # managed by Certbot
+    listen 443 ssl http2; # managed by Certbot
+    ssl_certificate /etc/letsencrypt/live/stu.oyishi.asia/fullchain.pem; # managed by Certbot
+    ssl_certificate_key /etc/letsencrypt/live/stu.oyishi.asia/privkey.pem; # managed by Certbot
+    include /etc/letsencrypt/options-ssl-nginx.conf; # managed by Certbot
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem; # managed by Certbot
+
+}
+
+server {
+    if ($host = stu.oyishi.asia) {
+        return 301 https://$host$request_uri;
+    } # managed by Certbot
+
+
+    listen 80;
+    listen [::]:80;
+    server_name stu.oyishi.asia oyishi.icu www.oyishi.icu;
+    return 404; # managed by Certbot
+
+
+}
