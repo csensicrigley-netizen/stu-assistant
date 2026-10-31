@@ -36,8 +36,8 @@ android {
         applicationId "com.stuassistant.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 56
-        versionName "1.0.55"
+        versionCode 57
+        versionName "1.0.56"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -75,6 +75,12 @@ android {
             applicationIdSuffix '.liveprobe'
             versionNameSuffix '-liveprobe.1'
             signingConfig signingConfigs.debug
+            matchingFallbacks = ['release']
+        }
+        huaweiprobe {
+            initWith liveprobe
+            applicationIdSuffix '.huaweiprobe'
+            versionNameSuffix '-huaweiprobe.1'
             matchingFallbacks = ['release']
         }
     }

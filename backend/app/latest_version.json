@@ -1,12 +1,12 @@
 {
-  "versionName": "1.0.55",
-  "versionCode": 56,
+  "versionName": "1.0.56",
+  "versionCode": 57,
   "apk": "/download/stu-assistant.apk",
   "notes": [
-    "新增独立实时通知验证包，可测试系统进度胶囊与倒计时，无需账号登录",
-    "区分通知发送、格式资格、系统提升状态，支持复制设备诊断；ColorOS 17 胶囊需真机确认"
+    "新增华为／卓易通独立验证 APK，提供本地实况窗计时请求与 Android 通知对照",
+    "诊断分别记录 APK 运行环境、通知扩展字段与请求状态，宿主实况窗由真机确认"
   ],
   "mandatory": false,
-  "releasedAt": "2026-10-31T06:27:08Z",
+  "releasedAt": "2026-10-31T07:03:11Z",
   "minSupported": "1.0.0"
 }

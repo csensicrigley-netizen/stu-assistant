@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <bool name="huawei_probe">false</bool>
+    <string name="live_probe_title">STU 实时通知验证</string>
+    <string name="huawei_probe_target">P80 Pro＋ · HarmonyOS 7 · 卓易通</string>
+</resources>
