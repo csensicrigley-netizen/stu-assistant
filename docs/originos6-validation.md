@@ -1,5 +1,7 @@
 # OriginOS 6 原子岛：自有包名验证
 
+本文属于独立机型探针记录，不计作正式 App 的功能升级。已交付版本及产品基线见[版本与验证构建](版本与验证构建.md)；后续包身份实验见[vivo 包身份对照验证](vivo-package-identity-probe.md)。
+
 ## 已有实测和不能推出的结论
 
 用户的 vivo V2509A / Android 16 / API 36 / `PD2509E_A_16.0.30.15.W10` 在旧通用验证包 1.0.55 中收到通知，但只出现在下拉通知栏。诊断为 `promotionAllowed=false`、`eligible(last built)=true`、`active=true`、`FLAG_PROMOTED_ONGOING=false`，实际用了 API36 的 `colorized=true` 兼容构造。这个结果说明该次通知没有获得标准提升，尚不能确定具体系统策略，也不能把它解释为漏掉通知权限声明或提升请求。

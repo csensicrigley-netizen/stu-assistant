@@ -18,42 +18,46 @@ if ($LASTEXITCODE -ne 0) { throw 'Source commit is unavailable.' }
 $sourceChanges = git -C $taskRoot status --porcelain
 if ($LASTEXITCODE -ne 0) { throw 'Cannot verify the source working tree.' }
 if ($sourceChanges) { throw 'Commit the source changes before creating a delivery APK. Use Gradle directly for development builds.' }
-& python (Join-Path $taskRoot 'deploy/sync-version.py')
-if ($LASTEXITCODE -ne 0) { throw 'Version metadata is inconsistent.' }
-$taskBuild = [IO.File]::ReadAllText((Join-Path $androidRoot 'app/build.gradle'))
-$taskVersion = [regex]::Match($taskBuild, 'versionName\s+"([^"]+)"').Groups[1].Value
-$taskCode = [regex]::Match($taskBuild, 'versionCode\s+(\d+)').Groups[1].Value
-if (-not $taskVersion -or -not $taskCode) { throw 'Native version was not found in app/build.gradle' }
+$versionScript = Join-Path $taskRoot 'deploy/sync-version.py'
+[string[]]$versionArgs = @($versionScript, '--json')
+foreach ($taskVariant in $taskVariants) { $versionArgs += @('--variant', $taskVariant) }
+$versionJson = & python @versionArgs
+if ($LASTEXITCODE -ne 0) { throw 'Product or probe version metadata is inconsistent.' }
+$versionMetadata = $versionJson | ConvertFrom-Json
 
-# 版本号只能往前：release/ 里发过的包若比这次还高，装上去会被系统判成降级，
-# 用户看到「应用未安装」，只能先卸载再装（2026-10-31 真实事故）。
+# Android upgrade ordering is per applicationId. An unrelated OEM experiment
+# must never force a product version increase. Read actual APK headers, not names.
 $sdkRoot = if ($env:ANDROID_HOME) { $env:ANDROID_HOME } elseif ($env:ANDROID_SDK_ROOT) { $env:ANDROID_SDK_ROOT } else { Join-Path $env:LOCALAPPDATA 'Android\Sdk' }
+$aaptPath = $null
 if ($sdkRoot -and (Test-Path -LiteralPath (Join-Path $sdkRoot 'build-tools'))) {
     $aaptPath = Get-ChildItem -LiteralPath (Join-Path $sdkRoot 'build-tools') -Directory |
         Sort-Object Name -Descending | ForEach-Object { Join-Path $_.FullName 'aapt.exe' } |
         Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
-    if ($aaptPath) {
-        $highest = 0
-        $highestName = ''
-        $probePrefix = 'stu-vc-probe-' + [Guid]::NewGuid().ToString('N')
-        $probeIndex = 0
-        foreach ($known in Get-ChildItem -LiteralPath (Join-Path $taskRoot 'release') -Filter '*.apk' -ErrorAction SilentlyContinue) {
-            $probeCopy = Join-Path $env:TEMP ($probePrefix + "-" + $probeIndex + '.apk')
-            $probeIndex++
-            try {
-                Copy-Item -LiteralPath $known.FullName -Destination $probeCopy -Force
-                $heading = (& $aaptPath dump badging $probeCopy 2>&1 | Select-String -Pattern '^package:' | Select-Object -First 1).Line
-                if ($heading -match "versionCode='(\d+)'") {
-                    $seen = [int]$Matches[1]
-                    if ($seen -gt $highest) { $highest = $seen; $highestName = $known.Name }
-                }
-            } catch { } finally { Remove-Item -LiteralPath $probeCopy -Force -ErrorAction SilentlyContinue }
-        }
-        if ($highest -ge [int]$taskCode) {
-            throw "版本号不能往回走：本次 versionCode=$taskCode，但 release/ 里 $highestName 已经是 $highest。先把 app/build.gradle 的 versionCode 提到 $($highest + 1) 以上。"
-        }
-        Write-Output "    versionCode $taskCode is newer than every shipped apk (highest $highest)"
-    }
+}
+if (-not $aaptPath) { throw 'aapt is required to verify delivery package identities and version floors.' }
+$shippedApks = @()
+$probePrefix = 'stu-vc-probe-' + [Guid]::NewGuid().ToString('N')
+$probeIndex = 0
+foreach ($known in Get-ChildItem -LiteralPath (Join-Path $taskRoot 'release') -Filter '*.apk' -ErrorAction SilentlyContinue) {
+    $probeCopy = Join-Path $env:TEMP ($probePrefix + "-" + $probeIndex + '.apk')
+    $probeIndex++
+    try {
+        Copy-Item -LiteralPath $known.FullName -Destination $probeCopy -Force
+        $badging = & $aaptPath dump badging $probeCopy 2>&1
+        $aaptExitCode = $LASTEXITCODE
+        $heading = ($badging | Select-String -Pattern '^package:' | Select-Object -First 1).Line
+        if ($aaptExitCode -ne 0 -or $heading -notmatch "name='([^']+)' versionCode='(\d+)'") { throw "Cannot verify shipped APK: $($known.Name)" }
+        $shippedApks += @{package=$Matches[1]; versionCode=[int]$Matches[2]; apk=$known.Name}
+    } finally { Remove-Item -LiteralPath $probeCopy -Force -ErrorAction SilentlyContinue }
+}
+$inventoryPath = [IO.Path]::GetTempFileName()
+try {
+    [IO.File]::WriteAllText($inventoryPath, (ConvertTo-Json -InputObject @($shippedApks)), [Text.UTF8Encoding]::new($false))
+    $checkedVersions = & python @versionArgs --shipped-apks $inventoryPath
+    if ($LASTEXITCODE -ne 0) { throw 'A delivery version does not exceed the previously shipped version for its package.' }
+} finally { Remove-Item -LiteralPath $inventoryPath -Force -ErrorAction SilentlyContinue }
+foreach ($build in $versionMetadata.builds) {
+    Write-Output "    $($build.channel): $($build.applicationId) $($build.versionName) ($($build.versionCode)); product $($build.baseProductVersion.versionName)"
 }
 if ($Variant -eq 'Release' -and -not (Test-Path -LiteralPath (Join-Path $taskRoot 'android-signing/keystore.properties'))) {
     throw 'The release signing properties are missing.'
@@ -70,7 +74,7 @@ $driveLetter = [char[]](70..90) | Where-Object { -not (Test-Path "$($_):\") } | 
 if (-not $driveLetter) { throw 'No free ASCII drive is available for the Android tools.' }
 $releaseDirectory = Join-Path $taskRoot 'release'
 New-Item -ItemType Directory -Path $releaseDirectory -Force | Out-Null
-$logPath = Join-Path $releaseDirectory "native-$taskVersion-build.log"
+$logPath = Join-Path $releaseDirectory "native-$($versionMetadata.builds[0].versionName)-build.log"
 subst "$($driveLetter):" "$taskRoot"
 if ($LASTEXITCODE -ne 0) { throw 'subst failed' }
 try {
@@ -90,9 +94,8 @@ try {
     $deliveries = @()
     foreach ($taskVariant in $taskVariants) {
         $variantLower = $taskVariant.ToLowerInvariant()
-        $suffix = switch ($taskVariant) { 'Haptics' { '-native.1' } 'Liveprobe' { '-liveprobe.1' } 'Huaweiprobe' { '-huaweiprobe.1' } 'Vivoprobe' { '-vivoprobe.1' } 'Vivoidentity' { '-vivoidentity.1' } 'Vivomap' { '-vivoidentity.1' } default { '' } }
-        $fileSuffix = switch ($taskVariant) { 'Vivoidentity' { '-vivoidentity-control.1' } 'Vivomap' { '-vivoidentity-amap.1' } default { $suffix } }
-        $artifactPath = Join-Path $releaseDirectory "STU-assistant-$taskVersion$fileSuffix.apk"
+        $buildMetadata = $versionMetadata.builds | Where-Object { $_.variant -eq $taskVariant } | Select-Object -First 1
+        $artifactPath = Join-Path $releaseDirectory $buildMetadata.artifactName
         $builtApk = Join-Path $androidRoot "app/build/outputs/apk/$variantLower/app-$variantLower.apk"
         $archive = [IO.Compression.ZipFile]::OpenRead($builtApk)
         try {
@@ -103,17 +106,15 @@ try {
             try { $packagedServer = ($configReader.ReadToEnd() | ConvertFrom-Json).server } finally { $configReader.Dispose() }
             if ($packagedServer -cne $effectiveServer) { throw 'Packaged backend differs from the intended deployment configuration.' }
         } finally { $archive.Dispose() }
-        $packageName = ''
-        if ($taskVariant -in @('Vivoidentity', 'Vivomap')) {
-            if (-not $aaptPath) { throw 'aapt is required to verify the identity experiment.' }
-            $heading = (& $aaptPath dump badging $builtApk 2>&1 | Select-String -Pattern '^package:' | Select-Object -First 1).Line
-            $expectedPackage = if ($taskVariant -eq 'Vivomap') { 'com.autonavi.minimap' } else { 'com.stuassistant.app.vivoprobe' }
-            if ($LASTEXITCODE -ne 0 -or $heading -notmatch "name='([^']+)' versionCode='([^']+)' versionName='([^']+)'") { throw 'APK identity metadata could not be read.' }
-            $packageName = $Matches[1]
-            if ($packageName -cne $expectedPackage -or $Matches[2] -ne $taskCode -or $Matches[3] -cne "$taskVersion$suffix") { throw 'Identity APK does not match intended package/version.' }
-        }
+        $badging = & $aaptPath dump badging $builtApk 2>&1
+        $aaptExitCode = $LASTEXITCODE
+        $heading = ($badging | Select-String -Pattern '^package:' | Select-Object -First 1).Line
+        if ($aaptExitCode -ne 0 -or $heading -notmatch "name='([^']+)' versionCode='([^']+)' versionName='([^']+)'") { throw 'APK identity metadata could not be read.' }
+        $packageName = $Matches[1]
+        if ($packageName -cne $buildMetadata.applicationId -or [int]$Matches[2] -ne $buildMetadata.versionCode -or $Matches[3] -cne $buildMetadata.versionName) { throw 'APK does not match the selected channel package/version.' }
         $hash = (Get-FileHash -LiteralPath $builtApk -Algorithm SHA256).Hash
-        $receipt = @{versionName="$taskVersion$suffix";versionCode=[int]$taskCode;variant=$taskVariant;package=$packageName;apk=(Split-Path $artifactPath -Leaf);bytes=(Get-Item -LiteralPath $builtApk).Length;sha256=$hash;builtAt=[DateTime]::UtcNow.ToString('o');source=$taskSource;sourceClean=$true;server=$packagedServer;webBundleIncluded=$false}
+        $receipt = @{versionName=$buildMetadata.versionName;versionCode=$buildMetadata.versionCode;variant=$taskVariant;channel=$buildMetadata.channel;isProductBuild=$buildMetadata.isProductBuild;baseProductVersion=$buildMetadata.baseProductVersion;package=$packageName;apk=(Split-Path $artifactPath -Leaf);bytes=(Get-Item -LiteralPath $builtApk).Length;sha256=$hash;builtAt=[DateTime]::UtcNow.ToString('o');source=$taskSource;sourceClean=$true;server=$packagedServer;webBundleIncluded=$false}
+        if (-not $buildMetadata.isProductBuild) { $receipt.functionalUpgrade = $false }
         $deliveries += @{builtApk=$builtApk;artifactPath=$artifactPath;receipt=$receipt}
     }
     $configHash = (Get-FileHash -LiteralPath $configPath -Algorithm SHA256).Hash
@@ -122,8 +123,7 @@ try {
     if ($LASTEXITCODE -ne 0 -or $sourceAfterBuild -ne $taskSource) { throw 'Source commit changed during the build.' }
     $changesAfterBuild = git -C $taskRoot status --porcelain
     if ($LASTEXITCODE -ne 0 -or $changesAfterBuild) { throw 'Source changed during the build; commit and rebuild before delivery.' }
-    # Validate the entire pair before publishing either artifact. Version-floor
-    # checks happen once, so the two identities intentionally share one version.
+    # Validate every artifact before publishing either member of an identity pair.
     foreach ($delivery in $deliveries) {
         $artifactPath = $delivery.artifactPath
         $delivery.receipt.nativeConfigSha256 = $configHash
