@@ -19,6 +19,37 @@ $taskBuild = [IO.File]::ReadAllText((Join-Path $androidRoot 'app/build.gradle'))
 $taskVersion = [regex]::Match($taskBuild, 'versionName\s+"([^"]+)"').Groups[1].Value
 $taskCode = [regex]::Match($taskBuild, 'versionCode\s+(\d+)').Groups[1].Value
 if (-not $taskVersion -or -not $taskCode) { throw 'Native version was not found in app/build.gradle' }
+
+# 版本号只能往前：release/ 里发过的包若比这次还高，装上去会被系统判成降级，
+# 用户看到「应用未安装」，只能先卸载再装（2026-10-31 真实事故）。
+$sdkRoot = if ($env:ANDROID_HOME) { $env:ANDROID_HOME } elseif ($env:ANDROID_SDK_ROOT) { $env:ANDROID_SDK_ROOT } else { Join-Path $env:LOCALAPPDATA 'Android\Sdk' }
+if ($sdkRoot -and (Test-Path -LiteralPath (Join-Path $sdkRoot 'build-tools'))) {
+    $aaptPath = Get-ChildItem -LiteralPath (Join-Path $sdkRoot 'build-tools') -Directory |
+        Sort-Object Name -Descending | ForEach-Object { Join-Path $_.FullName 'aapt.exe' } |
+        Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+    if ($aaptPath) {
+        $highest = 0
+        $highestName = ''
+        $probePrefix = 'stu-vc-probe-' + [Guid]::NewGuid().ToString('N')
+        $probeIndex = 0
+        foreach ($known in Get-ChildItem -LiteralPath (Join-Path $taskRoot 'release') -Filter '*.apk' -ErrorAction SilentlyContinue) {
+            $probeCopy = Join-Path $env:TEMP ($probePrefix + "-" + $probeIndex + '.apk')
+            $probeIndex++
+            try {
+                Copy-Item -LiteralPath $known.FullName -Destination $probeCopy -Force
+                $heading = (& $aaptPath dump badging $probeCopy 2>&1 | Select-String -Pattern '^package:' | Select-Object -First 1).Line
+                if ($heading -match "versionCode='(\d+)'") {
+                    $seen = [int]$Matches[1]
+                    if ($seen -gt $highest) { $highest = $seen; $highestName = $known.Name }
+                }
+            } catch { } finally { Remove-Item -LiteralPath $probeCopy -Force -ErrorAction SilentlyContinue }
+        }
+        if ($highest -ge [int]$taskCode) {
+            throw "版本号不能往回走：本次 versionCode=$taskCode，但 release/ 里 $highestName 已经是 $highest。先把 app/build.gradle 的 versionCode 提到 $($highest + 1) 以上。"
+        }
+        Write-Output "    versionCode $taskCode is newer than every shipped apk (highest $highest)"
+    }
+}
 if ($Variant -eq 'Release' -and -not (Test-Path -LiteralPath (Join-Path $taskRoot 'android-signing/keystore.properties'))) {
     throw 'The release signing properties are missing.'
 }
