@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <bool name="huawei_probe">true</bool>
+    <string name="live_probe_title">STU 华为通知验证</string>
+</resources>

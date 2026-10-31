@@ -42,6 +42,9 @@
         <receiver
             android:name=".liveprobe.LiveProbeDismissReceiver"
             android:exported="false" />
+        <receiver
+            android:name=".liveprobe.HuaweiLiveViewDismissReceiver"
+            android:exported="false" />
 
         <provider
             android:name="androidx.core.content.FileProvider"

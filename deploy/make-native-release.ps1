@@ -1,5 +1,5 @@
 param(
-    [ValidateSet('Haptics','Release','Liveprobe')][string]$Variant = 'Haptics',
+    [ValidateSet('Haptics','Release','Liveprobe','Huaweiprobe')][string]$Variant = 'Haptics',
     [string]$Server = '',
     [switch]$Online
 )
@@ -64,7 +64,7 @@ if (-not $env:JAVA_HOME) { $env:JAVA_HOME = [Environment]::GetEnvironmentVariabl
 $driveLetter = [char[]](70..90) | Where-Object { -not (Test-Path "$($_):\") } | Select-Object -First 1
 if (-not $driveLetter) { throw 'No free ASCII drive is available for the Android tools.' }
 $variantLower = $Variant.ToLowerInvariant()
-$suffix = switch ($Variant) { 'Haptics' { '-native.1' } 'Liveprobe' { '-liveprobe.1' } default { '' } }
+$suffix = switch ($Variant) { 'Haptics' { '-native.1' } 'Liveprobe' { '-liveprobe.1' } 'Huaweiprobe' { '-huaweiprobe.1' } default { '' } }
 $releaseDirectory = Join-Path $taskRoot 'release'
 New-Item -ItemType Directory -Path $releaseDirectory -Force | Out-Null
 $artifactPath = Join-Path $releaseDirectory "STU-assistant-$taskVersion$suffix.apk"
