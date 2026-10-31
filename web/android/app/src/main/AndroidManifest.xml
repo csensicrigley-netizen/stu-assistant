@@ -3,20 +3,11 @@
 
     <!-- 实时活动 / 上课提醒：本地进行中通知在所有机型都要这条 -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.VIBRATE" />
 
-    <!--
-      华为实况窗（HMS Live View）：在 AppGallery Connect 建应用、下载
-      agconnect-services.json 放进 app/ 目录、开通 Push Kit 的实况窗权限后，
-      再在这里补：
-        <meta-data android:name="com.huawei.hms.client.appid" android:value="你的APPID" />
-      服务端推送由 backend/app/push/huawei.py 负责；没有凭据时插件会自动降级成
-      本地实时通知，不影响装机使用。
-
-      OPPO 流体云（ColorOS 实时活动）：在 OPPO 开放平台建应用并开通 Push 与实时活动
-      权限后补相应的 provider/meta-data 占位；同样由 backend/app/push/oppo.py 推送。
-    -->
+    <!-- Public Android Live Updates only; vendor entitlements require separate approval. -->
 
     <application
         android:allowBackup="false"
@@ -43,6 +34,14 @@
             </intent-filter>
 
         </activity>
+
+        <activity
+            android:name=".liveprobe.LiveProbeActivity"
+            android:exported="false"
+            android:theme="@style/AppTheme.NoActionBar" />
+        <receiver
+            android:name=".liveprobe.LiveProbeDismissReceiver"
+            android:exported="false" />
 
         <provider
             android:name="androidx.core.content.FileProvider"
