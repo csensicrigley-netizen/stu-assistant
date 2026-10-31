@@ -43,16 +43,17 @@ public class RichTapPatternTest {
         int[] confirm = new RichTapPattern("confirm", 100).packet();
         assertEquals(56, confirm.length);
         assertEquals(3, confirm[0]);
-        assertTransient(confirm, 0, 0, 46, 50);
+        assertTransient(confirm, 0, 0, 100, 55);
         int[] reject = new RichTapPattern("reject", 100).packet();
         assertEquals(111, reject.length);
         assertEquals(3, reject[0]);
-        assertTransient(reject, 0, 0, 22, 50);
-        assertTransient(reject, 1, 60, 19, 50);
+        assertTransient(reject, 0, 0, 100, 90);
+        assertTransient(reject, 1, 60, 100, 90);
     }
 
     @Test public void vendorJsonAndPacketsAgreeOnEverySemanticOnsetGainAndSharpness() {
-        for (String kind : new String[] { "selection", "toggle", "confirm", "reject", "preview" }) {
+        for (String kind : new String[] { "selection", "toggle", "confirm", "reject", "preview", "navigation",
+            "navigate_press", "navigate_release", "utility_press", "utility_release", "destructive_press", "destructive_release" }) {
             for (int strength : new int[] { 0, 1, 25, 50, 100 }) {
                 RichTapPattern pattern = new RichTapPattern(kind, strength);
                 int[] packet = pattern.packet();
@@ -69,7 +70,7 @@ public class RichTapPatternTest {
                     assertEquals(event == 0 ? 0 : 60, fields[0]);
                     assertEquals(packet[offset + 1], fields[0]);
                     assertEquals(packet[offset + 2], fields[1]);
-                    assertEquals(50, fields[2]);
+                    assertEquals(HapticProfile.forKind(kind, strength).richTapSharpness(), fields[2]);
                     assertEquals(packet[offset + 3], fields[2]);
                     assertTrue(fields[1] >= 0 && fields[1] <= 100);
                     assertEquals(strength == 0, fields[1] == 0);
@@ -84,6 +85,46 @@ public class RichTapPatternTest {
                 new RichTapPattern(kind, 100);
                 fail("Unknown kind must not become a vendor event");
             } catch (IllegalArgumentException expected) { }
+        }
+    }
+
+    @Test public void previewRestoresTheFullGainSingleTransientWithoutLosingItsSharpness() {
+        for (int strength : new int[] { 0, 1, 25, 50, 100 }) {
+            RichTapPattern preview = new RichTapPattern("preview", strength);
+            assertEquals(strength, preview.intensity);
+            assertEquals(100, preview.frequency);
+            assertEquals(56, preview.packet().length);
+            assertTransient(preview.packet(), 0, 0, strength, 100);
+            assertEquals(1, jsonEvents(preview.json()).size());
+        }
+    }
+
+    @Test public void onlyNavigationHasTheExplicitPointEightVendorGain() {
+        for (int strength : new int[] { 0, 1, 25, 50, 100 }) {
+            RichTapPattern navigation = new RichTapPattern("navigation", strength);
+            int expected = strength == 0 ? 0 : Math.max(1, Math.round(strength * .8f));
+            assertEquals(expected, navigation.intensity);
+            assertEquals(1, jsonEvents(navigation.json()).size());
+            for (String kind : new String[] { "selection", "toggle", "confirm", "reject", "preview",
+                "navigate_press", "navigate_release", "utility_press", "utility_release", "destructive_press", "destructive_release" }) {
+                RichTapPattern full = new RichTapPattern(kind, strength);
+                assertEquals(kind, strength, full.intensity);
+                for (int[] event : jsonEvents(full.json())) assertEquals(kind, strength, event[1]);
+            }
+        }
+    }
+
+    @Test public void typedFamiliesUseDifferentSharpnessWithoutChangingTheirGlobalGain() {
+        String[] kinds = { "navigate_press", "navigate_release", "utility_press", "utility_release", "destructive_press", "destructive_release" };
+        int[] sharpness = { 40, 75, 70, 90, 100, 35 };
+        for (int i = 0; i < kinds.length; i++) {
+            RichTapPattern full = new RichTapPattern(kinds[i], 100);
+            RichTapPattern half = new RichTapPattern(kinds[i], 50);
+            assertEquals(100, full.intensity);
+            assertEquals(50, half.intensity);
+            assertEquals(sharpness[i], full.frequency);
+            assertEquals(full.frequency, half.frequency);
+            assertTransient(full.packet(), 0, 0, 100, sharpness[i]);
         }
     }
 

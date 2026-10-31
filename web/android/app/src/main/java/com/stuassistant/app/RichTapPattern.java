@@ -11,7 +11,7 @@ final class RichTapPattern {
         profile = HapticProfile.forKind(kind, strength);
         if (profile == null) throw new IllegalArgumentException("Unknown haptic kind");
         intensity = profile.richTapIntensity(0);
-        frequency = "press".equals(kind) ? 52 : "release".equals(kind) ? 100 : 50;
+        frequency = profile.richTapSharpness();
     }
 
     int[] packet() {

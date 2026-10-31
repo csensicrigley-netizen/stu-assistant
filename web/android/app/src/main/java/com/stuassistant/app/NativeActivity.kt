@@ -112,7 +112,7 @@ class NativeActivity:ComponentActivity() {
                 val reconnect=s.sources.count {it.optString("state")=="need_login"&&it.optString("source") in academicStrings(s.user?.optJSONArray("bound"))}
                 val tabs=listOf(GlassNavigationTab("today","今天"),GlassNavigationTab("week","课表"),GlassNavigationTab("items","事项",urgent),GlassNavigationTab("campus","校园"),GlassNavigationTab("me","我的",reconnect))
                 Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height((104+bottom).dp).nativeSheetBackground(sheets)) {
-                    LiquidGlassBottomBar(GlassNavigationState(current,tabs,dark,s.palette,s.hapticStrength,bottom,reduced),combined) {next->if(next!=current){feedback.play("selection",s.hapticStrength);route=next}else if(route=="import"||route=="medical"){route="week"}}
+                    LiquidGlassBottomBar(GlassNavigationState(current,tabs,dark,s.palette,s.hapticStrength,bottom,reduced),combined) {next->if(next!=current){feedback.play("navigation",s.hapticStrength);route=next}else if(route=="import"||route=="medical"){route="week"}}
                 }
             }
             if(ready) NativeUpdatePrompt(store,combined,Modifier.align(Alignment.BottomCenter).padding(start=12.dp,end=12.dp,bottom=(104+bottom).dp))

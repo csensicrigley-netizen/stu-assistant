@@ -112,7 +112,7 @@ private fun CampusModePill(store: NativeStore, s: NativeState, onConnect: () -> 
             try { store.refresh("sync") } catch (cancel: CancellationException) { throw cancel }
             catch (_: Exception) { /* The store publishes the refresh error. */ }
         }
-    }, enabled = !busy)
+    }, enabled = !busy, haptic = if (s.sample) NativeButtonHaptic.Navigation else NativeButtonHaptic.Submit)
 }
 
 @Composable
@@ -330,9 +330,9 @@ private fun CampusLife(store: NativeStore, s: NativeState, now: AcademicMoment, 
             NText("查电费、看读数、自助缴费", 17, true)
             NText("学校的水电系统只在校园网内开放。在宿舍或教学区连上校园 Wi-Fi 可直接打开；在校外，先登录 WebVPN，再从 WebVPN 门户进入。", 14, muted = true)
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                NButton("水电查询", { nativeOpenLink(context, "http://power.stu.edu.cn/") }, primary = true)
-                NButton("缴费平台", { nativeOpenLink(context, "http://192.168.48.49:8080/hpao/main") })
-                NButton("WebVPN", { nativeOpenLink(context, campusWebVpn) })
+                NButton("水电查询", { nativeOpenLink(context, "http://power.stu.edu.cn/") }, primary = true, haptic = NativeButtonHaptic.Navigation)
+                NButton("缴费平台", { nativeOpenLink(context, "http://192.168.48.49:8080/hpao/main") }, haptic = NativeButtonHaptic.Navigation)
+                NButton("WebVPN", { nativeOpenLink(context, campusWebVpn) }, haptic = NativeButtonHaptic.Navigation)
             }
             NText("两个页面都是学校的 HTTP 地址，登录时注意确认地址栏。助手只帮你打开入口，不读取账单，也不会代你付款。", 12, muted = true)
         }
@@ -416,8 +416,8 @@ private fun CampusLife(store: NativeStore, s: NativeState, now: AcademicMoment, 
             }
             listOf("39 路终点在汕头大学正门", "潮汕站可乘 181b 路", "线路会调整，出发前以公交官方信息为准").forEach { NText("• " + it, 13, muted = true) }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                NButton("车来了查实时 ↗", { nativeOpenLink(context, "https://www.chelaile.net.cn/") })
-                NButton("高德地图查实时 ↗", { nativeOpenLink(context, "https://www.amap.com/") })
+                NButton("车来了查实时 ↗", { nativeOpenLink(context, "https://www.chelaile.net.cn/") }, haptic = NativeButtonHaptic.Navigation)
+                NButton("高德地图查实时 ↗", { nativeOpenLink(context, "https://www.amap.com/") }, haptic = NativeButtonHaptic.Navigation)
             }
         }
         CampusFootnote("线路来自学校 2023 年来访交通指引（仅供参考）。助手不提供实时到站：唯一找到的实时数据源不允许第三方转用。")

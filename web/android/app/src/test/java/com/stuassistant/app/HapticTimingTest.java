@@ -47,18 +47,19 @@ public class HapticTimingTest {
     }
 
     @Test public void semanticEventsNeverUseTheLegacyReleaseQueue() {
-        for (String previous : new String[] { "press", "release", "selection", "toggle", "confirm", "reject", "preview" }) {
+        for (String previous : new String[] { "press", "release", "navigate_press", "utility_press", "destructive_press",
+            "selection", "toggle", "confirm", "reject", "preview", "navigation" }) {
             HapticTiming timing = new HapticTiming();
             timing.played(previous, 100);
-            for (String kind : new String[] { "selection", "toggle", "confirm", "reject", "preview" }) {
+            for (String kind : new String[] { "selection", "toggle", "confirm", "reject", "preview", "navigation" }) {
                 assertEquals(previous + " to " + kind, 0, timing.releaseDelay(kind, 101));
             }
         }
     }
 
     @Test public void droppedSemanticEventsDoNotMoveTheRateLimitWindow() {
-        String[] kinds = { "selection", "toggle", "confirm", "reject", "preview" };
-        int[] intervals = { 50, 60, 90, 160, 60 };
+        String[] kinds = { "selection", "toggle", "confirm", "reject", "preview", "navigation" };
+        int[] intervals = { 50, 60, 90, 160, 60, 50 };
         for (int i = 0; i < kinds.length; i++) {
             HapticTiming timing = new HapticTiming();
             timing.played(kinds[i], 1000);
@@ -74,7 +75,7 @@ public class HapticTimingTest {
     }
 
     @Test public void rejectionInterruptsLegacyButRepeatedRejectionWaits160Milliseconds() {
-        for (String previous : new String[] { "press", "release" }) {
+        for (String previous : new String[] { "press", "release", "navigate_press", "utility_press", "destructive_press" }) {
             HapticTiming timing = new HapticTiming();
             timing.played(previous, 100);
             assertFalse(timing.throttled("reject", 101));
@@ -88,8 +89,8 @@ public class HapticTimingTest {
     }
 
     @Test public void nonErrorSemanticEventsStillRespectTheLastActualLegacyOnset() {
-        String[] kinds = { "selection", "toggle", "confirm", "preview" };
-        int[] intervals = { 50, 60, 90, 60 };
+        String[] kinds = { "selection", "toggle", "confirm", "preview", "navigation" };
+        int[] intervals = { 50, 60, 90, 60, 50 };
         for (String previous : new String[] { "press", "release" }) {
             for (int i = 0; i < kinds.length; i++) {
                 HapticTiming timing = new HapticTiming();
@@ -115,7 +116,8 @@ public class HapticTimingTest {
     @Test public void rejectProtectsItsSecondPulseWithoutQueuingFollowUpEvents() {
         HapticTiming timing = new HapticTiming();
         timing.played("reject", 100);
-        for (String kind : new String[] { "selection", "toggle", "confirm", "reject", "preview", "press", "release" }) {
+        for (String kind : new String[] { "selection", "toggle", "confirm", "reject", "preview", "navigation",
+            "press", "release", "navigate_press", "utility_press", "destructive_press" }) {
             for (long now : new long[] { 101, 150, 160, 259 }) assertTrue(kind, timing.throttled(kind, now));
             assertFalse(kind, timing.throttled(kind, 260));
             assertEquals(0, timing.releaseDelay(kind, 150));
@@ -125,5 +127,41 @@ public class HapticTimingTest {
         assertFalse(timing.throttled("selection", 150));
         assertFalse(timing.throttled("press", 150));
         assertEquals(0, timing.releaseDelay("release", 150));
+    }
+
+    @Test public void typedReleasesOnlyCompleteTheirMatchingFamily() {
+        String[] presses = { "navigate_press", "utility_press", "destructive_press" };
+        String[] releases = { "navigate_release", "utility_release", "destructive_release" };
+        int[] intervals = { 80, 110, 150 };
+        for (int family = 0; family < presses.length; family++) {
+            HapticTiming timing = new HapticTiming();
+            timing.played(presses[family], 100);
+            assertFalse(timing.throttled(releases[family], 101));
+            assertEquals(intervals[family] - 1, timing.releaseDelay(releases[family], 101));
+            assertEquals(1, timing.releaseDelay(releases[family], 100 + intervals[family] - 1));
+            assertEquals(0, timing.releaseDelay(releases[family], 100 + intervals[family]));
+            assertEquals(0, timing.releaseDelay(releases[family], 1000));
+            for (int other = 0; other < releases.length; other++) if (family != other) {
+                assertTrue("Cross-family release must be dropped, not scheduled", timing.throttled(releases[other], 1000));
+                assertEquals(0, timing.releaseDelay(releases[other], 101));
+            }
+        }
+    }
+
+    @Test public void orphanedOrCancelledTypedReleasesAreDroppedWithoutInventingAPress() {
+        for (String release : new String[] { "navigate_release", "utility_release", "destructive_release" }) {
+            HapticTiming timing = new HapticTiming();
+            assertTrue(timing.throttled(release, 1000));
+            assertEquals(0, timing.releaseDelay(release, 1000));
+            timing.played("press", 100);
+            assertTrue(timing.throttled(release, 1000));
+            assertEquals(0, timing.releaseDelay(release, 101));
+            timing.played("navigation", 200);
+            assertTrue(timing.throttled(release, 1000));
+            timing.reset();
+            assertTrue(timing.throttled(release, 1000));
+        }
+        // The original loose legacy release behavior is intentionally unchanged.
+        assertFalse(new HapticTiming().throttled("release", 1000));
     }
 }
