@@ -6,14 +6,16 @@
   release\stu-assistant-server.tar.gz   upload to the server, then: sudo bash deploy/install.sh your.domain
   release\STU事项助手-<version>.apk      the Android App (the website also offers it at /download/)
 
-  -Server bakes the address into the App so students only sign in. Without it
-  the App asks for the address once.
+  -Server overrides the packaged deployment address. Without it, the checked-in
+  native configuration is used. An empty address blocks the build.
 #>
-param([string]$Server = "")
+param([string]$Server = "", [switch]$Online)
 
 $ErrorActionPreference = "Stop"
 $root = (Resolve-Path "$PSScriptRoot\..").Path
 $web = "$root\web"
+& python "$root\deploy\sync-version.py"
+if ($LASTEXITCODE -ne 0) { throw 'Version metadata is inconsistent.' }
 
 Write-Output "1/4 browser version"
 Push-Location $web
@@ -74,7 +76,7 @@ New-Item -ItemType Directory -Force "$web\dist" | Out-Null
 Write-Output ("    dist\version.json written (" + $appName + "/" + $appCode + ")")
 
 Write-Output "2/4 Android App"
-& "$web\scripts\build-android.ps1" -Server $Server
+& "$web\scripts\build-android.ps1" -Server $Server -Online:$Online
 if (-not (Test-Path "$web\dist\download\stu-assistant.apk")) { throw "APK missing from dist\download" }
 
 Write-Output "3/4 server bundle"

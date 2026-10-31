@@ -8,6 +8,10 @@ import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
 import java.util.ArrayDeque;
 import java.util.Arrays;
+import java.io.InputStream;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import org.json.JSONObject;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -21,6 +25,15 @@ public class NativePackagingInstrumentedTest {
         assertNotNull(launch);
         assertEquals("com.stuassistant.app.NativeActivity", launch.getComponent().getClassName());
         assertTrue(Arrays.asList(app.getAssets().list("")).contains("native-config.json"));
+        try (InputStream input = app.getAssets().open("native-config.json")) {
+            JSONObject config = new JSONObject(new String(input.readAllBytes(), StandardCharsets.UTF_8));
+            URI service = URI.create(config.getString("server"));
+            assertEquals("https", service.getScheme());
+            assertNotNull(service.getHost());
+            assertNull(service.getUserInfo());
+            assertNull(service.getQuery());
+            assertNull(service.getFragment());
+        }
         assertFalse(Arrays.asList(app.getAssets().list("")).contains("public"));
         ArrayDeque<String> directories = new ArrayDeque<>();
         directories.add("");

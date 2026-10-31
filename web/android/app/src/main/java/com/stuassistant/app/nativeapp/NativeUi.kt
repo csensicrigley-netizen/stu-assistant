@@ -3,6 +3,10 @@ package com.stuassistant.app.nativeapp
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
 import androidx.compose.foundation.interaction.*
 import androidx.compose.foundation.layout.*
@@ -13,7 +17,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.platform.LocalContext
@@ -34,6 +41,9 @@ import com.kyant.shapes.RoundedRectangle
 import com.stuassistant.app.NativeFeedbackSink
 import com.stuassistant.app.R
 import com.stuassistant.app.glass.*
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 data class NativeColors(val bg:Color,val surface:Color,val ink:Color,val muted:Color,val brand:Color,val danger:Color,val border:Color,val onBrand:Color=Color.White)
 val LocalNativeColors = staticCompositionLocalOf { NativeColors(Color(0xFFFFF0F1),Color(0xFFFFFCFC),Color(0xFF35212D),Color(0xFF76636D),Color(0xFF6756B9),Color(0xFFAB3A47),Color(0xFFE8DCE0)) }
@@ -116,6 +126,32 @@ enum class NativeButtonHaptic(val press:String,val release:String) {
     val commitRelease=NativePressFeedback(source,enabled,haptic)
     LiquidButton({commitRelease();onClick()},LocalNativeBackdrop.current,modifier=modifier,enabled=enabled,
         interactionSource=source,surfaceColor=surfaceColor,content=content)
+}
+
+/** Opt in only interactive cards; keep their existing size, content and surface recipe. */
+@Composable internal fun Modifier.nativeCardAction(onClick:()->Unit,enabled:Boolean=true,haptic:NativeButtonHaptic=NativeButtonHaptic.Navigation,shape:Shape=RoundedRectangle(20.dp)):Modifier {
+    val source=remember {MutableInteractionSource()}
+    val pressed by source.collectIsPressedAsState()
+    val scope=rememberCoroutineScope()
+    var tapPulse by remember {mutableStateOf(false)}
+    val pulseJob=remember {arrayOfNulls<Job>(1)}
+    val reduced=LocalLiquidGlassReducedMotion.current
+    val tint=LocalNativeColors.current.ink
+    val commitRelease=NativePressFeedback(source,enabled,haptic)
+    val scale by animateFloatAsState(if((pressed||tapPulse)&&!reduced).985f else 1f,
+        animationSpec=if(reduced)snap()else spring(dampingRatio=.85f,stiffness=900f),label="card press")
+    val highlight by animateFloatAsState(if(pressed||tapPulse)1f else 0f,
+        animationSpec=if(reduced)snap()else tween(90),label="card highlight")
+    return this.graphicsLayer {scaleX=scale;scaleY=scale}.clip(shape)
+        .drawWithContent {drawContent();if(highlight>0f)drawRect(tint.copy(alpha=.055f*highlight))}
+        .clickable(enabled=enabled,role=Role.Button,interactionSource=source,indication=null) {
+            commitRelease()
+            // Scrollable parents may batch a quick Press/Release into one frame. Keep
+            // a short visual pulse after a real click without synthesizing any haptics.
+            pulseJob[0]?.cancel();tapPulse=true
+            pulseJob[0]=scope.launch {delay(80);tapPulse=false}
+            onClick()
+        }
 }
 private data class NativeAcceptedPress(val interaction:PressInteraction.Press,val profile:NativeButtonHaptic,val strength:Int)
 
