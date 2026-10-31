@@ -1,6 +1,6 @@
 {
-  "versionName": "1.0.56",
-  "versionCode": 57,
+  "versionName": "1.0.57",
+  "versionCode": 58,
   "apk": "/download/stu-assistant.apk",
   "notes": [
     "新增华为／卓易通独立验证 APK，提供本地实况窗计时请求与 Android 通知对照",

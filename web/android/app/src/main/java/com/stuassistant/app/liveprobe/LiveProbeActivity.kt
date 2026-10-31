@@ -39,7 +39,9 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import com.stuassistant.app.R
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlin.math.ceil
 
 /** A separate local-only launcher. No account, NativeStore, WebView, or backend is used. */
@@ -108,6 +110,8 @@ class LiveProbeActivity : ComponentActivity() {
         }
         var snapshot by remember { mutableStateOf<ProbeSnapshot?>(null) }
         var huaweiSnapshot by remember { mutableStateOf<HuaweiLiveViewSnapshot?>(null) }
+        var switching by remember { mutableStateOf(false) }
+        val scope = rememberCoroutineScope()
         val environment = remember { if (huaweiMode) HuaweiProbeEnvironment.detect() else null }
         var readError by remember { mutableStateOf<String?>(null) }
         var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
@@ -161,18 +165,45 @@ class LiveProbeActivity : ComponentActivity() {
                 readError = null
                 notice = null
                 now = System.currentTimeMillis()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (error: Exception) {
                 notice = "操作失败：${error.message ?: error.javaClass.simpleName}"
             }
             refreshToken++
         }
         val startBaseline: (ProbeKind) -> Unit = { kind ->
-            perform {
-                if (huaweiMode) {
-                    huaweiSnapshot = huaweiProbe.finish()
-                    check(huaweiSnapshot?.active != true) { "华为测试尚未结束，请先结束后再试" }
+            if (!huaweiMode) {
+                perform { probe.start(kind) }
+            } else if (!switching) {
+                switching = true
+                notice = null
+                scope.launch {
+                    try {
+                        var previous = huaweiProbe.finish()
+                        huaweiSnapshot = previous
+                        var attempts = 0
+                        while (previous.active && attempts < 40) {
+                            delay(50)
+                            previous = huaweiProbe.snapshot()
+                            huaweiSnapshot = previous
+                            attempts++
+                        }
+                        if (previous.active) {
+                            notice = "华为通知尚未结束，请稍后再试"
+                            refreshToken++
+                        } else {
+                            perform { probe.start(kind) }
+                        }
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (error: Exception) {
+                        notice = "切换测试失败：${error.message ?: error.javaClass.simpleName}"
+                        refreshToken++
+                    } finally {
+                        switching = false
+                    }
                 }
-                probe.start(kind)
             }
         }
         val performHuawei: (() -> HuaweiLiveViewSnapshot) -> Unit = { action ->
@@ -181,10 +212,44 @@ class LiveProbeActivity : ComponentActivity() {
                 readError = null
                 notice = null
                 now = System.currentTimeMillis()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (error: Exception) {
                 notice = "华为实验操作失败：${error.message ?: error.javaClass.simpleName}"
             }
             refreshToken++
+        }
+        val startHuawei: () -> Unit = {
+            if (!switching) {
+                switching = true
+                notice = null
+                scope.launch {
+                    try {
+                        var previous = probe.finish()
+                        snapshot = previous
+                        var attempts = 0
+                        while (previous.active && attempts < 40) {
+                            delay(50)
+                            previous = probe.snapshot()
+                            snapshot = previous
+                            attempts++
+                        }
+                        if (previous.active) {
+                            notice = "Android 对照通知尚未结束，请稍后再试"
+                            refreshToken++
+                        } else {
+                            performHuawei { huaweiProbe.start() }
+                        }
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (error: Exception) {
+                        notice = "切换测试失败：${error.message ?: error.javaClass.simpleName}"
+                        refreshToken++
+                    } finally {
+                        switching = false
+                    }
+                }
+            }
         }
 
         CompositionLocalProvider(LocalProbeColors provides colors) {
@@ -229,23 +294,18 @@ class LiveProbeActivity : ComponentActivity() {
                     if (huaweiMode) ProbeCard {
                         ProbeText("华为本地计时实验", size = 20, bold = true)
                         ProbeText("尝试通知扩展；华为专有接口权限与宿主实况窗均未验证。", muted = true)
-                        ProbeButton("开始华为计时", "probe_huawei_start", primary = true) {
-                            performHuawei {
-                                snapshot = probe.finish()
-                                check(snapshot?.active != true) { "Android 对照通知尚未结束，请先结束后再试" }
-                                huaweiProbe.start()
-                            }
-                        }
+                        ProbeButton("开始华为计时", "probe_huawei_start", primary = true, enabled = !switching, onClick = startHuawei)
+                        if (switching) ProbeText("正在结束上一项测试…", muted = true)
                         val currentHuawei = huaweiSnapshot
                         if (currentHuawei?.active == true) {
                             val seconds = currentHuawei.endsAt?.let { ceil((it - now).coerceAtLeast(0) / 1_000.0).toLong() }
                             ProbeText(seconds?.let { "计时剩余  %d:%02d".format(it / 60, it % 60) } ?: "计时测试进行中", size = 24, bold = true)
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            ProbeButton("刷新计时", "probe_huawei_refresh", Modifier.weight(1f), enabled = currentHuawei?.active == true) {
+                            ProbeButton("刷新计时", "probe_huawei_refresh", Modifier.weight(1f), enabled = !switching && currentHuawei?.active == true) {
                                 performHuawei { huaweiProbe.refresh() }
                             }
-                            ProbeButton("结束华为测试", "probe_huawei_finish", Modifier.weight(1f), enabled = currentHuawei?.active == true) {
+                            ProbeButton("结束华为测试", "probe_huawei_finish", Modifier.weight(1f), enabled = !switching && currentHuawei?.active == true) {
                                 performHuawei { huaweiProbe.finish() }
                             }
                         }
@@ -271,10 +331,10 @@ class LiveProbeActivity : ComponentActivity() {
                             ProbeText(environment.hint, muted = true)
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            ProbeButton("进度测试", "probe_start_progress", Modifier.weight(1f), primary = true) {
+                            ProbeButton("进度测试", "probe_start_progress", Modifier.weight(1f), primary = true, enabled = !switching) {
                                 startBaseline(ProbeKind.PROGRESS)
                             }
-                            ProbeButton("3 分钟倒计时", "probe_start_countdown", Modifier.weight(1f), primary = true) {
+                            ProbeButton("3 分钟倒计时", "probe_start_countdown", Modifier.weight(1f), primary = true, enabled = !switching) {
                                 startBaseline(ProbeKind.COUNTDOWN)
                             }
                         }
@@ -294,9 +354,9 @@ class LiveProbeActivity : ComponentActivity() {
                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             ProbeButton(
                                 "推进进度", "probe_advance", Modifier.weight(1f),
-                                enabled = current?.active == true && current.kind == ProbeKind.PROGRESS,
+                                enabled = !switching && current?.active == true && current.kind == ProbeKind.PROGRESS,
                             ) { perform { probe.advance() } }
-                            ProbeButton("结束测试", "probe_finish", Modifier.weight(1f), enabled = current?.active == true) {
+                            ProbeButton("结束测试", "probe_finish", Modifier.weight(1f), enabled = !switching && current?.active == true) {
                                 perform { probe.finish() }
                             }
                         }
