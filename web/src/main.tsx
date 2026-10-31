@@ -5,6 +5,9 @@ import App from "./App";
 import { installInteractionFeedback } from "./lib/haptics";
 
 import "./styles/tokens.css";
+import "./styles/emboss.css";
+import "./styles/fan.css";
+import "./styles/landing.css";
 import "./styles/app.css";
 
 /**
