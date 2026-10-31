@@ -54,6 +54,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
@@ -82,6 +83,7 @@ import androidx.compose.ui.semantics.isTraversalGroup
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import com.kyant.backdrop.Backdrop
 import com.kyant.shapes.RoundedRectangle
 import com.stuassistant.app.glass.LiquidDialogSurface
@@ -203,7 +205,7 @@ fun NSheet(
 }
 
 @Composable
-fun NativeSheetHost(controller: NativeSheetController, backdrop: Backdrop) {
+fun NativeSheetHost(controller: NativeSheetController, backdrop: Backdrop, bottomNavigationSpace: Dp = 0.dp) {
     val entries = controller.entries.filterIsInstance<NativeSheetEntry>()
     val top = entries.lastOrNull()
     val latestTop by rememberUpdatedState(top)
@@ -233,13 +235,13 @@ fun NativeSheetHost(controller: NativeSheetController, backdrop: Backdrop) {
 
     // Keep underlying content composed: it may itself register the next NSheet in the stack.
     entries.forEach { entry ->
-        key(entry) { NativeSheetLayer(entry, entry === top && entry.requested, backdrop,
+        key(entry) { NativeSheetLayer(entry, entry === top && entry.requested, backdrop, bottomNavigationSpace,
             { controller.requestDismiss(entry) }, { controller.finishRemoval(entry) }) }
     }
 }
 
 @Composable
-private fun NativeSheetLayer(entry: NativeSheetEntry, active: Boolean, backdrop: Backdrop, requestDismiss: () -> Unit, onHidden: () -> Unit) {
+private fun NativeSheetLayer(entry: NativeSheetEntry, active: Boolean, backdrop: Backdrop, bottomNavigationSpace: Dp, requestDismiss: () -> Unit, onHidden: () -> Unit) {
     val colors = LocalNativeColors.current
     val focusManager = LocalFocusManager.current
     val scope = rememberCoroutineScope()
@@ -298,7 +300,9 @@ private fun NativeSheetLayer(entry: NativeSheetEntry, active: Boolean, backdrop:
         transitionSpec = { if (reducedMotion) snap() else tween(200) }, label = "sheet scrim",
     ) { if (it == EnterExitState.Visible) 1f else 0f }
     BoxWithConstraints(
-        Modifier.fillMaxSize().then(if (active) Modifier else Modifier.clearAndSetSemantics {}.blockSheetPointers()),
+        Modifier.fillMaxSize().padding(bottom = bottomNavigationSpace)
+            .then(if (bottomNavigationSpace > 0.dp) Modifier.clipToBounds() else Modifier)
+            .then(if (active) Modifier else Modifier.clearAndSetSemantics {}.blockSheetPointers()),
     ) {
         Box(
             Modifier.fillMaxSize()
@@ -320,7 +324,8 @@ private fun NativeSheetLayer(entry: NativeSheetEntry, active: Boolean, backdrop:
                     // Include safe-area/IME padding in the layer's own-height exit distance.
                     // Motion's lower elastic bound is .6; thresholds use raw pointer distance.
                     .graphicsLayer { translationY = (1f - panelProgress) * size.height + dragDistance * .6f }
-                    .navigationBarsPadding().imePadding()
+                    // The reserved bar space already includes the system safe area.
+                    .then(if (bottomNavigationSpace > 0.dp) Modifier else Modifier.navigationBarsPadding()).imePadding()
                     .widthIn(max = 600.dp).fillMaxWidth().heightIn(max = maxHeight * .88f)
                     .focusProperties {
                         onEnter = { if (!active) cancelFocusChange() }
