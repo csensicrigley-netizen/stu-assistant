@@ -83,6 +83,8 @@ class NativeActivity:ComponentActivity() {
     val density=LocalDensity.current
     val bottom=with(density){WindowInsets.navigationBars.getBottom(this).toDp().value}
     val ime=WindowInsets.ime.getBottom(density)>0
+    val showBottomNavigation=ready&&!needsWelcome&&!connect&&!ime
+    val bottomNavigationSpace=if(showBottomNavigation)(104+bottom).dp else 0.dp
     val scope=rememberCoroutineScope()
     LaunchedEffect(s.hapticStrength) {if(s.hapticStrength==0)feedback.cancel()}
     BackHandler {activity.moveTaskToBack(true)}
@@ -106,17 +108,25 @@ class NativeActivity:ComponentActivity() {
                     }
                 }
             }
-            if(ready&&!needsWelcome&&!connect&&!ime&&sheets.entries.isEmpty()) {
+            if(ready) NativeUpdatePrompt(store,combined,Modifier.align(Alignment.BottomCenter).padding(start=12.dp,end=12.dp,bottom=(104+bottom).dp))
+            NativeSheetHost(sheets,combined,bottomNavigationSpace)
+            // Keep the same glass bar mounted above the modal scrim. Sheets reserve
+            // its space; nativeSheetBackground still prevents modal click-through.
+            if(showBottomNavigation) {
                 val current=if(route=="import"||route=="medical")"week"else route.substringBefore(':')
                 val urgent=s.tasks.map(AcademicRecords::task).count {it.id !in s.done&&AcademicRecords.bucket(it) in listOf("today","overdue")}
                 val reconnect=s.sources.count {it.optString("state")=="need_login"&&it.optString("source") in academicStrings(s.user?.optJSONArray("bound"))}
                 val tabs=listOf(GlassNavigationTab("today","今天"),GlassNavigationTab("week","课表"),GlassNavigationTab("items","事项",urgent),GlassNavigationTab("campus","校园"),GlassNavigationTab("me","我的",reconnect))
                 Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height((104+bottom).dp).nativeSheetBackground(sheets)) {
-                    LiquidGlassBottomBar(GlassNavigationState(current,tabs,dark,s.palette,s.hapticStrength,bottom,reduced),combined) {next->if(next!=current){feedback.play("navigation",s.hapticStrength);route=next}else if(route=="import"||route=="medical"){route="week"}}
+                    LiquidGlassBottomBar(GlassNavigationState(current,tabs,dark,s.palette,s.hapticStrength,bottom,reduced),combined) {next->
+                        // Also reject a selection queued before the sheet opened.
+                        if(sheets.entries.isEmpty()) {
+                            if(next!=current){feedback.play("navigation",s.hapticStrength);route=next}
+                            else if(route=="import"||route=="medical"){route="week"}
+                        }
+                    }
                 }
             }
-            if(ready) NativeUpdatePrompt(store,combined,Modifier.align(Alignment.BottomCenter).padding(start=12.dp,end=12.dp,bottom=(104+bottom).dp))
-            NativeSheetHost(sheets,combined)
         }
     }
 }
