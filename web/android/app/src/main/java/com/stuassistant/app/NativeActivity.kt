@@ -84,7 +84,6 @@ class NativeActivity:ComponentActivity() {
     val bottom=with(density){WindowInsets.navigationBars.getBottom(this).toDp().value}
     val ime=WindowInsets.ime.getBottom(density)>0
     val showBottomNavigation=ready&&!needsWelcome&&!connect&&!ime
-    val bottomNavigationSpace=if(showBottomNavigation)(104+bottom).dp else 0.dp
     val scope=rememberCoroutineScope()
     LaunchedEffect(s.hapticStrength) {if(s.hapticStrength==0)feedback.cancel()}
     BackHandler {activity.moveTaskToBack(true)}
@@ -108,10 +107,8 @@ class NativeActivity:ComponentActivity() {
                     }
                 }
             }
-            if(ready) NativeUpdatePrompt(store,combined,Modifier.align(Alignment.BottomCenter).padding(start=12.dp,end=12.dp,bottom=(104+bottom).dp))
-            NativeSheetHost(sheets,combined,bottomNavigationSpace)
-            // Keep the same glass bar mounted above the modal scrim. Sheets reserve
-            // its space; nativeSheetBackground still prevents modal click-through.
+            // Keep the same bar mounted behind the full-screen modal. A sheet
+            // covers it normally without owning its visibility or lifetime.
             if(showBottomNavigation) {
                 val current=if(route=="import"||route=="medical")"week"else route.substringBefore(':')
                 val urgent=s.tasks.map(AcademicRecords::task).count {it.id !in s.done&&AcademicRecords.bucket(it) in listOf("today","overdue")}
@@ -127,6 +124,8 @@ class NativeActivity:ComponentActivity() {
                     }
                 }
             }
+            if(ready) NativeUpdatePrompt(store,combined,Modifier.align(Alignment.BottomCenter).padding(start=12.dp,end=12.dp,bottom=(104+bottom).dp))
+            NativeSheetHost(sheets,combined)
         }
     }
 }
