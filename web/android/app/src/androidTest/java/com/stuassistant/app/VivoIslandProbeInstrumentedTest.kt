@@ -159,9 +159,10 @@ class VivoIslandProbeInstrumentedTest {
     @Test fun rawInventoryKeepsAReceivedNotificationWhoseSessionMarkerWasRemoved() {
         probe.start(VivoProbeMode.SUPERX_NAVIGATION)
         val initial = awaitMode(VivoProbeMode.SUPERX_NAVIGATION)
-        val stripped = Notification.Builder.recoverBuilder(context, initial.notification)
-            .setExtras(Bundle(initial.notification.extras).apply { remove(VivoIslandProbe.EXTRA_SESSION) })
-            .build()
+        val stripped = initial.notification.clone().apply {
+            extras = Bundle(extras).apply { remove(VivoIslandProbe.EXTRA_SESSION) }
+        }
+        assertFalse("The stripping fixture must remove the session before posting", stripped.extras.containsKey(VivoIslandProbe.EXTRA_SESSION))
         manager.notify(VivoIslandProbe.SUPERX_TAG, VivoIslandProbe.NOTIFICATION_ID, stripped)
         awaitCondition("Raw inventory failed to expose a session-stripped notification") {
             val state = probe.snapshot()
@@ -191,9 +192,10 @@ class VivoIslandProbeInstrumentedTest {
         try {
             probe.start(VivoProbeMode.SUPERX_NAVIGATION)
             val initial = awaitMode(VivoProbeMode.SUPERX_NAVIGATION)
-            val stripped = Notification.Builder.recoverBuilder(context, initial.notification)
-                .setExtras(Bundle(initial.notification.extras).apply { remove(VivoIslandProbe.EXTRA_SESSION) })
-                .build()
+            val stripped = initial.notification.clone().apply {
+                extras = Bundle(extras).apply { remove(VivoIslandProbe.EXTRA_SESSION) }
+            }
+            assertFalse("The retagging fixture must remove the session before posting", stripped.extras.containsKey(VivoIslandProbe.EXTRA_SESSION))
             manager.cancel(VivoIslandProbe.SUPERX_TAG, VivoIslandProbe.NOTIFICATION_ID)
             manager.notify(rewrittenTag, VivoIslandProbe.NOTIFICATION_ID, stripped)
             manager.notify(otherTag, otherId, Notification.Builder(context, VivoIslandProbe.CHANNEL_ID)
