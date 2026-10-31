@@ -8,6 +8,13 @@ $taskRoot = (Resolve-Path "$PSScriptRoot/..").Path
 $androidRoot = Join-Path $taskRoot 'web/android'
 $configPath = Join-Path $androidRoot 'app/src/main/assets/native-config.json'
 $savedConfig = [IO.File]::ReadAllBytes($configPath)
+$taskSource = git -C $taskRoot rev-parse HEAD
+if ($LASTEXITCODE -ne 0) { throw 'Source commit is unavailable.' }
+$sourceChanges = git -C $taskRoot status --porcelain
+if ($LASTEXITCODE -ne 0) { throw 'Cannot verify the source working tree.' }
+if ($sourceChanges) { throw 'Commit the source changes before creating a delivery APK. Use Gradle directly for development builds.' }
+& python (Join-Path $taskRoot 'deploy/sync-version.py')
+if ($LASTEXITCODE -ne 0) { throw 'Version metadata is inconsistent.' }
 $taskBuild = [IO.File]::ReadAllText((Join-Path $androidRoot 'app/build.gradle'))
 $taskVersion = [regex]::Match($taskBuild, 'versionName\s+"([^"]+)"').Groups[1].Value
 $taskCode = [regex]::Match($taskBuild, 'versionCode\s+(\d+)').Groups[1].Value
@@ -15,9 +22,12 @@ if (-not $taskVersion -or -not $taskCode) { throw 'Native version was not found 
 if ($Variant -eq 'Release' -and -not (Test-Path -LiteralPath (Join-Path $taskRoot 'android-signing/keystore.properties'))) {
     throw 'The release signing properties are missing.'
 }
-if ($Server) {
-    $taskUri = [Uri]$Server
-    if (-not $taskUri.IsAbsoluteUri -or $taskUri.Scheme -ne 'https' -or $taskUri.UserInfo -or $taskUri.Query -or $taskUri.Fragment) { throw 'Server must be an HTTPS base URL without user info, query or fragment.' }
+$effectiveServer = if ($Server) { $Server.Trim().TrimEnd('/') } else { ([Text.Encoding]::UTF8.GetString($savedConfig) | ConvertFrom-Json).server }
+$taskUri = $null
+if (-not $effectiveServer -or -not [Uri]::TryCreate($effectiveServer, [UriKind]::Absolute, [ref]$taskUri) -or
+    $taskUri.Scheme -ne 'https' -or -not $taskUri.Host -or $taskUri.UserInfo -or $taskUri.Query -or $taskUri.Fragment -or
+    $effectiveServer -match '[?#]' -or $effectiveServer -ne $effectiveServer.Trim() -or $effectiveServer.EndsWith('/')) {
+    throw 'Configure an HTTPS backend base URL before packaging; users cannot supply one in the app.'
 }
 if (-not $env:JAVA_HOME) { $env:JAVA_HOME = [Environment]::GetEnvironmentVariable('JAVA_HOME','User') }
 $driveLetter = [char[]](70..90) | Where-Object { -not (Test-Path "$($_):\") } | Select-Object -First 1
@@ -31,7 +41,11 @@ $logPath = Join-Path $releaseDirectory "native-$taskVersion-build.log"
 subst "$($driveLetter):" "$taskRoot"
 if ($LASTEXITCODE -ne 0) { throw 'subst failed' }
 try {
-    if ($Server) { [IO.File]::WriteAllText($configPath, (@{server=$Server.TrimEnd('/')} | ConvertTo-Json -Compress), [Text.UTF8Encoding]::new($false)) }
+    if ($Server) {
+        $deploymentConfig = [Text.Encoding]::UTF8.GetString($savedConfig) | ConvertFrom-Json
+        $deploymentConfig.server = $effectiveServer
+        [IO.File]::WriteAllText($configPath, ($deploymentConfig | ConvertTo-Json -Compress), [Text.UTF8Encoding]::new($false))
+    }
     Push-Location "$($driveLetter):\web\android"
     try {
         [string[]]$networkArgs = if ($Online) { @() } else { @('--offline') }
@@ -39,17 +53,28 @@ try {
         if ($LASTEXITCODE -ne 0) { Get-Content -LiteralPath $logPath -Tail 35; throw 'Native APK build failed' }
     } finally { Pop-Location }
     $builtApk = Join-Path $androidRoot "app/build/outputs/apk/$variantLower/app-$variantLower.apk"
-    Copy-Item -LiteralPath $builtApk -Destination $artifactPath
     Add-Type -AssemblyName System.IO.Compression.FileSystem
-    $archive = [IO.Compression.ZipFile]::OpenRead($artifactPath)
+    $archive = [IO.Compression.ZipFile]::OpenRead($builtApk)
     try {
         if ($archive.Entries.FullName | Where-Object { $_ -like 'assets/public/*' -or $_ -like 'assets/*.js' }) { throw 'A web UI bundle unexpectedly entered the native APK' }
         $packagedConfig = $archive.GetEntry('assets/native-config.json')
         if (-not $packagedConfig) { throw 'Native configuration is missing from the APK' }
+        $configReader = [IO.StreamReader]::new($packagedConfig.Open(), [Text.Encoding]::UTF8)
+        try { $packagedServer = ($configReader.ReadToEnd() | ConvertFrom-Json).server } finally { $configReader.Dispose() }
+        if ($packagedServer -cne $effectiveServer) { throw 'Packaged backend differs from the intended deployment configuration.' }
     } finally { $archive.Dispose() }
-    $hash = (Get-FileHash -LiteralPath $artifactPath -Algorithm SHA256).Hash
-    $receipt = @{versionName="$taskVersion$suffix";versionCode=[int]$taskCode;variant=$Variant;apk=(Split-Path $artifactPath -Leaf);bytes=(Get-Item -LiteralPath $artifactPath).Length;sha256=$hash;builtAt=[DateTime]::UtcNow.ToString('o');source=(git -C $taskRoot rev-parse HEAD);webBundleIncluded=$false}
-    [IO.File]::WriteAllText("$artifactPath.json",($receipt | ConvertTo-Json),[Text.UTF8Encoding]::new($false))
+    $configHash = (Get-FileHash -LiteralPath $configPath -Algorithm SHA256).Hash
+    [IO.File]::WriteAllBytes($configPath,$savedConfig)
+    $sourceAfterBuild = git -C $taskRoot rev-parse HEAD
+    if ($LASTEXITCODE -ne 0 -or $sourceAfterBuild -ne $taskSource) { throw 'Source commit changed during the build.' }
+    $changesAfterBuild = git -C $taskRoot status --porcelain
+    if ($LASTEXITCODE -ne 0 -or $changesAfterBuild) { throw 'Source changed during the build; commit and rebuild before delivery.' }
+    $hash = (Get-FileHash -LiteralPath $builtApk -Algorithm SHA256).Hash
+    $receipt = @{versionName="$taskVersion$suffix";versionCode=[int]$taskCode;variant=$Variant;apk=(Split-Path $artifactPath -Leaf);bytes=(Get-Item -LiteralPath $builtApk).Length;sha256=$hash;builtAt=[DateTime]::UtcNow.ToString('o');source=$taskSource;sourceClean=$true;server=$packagedServer;nativeConfigSha256=$configHash;webBundleIncluded=$false}
+    # Failed validation must leave any earlier delivery APK and its receipt intact.
+    [IO.File]::WriteAllText("$artifactPath.json.tmp",($receipt | ConvertTo-Json),[Text.UTF8Encoding]::new($false))
+    Copy-Item -LiteralPath $builtApk -Destination $artifactPath
+    Move-Item -LiteralPath "$artifactPath.json.tmp" -Destination "$artifactPath.json" -Force
     Write-Output "$artifactPath`nSHA256 $hash"
 } finally {
     [IO.File]::WriteAllBytes($configPath,$savedConfig)

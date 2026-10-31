@@ -1,0 +1,31 @@
+// Run before every build, including direct Android Studio / Gradle invocations.
+// A missing deployment address is a build error, never an onboarding task.
+def nativeConfigFile = file('src/main/assets/native-config.json')
+def webVersionFile = rootProject.file('../src/lib/version.ts')
+def versionMetadataFile = rootProject.file('../../backend/app/latest_version.json')
+
+tasks.register('validateNativeConfiguration') {
+    inputs.files(nativeConfigFile, webVersionFile, versionMetadataFile, file('build.gradle'))
+    doLast {
+        def config = new groovy.json.JsonSlurper().parse(nativeConfigFile, 'UTF-8')
+        def value = config.server
+        URI server = null
+        try { if (value instanceof String) server = new URI(value) } catch (Exception ignored) { }
+        if (!server || server.scheme != 'https' || !server.host || server.rawUserInfo ||
+                server.rawQuery != null || server.rawFragment != null || server.port == 0 ||
+                server.port > 65535 || value != value.trim() || value.endsWith('/')) {
+            throw new GradleException('Configure a nonempty HTTPS backend base URL in assets/native-config.json (no credentials, query, fragment, or trailing slash).')
+        }
+        def web = webVersionFile.getText('UTF-8')
+        def webName = web =~ /APP_VERSION_NAME\s*=\s*"([^"]+)"/
+        def webCode = web =~ /APP_VERSION_CODE\s*=\s*(\d+)/
+        def metadata = new groovy.json.JsonSlurper().parse(versionMetadataFile, 'UTF-8')
+        def name = android.defaultConfig.versionName
+        def code = android.defaultConfig.versionCode
+        if (!webName.find() || !webCode.find() || webName.group(1) != name ||
+                webCode.group(1).toInteger() != code || metadata.versionName != name || metadata.versionCode != code) {
+            throw new GradleException('Version numbers differ; run python deploy/sync-version.py --write')
+        }
+    }
+}
+tasks.named('preBuild').configure { dependsOn('validateNativeConfiguration') }

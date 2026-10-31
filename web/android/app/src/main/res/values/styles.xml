@@ -12,7 +12,7 @@
         <item name="colorAccent">@color/accent</item>
     </style>
 
-    <style name="AppTheme.NoActionBar" parent="Theme.AppCompat.DayNight.NoActionBar">
+    <style name="AppTheme.NativeBase" parent="Theme.AppCompat.DayNight.NoActionBar">
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
         <item name="android:windowBackground">@color/paper</item>
@@ -32,9 +32,9 @@
         <item name="android:navigationBarColor">@color/paper</item>
         <!-- 浅纸配深图标；MainActivity 会按系统深浅色在运行时覆盖 -->
         <item name="android:windowLightStatusBar">true</item>
-        <item name="android:windowLightNavigationBar">true</item>
-        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
     </style>
+
+    <style name="AppTheme.NoActionBar" parent="AppTheme.NativeBase" />
 
     <!-- Launch: Android 12+ draws the system splash from these attributes;
          older versions show @drawable/splash as the window background. -->

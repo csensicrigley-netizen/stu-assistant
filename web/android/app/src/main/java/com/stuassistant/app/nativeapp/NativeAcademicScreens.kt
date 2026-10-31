@@ -214,9 +214,8 @@ private fun academicTones(): AcademicTones {
 private fun AcademicCta(title: String, subtitle: String, icon: String, onClick: () -> Unit) {
     val c = LocalNativeColors.current
     val tones = academicTones()
-    val source = remember { MutableInteractionSource() }
-    Row(Modifier.fillMaxWidth().heightIn(min = 68.dp).clip(RoundedCornerShape(20.dp)).background(tones.soft)
-        .clickable(role = Role.Button, interactionSource = source, indication = null, onClick = onClick).padding(horizontal = 16.dp, vertical = 12.dp),
+    Row(Modifier.fillMaxWidth().heightIn(min = 68.dp).nativeCardAction(onClick)
+        .background(tones.soft).padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Box(Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(c.brand), contentAlignment = Alignment.Center) { AcademicIcon(icon, if (c.bg.luminance() < .2f) c.bg else Color.White) }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) { AcademicText(title, c.ink, 15, bold = true); AcademicText(subtitle, tones.softInk, 13) }
@@ -239,9 +238,9 @@ private fun AcademicDuePreview(task: AcademicTask, now: Long) {
 @Composable
 private fun AcademicNoticePreview(notice: AcademicNotice) {
     val c = LocalNativeColors.current; val context = LocalContext.current
-    val source = remember { MutableInteractionSource() }
-    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(c.surface).border(1.dp, c.border, RoundedCornerShape(14.dp))
-        .then(notice.url?.let { url -> Modifier.clickable(role = Role.Button, interactionSource = source, indication = null) { nativeOpenLink(context, url) } } ?: Modifier)
+    Row(Modifier.fillMaxWidth()
+        .then(notice.url?.let { url -> Modifier.nativeCardAction({nativeOpenLink(context,url)},shape=RoundedCornerShape(14.dp)) } ?: Modifier)
+        .clip(RoundedCornerShape(14.dp)).background(c.surface).border(1.dp, c.border, RoundedCornerShape(14.dp))
         .padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             AcademicText(notice.title, c.ink, 15, bold = true, maxLines = 2)
@@ -415,7 +414,6 @@ fun NativeTodayScreen(store: NativeStore, s: NativeState, onNavigate: (String) -
 @Composable
 private fun AcademicNowCard(current: AcademicBlock?, upcoming: AcademicBlock?, later: AcademicNextClass?, blocks: List<AcademicBlock>, minute: Int, status: AcademicDayStatus, onOpen: (AcademicBlock) -> Unit) {
     val colors = LocalNativeColors.current
-    val interaction = remember { MutableInteractionSource() }
     if (status.kind == "closed") { NCard { NText("▣ 停课", 13, true); NText(status.label, 20, true); NText("按教务处校历，今天没有课。", 14, muted = true) }; return }
     val block = current ?: upcoming
     if (block == null) {
@@ -433,7 +431,7 @@ private fun AcademicNowCard(current: AcademicBlock?, upcoming: AcademicBlock?, l
     val mark = recipe.mark
     val previous = blocks.getOrNull(blocks.indexOf(block) - 1)
     val moved = previous != null && previous.location.isNotEmpty() && block.location.isNotEmpty() && previous.location != block.location && block.startMin - previous.endMin <= 30
-    Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(28.dp)).background(Brush.radialGradient(listOf(tint, colors.surface), center = Offset(1000f, 0f), radius = 1100f)).border(1.dp, mark.copy(alpha = .25f), RoundedCornerShape(28.dp)).clickable(role = Role.Button, interactionSource = interaction, indication = null) { onOpen(block) }) {
+    Box(Modifier.fillMaxWidth().nativeCardAction({onOpen(block)},shape=RoundedCornerShape(28.dp)).background(Brush.radialGradient(listOf(tint, colors.surface), center = Offset(1000f, 0f), radius = 1100f)).border(1.dp, mark.copy(alpha = .25f), RoundedCornerShape(28.dp))) {
         AcademicHeroDecoration(mark, Modifier.matchParentSize())
         Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             NText(if (current != null) "● 正在上课 · 还剩 ${AcademicClock.span(block.endMin - minute)}" else "● 下一节 · ${if (block.startMin <= minute) "马上开始" else "还有 ${AcademicClock.span(block.startMin - minute)}"}", 13, true)
@@ -517,9 +515,8 @@ private fun AcademicAgenda(blocks: List<AcademicBlock>, minute: Int, compact: Bo
 private fun AcademicLesson(block: AcademicBlock, onOpen: (AcademicBlock) -> Unit, status: String = "", compact: Boolean = false) {
     val c = LocalNativeColors.current
     val mark = academicCourseColor(block.course.hue)
-    val interaction = remember { MutableInteractionSource() }
     if (compact) {
-        Row(Modifier.fillMaxWidth().clickable(role = Role.Button, interactionSource = interaction, indication = null) { onOpen(block) }, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(Modifier.fillMaxWidth().nativeCardAction({onOpen(block)},shape=RoundedCornerShape(14.dp)), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Column(Modifier.width(52.dp).padding(top = 13.dp)) { AcademicText(block.start, if (status == "past") c.muted else c.ink, 14, bold = true); NText(block.end, 12, muted = true) }
             val recipe = academicCourseColors(block.course.hue)
             Box(Modifier.weight(1f).clip(RoundedCornerShape(14.dp)).background(if (status == "live") recipe.soft else c.surface).border(1.dp, if (status == "live") recipe.mid.copy(alpha = .6f) else c.border, RoundedCornerShape(14.dp))) {
@@ -533,7 +530,7 @@ private fun AcademicLesson(block: AcademicBlock, onOpen: (AcademicBlock) -> Unit
         }
         return
     }
-    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(c.surface).border(1.dp, if (status == "live") mark.copy(alpha = .5f) else c.border, RoundedCornerShape(14.dp)).clickable(role = Role.Button, interactionSource = interaction, indication = null) { onOpen(block) }.padding(vertical = 12.dp, horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+    Row(Modifier.fillMaxWidth().nativeCardAction({onOpen(block)},shape=RoundedCornerShape(14.dp)).background(c.surface).border(1.dp, if (status == "live") mark.copy(alpha = .5f) else c.border, RoundedCornerShape(14.dp)).padding(vertical = 12.dp, horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Box(Modifier.width(4.dp).height(48.dp).clip(RoundedCornerShape(3.dp)).background(mark.copy(alpha = if (status == "past") .4f else 1f)))
         Column(Modifier.width(52.dp)) { NText(block.start, 15, true); NText(block.end, 12, muted = true) }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
