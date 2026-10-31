@@ -36,8 +36,8 @@ android {
         applicationId "com.stuassistant.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 60
-        versionName "1.0.59"
+        versionCode 61
+        versionName "1.0.60"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -89,6 +89,24 @@ android {
             versionNameSuffix '-vivoprobe.1'
             matchingFallbacks = ['release']
         }
+        vivoidentity {
+            initWith liveprobe
+            applicationIdSuffix '.vivoprobe'
+            versionNameSuffix '-vivoidentity.1'
+            matchingFallbacks = ['release']
+        }
+        vivomap {
+            initWith vivoidentity
+            matchingFallbacks = ['release']
+        }
+    }
+}
+
+// Personal sideload experiment. The UI stays clearly branded as an STU probe.
+// Do not alter production identity, namespace, certificate, or vendor scene lists.
+androidComponents {
+    onVariants(selector().withBuildType('vivomap')) { variant ->
+        variant.applicationId.set('com.autonavi.minimap')
     }
 }
 

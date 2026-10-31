@@ -19,7 +19,7 @@ import com.stuassistant.app.R
 import org.json.JSONArray
 import java.util.UUID
 
-enum class VivoProbeMode { CONTROL, STANDARD_PLAIN, STANDARD_COLORIZED, SUPERX, SUPERX_HYBRID }
+enum class VivoProbeMode { CONTROL, STANDARD_PLAIN, STANDARD_COLORIZED, SUPERX, SUPERX_HYBRID, SUPERX_NAVIGATION }
 
 data class VivoProbeSnapshot(
     val active: Boolean,
@@ -28,6 +28,7 @@ data class VivoProbeSnapshot(
     val startedAt: Long?,
     val expiresAt: Long?,
     val current: StatusBarNotification?,
+    val rawActive: List<StatusBarNotification>,
     val lastError: String?,
     val lastAction: String,
     val observations: Map<VivoProbeMode, String>,
@@ -47,17 +48,20 @@ class VivoIslandProbe(context: Context) {
     fun snapshot(): VivoProbeSnapshot = synchronized(LOCK) {
         var readError: String? = null
         val session = prefs.getString("session", null)
-        val current = try {
-            manager?.activeNotifications?.firstOrNull {
-                it.id == NOTIFICATION_ID && it.tag == notificationTag(savedMode()) && session != null &&
-                    it.notification.extras.getString(EXTRA_SESSION) == session
-            }
+        val rawActive = try {
+            manager?.activeNotifications?.filter {
+                it.packageName == app.packageName && it.user == android.os.Process.myUserHandle()
+            }.orEmpty()
         } catch (error: RuntimeException) {
             readError = describe("活动通知读取失败", error)
-            null
+            emptyList()
         } catch (error: LinkageError) {
             readError = describe("活动通知接口不可用", error)
-            null
+            emptyList()
+        }
+        val current = rawActive.firstOrNull {
+            it.id == NOTIFICATION_ID && it.tag == notificationTag(savedMode()) && session != null &&
+                it.notification.extras.getString(EXTRA_SESSION) == session
         }
         if (current != null && current.notification.extras.getString(EXTRA_SESSION) == session) {
             if (prefs.getLong("firstObservedAt", 0L) == 0L) {
@@ -79,6 +83,7 @@ class VivoIslandProbe(context: Context) {
             startedAt = prefs.getLong("startedAt", 0L).takeIf { it > 0L },
             expiresAt = prefs.getLong("expiresAt", 0L).takeIf { it > 0L },
             current = current,
+            rawActive = rawActive,
             lastError = readError ?: prefs.getString("lastError", null),
             lastAction = prefs.getString("lastAction", "尚未开始") ?: "尚未开始",
             observations = VivoProbeMode.entries.associateWith { prefs.getString("observation_${it.name}", "未记录") ?: "未记录" },
@@ -100,8 +105,10 @@ class VivoIslandProbe(context: Context) {
             .putInt("progress", 0).putLong("startedAt", now).putLong("startedElapsed", SystemClock.elapsedRealtime())
             .putLong("expiresAt", now + TIMEOUT_MS).putLong("firstObservedAt", 0L).putLong("lastObservedAt", 0L)
             .putBoolean("stopped", false).remove("lastError").remove("lastBuiltEligible")
+            .remove("lastBuiltRequest").remove("built_${mode.name}")
             .remove("observation_${mode.name}").remove("readback_${mode.name}")
             .putString("lastAction", "手动开始 ${mode.name}").apply()
+        if (mode == VivoProbeMode.SUPERX_NAVIGATION) prefs.edit().remove("beforePostSceneStatus").apply()
         appendHistory("开始 ${mode.name}; expiresAt=${now + TIMEOUT_MS}")
         publish(mode)
         snapshot()
@@ -149,12 +156,22 @@ class VivoIslandProbe(context: Context) {
             appendLine("startedAt=${s.startedAt}; expiresAt=${s.expiresAt}; stopped=${prefs.getBoolean("stopped", true)}")
             appendLine("startedElapsed=${prefs.getLong("startedElapsed", 0L)}; firstObservedAt=${prefs.getLong("firstObservedAt", 0L)}; lastObservedAt=${prefs.getLong("lastObservedAt", 0L)}")
             appendLine("lastBuiltEligible=${if (prefs.contains("lastBuiltEligible")) prefs.getBoolean("lastBuiltEligible", false) else null}")
+            appendLine("lastBuiltRequest=${prefs.getString("lastBuiltRequest", "尚未构造")}")
+            appendLine("beforePostSceneStatus=${prefs.getString("beforePostSceneStatus", "尚未采集纯NAV首次发布前状态")}")
+            appendLine(channelDiagnostics())
             appendLine("observedSessionMatches=${s.current?.notification?.extras?.getString(EXTRA_SESSION)?.let { it == prefs.getString("session", null) }}")
+            appendLine("rawActiveCount=${s.rawActive.size}; strictActive=${s.active}")
+            s.rawActive.forEachIndexed { index, raw ->
+                val extras = raw.notification.extras
+                appendLine("raw[$index]: id=${raw.id}; tag=${raw.tag}; postTime=${raw.postTime}; channel=${if (Build.VERSION.SDK_INT >= 26) raw.notification.channelId else "unsupported"}; sessionPresent=${extras.containsKey(EXTRA_SESSION)}; sessionMatch=${extras.getString(EXTRA_SESSION)?.let { it == prefs.getString("session", null) }}; mode=${extras.getString(EXTRA_MODE)}; modeMatch=${extras.getString(EXTRA_MODE)?.let { it == s.mode?.name }}; scene=${extras.getString("notification.superx.scene")}; operation=${if (extras.containsKey(VivoSuperXPayload.OPERATION)) extras.getInt(VivoSuperXPayload.OPERATION) else null}; style=${extras.getString(Notification.EXTRA_TEMPLATE)}; requestPromoted=${extras.getBoolean(LiveUpdateProbe.REQUEST_PROMOTED_EXTRA, false)}; colorized=${extras.getBoolean(Notification.EXTRA_COLORIZED, false)}; flags=${raw.notification.flags}")
+            }
             appendLine("lastAction=${s.lastAction}; lastError=${s.lastError ?: "无"}")
             appendLine("每模式人工观察（带记录时刻，不代表最新会话）：")
             s.observations.forEach { (mode, result) -> appendLine("${mode.name}=$result") }
             appendLine("每模式最近一次系统通知读回（可能属于较早会话）：")
             VivoProbeMode.entries.forEach { appendLine("${it.name}=${prefs.getString("readback_${it.name}", "未读到")}") }
+            appendLine("每模式最近构造请求（notify调用前保存，不代表系统接收）：")
+            VivoProbeMode.entries.forEach { appendLine("${it.name}=${prefs.getString("built_${it.name}", "尚未构造")}") }
             appendLine("最近操作历史（epoch ms / elapsed ms）：")
             s.history.forEach { appendLine(it) }
         }
@@ -176,10 +193,21 @@ class VivoIslandProbe(context: Context) {
                 appendHistory("notify未调用：通知权限/通道未开启")
                 return
             }
+            if (mode == VivoProbeMode.SUPERX_NAVIGATION && !prefs.contains("beforePostSceneStatus")) {
+                val capturedAt = System.currentTimeMillis()
+                val status = VivoSuperXPayload.readStatus(manager, app.packageName, "NAVIGATION")
+                prefs.edit().putString("beforePostSceneStatus", "capturedAt=$capturedAt; scene=NAVIGATION; sceneStatus=${status.sceneStatus}; customFun=${status.customFun}").apply()
+                // A false/unknown getter result is evidence, not authorization to
+                // skip this explicit manual protocol experiment or write a setter.
+            }
             val notification = buildNotification(mode)
             val eligible = if (Build.VERSION.SDK_INT >= 36) runCatching { notification.hasPromotableCharacteristics() }.getOrNull() else null
+            val extras = notification.extras
+            val builtSummary = "builtAt=${System.currentTimeMillis()}; builtElapsed=${SystemClock.elapsedRealtime()}; mode=$mode; tag=${notificationTag(mode)}; id=$NOTIFICATION_ID; channel=$CHANNEL_ID; scene=${extras.getString("notification.superx.scene")}; operation=${if (extras.containsKey(VivoSuperXPayload.OPERATION)) extras.getInt(VivoSuperXPayload.OPERATION) else null}; style=${extras.getString(Notification.EXTRA_TEMPLATE)}; requestPromoted=${extras.getBoolean(LiveUpdateProbe.REQUEST_PROMOTED_EXTRA, false)}; colorized=${extras.getBoolean(Notification.EXTRA_COLORIZED, false)}; eligible=$eligible"
             prefs.edit().apply {
                 if (eligible == null) remove("lastBuiltEligible") else putBoolean("lastBuiltEligible", eligible)
+                putString("lastBuiltRequest", builtSummary)
+                putString("built_${mode.name}", builtSummary)
             }.apply()
             manager.notify(notificationTag(mode), NOTIFICATION_ID, notification)
             prefs.edit().remove("lastError").apply()
@@ -192,7 +220,8 @@ class VivoIslandProbe(context: Context) {
         val builder = if (Build.VERSION.SDK_INT >= 26) Notification.Builder(app, CHANNEL_ID) else Notification.Builder(app)
         val session = prefs.getString("session", "") ?: ""
         val progress = prefs.getInt("progress", 0)
-        val content = Intent().setClassName(app.packageName, "com.stuassistant.app.liveprobe.VivoProbeActivity")
+        val targetActivity = if (mode == VivoProbeMode.SUPERX_NAVIGATION) "com.stuassistant.app.liveprobe.VivoIdentityProbeActivity" else "com.stuassistant.app.liveprobe.VivoProbeActivity"
+        val content = Intent().setClassName(app.packageName, targetActivity)
             .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         val tap = PendingIntent.getActivity(app, 0, content, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         builder.setSmallIcon(R.drawable.ic_live_probe).setContentTitle("原子岛对照测试")
@@ -205,12 +234,14 @@ class VivoIslandProbe(context: Context) {
         if (Build.VERSION.SDK_INT >= 26) builder.setTimeoutAfter((prefs.getLong("expiresAt", 0L) - System.currentTimeMillis()).coerceIn(1L, TIMEOUT_MS))
         if (mode == VivoProbeMode.CONTROL) {
             builder.setProgress(100, progress, false)
-        } else if (mode == VivoProbeMode.SUPERX) {
+        } else if (mode == VivoProbeMode.SUPERX || mode == VivoProbeMode.SUPERX_NAVIGATION) {
             builder.setProgress(100, progress, false)
                 .addExtras(VivoSuperXPayload.create(
                     title = "原子岛协议测试", content = "$progress% · 手动验证",
                     icon = Icon.createWithResource(app, R.drawable.ic_live_probe), clickIntent = tap,
-                ))
+                ).apply {
+                    if (mode == VivoProbeMode.SUPERX_NAVIGATION) putString("notification.superx.scene", "NAVIGATION")
+                })
         } else if (Build.VERSION.SDK_INT >= 36) {
             builder.setColorized(mode == VivoProbeMode.STANDARD_COLORIZED)
                 .setStyle(Notification.ProgressStyle().setProgress(progress)
@@ -239,7 +270,7 @@ class VivoIslandProbe(context: Context) {
         prefs.edit().putBoolean("stopped", true).putString("lastAction", action).remove("lastError").apply()
         appendHistory(action)
         try {
-            if (sendEnd && before.mode in setOf(VivoProbeMode.SUPERX, VivoProbeMode.SUPERX_HYBRID) && before.current != null &&
+            if (sendEnd && before.mode in setOf(VivoProbeMode.SUPERX, VivoProbeMode.SUPERX_HYBRID, VivoProbeMode.SUPERX_NAVIGATION) && before.current != null &&
                 before.current.notification.extras.getString(EXTRA_SESSION) == prefs.getString("session", null) &&
                 (Build.VERSION.SDK_INT < 33 || app.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED)) {
                 val ended = Notification.Builder.recoverBuilder(app, before.current.notification)
@@ -250,11 +281,21 @@ class VivoIslandProbe(context: Context) {
         } catch (error: RuntimeException) { recordError("SuperX结束写入失败", error) }
         catch (error: LinkageError) { recordError("SuperX结束接口不可用", error) }
         finally {
-            try {
-                manager?.cancel(NOTIFICATION_TAG, NOTIFICATION_ID)
-                manager?.cancel(SUPERX_TAG, NOTIFICATION_ID)
+            val ownedRaw = before.rawActive.filter {
+                it.packageName == app.packageName && it.user == android.os.Process.myUserHandle() &&
+                    (Build.VERSION.SDK_INT < 29 || it.uid == android.os.Process.myUid()) &&
+                    it.id == NOTIFICATION_ID
             }
-            catch (error: RuntimeException) { recordError("通知取消失败", error) }
+            // A ROM can rewrite the tag or remove our session extras. Explicit
+            // stop still retires only this app/user/UID's reserved probe ID;
+            // it never authorizes an update or touches another notification ID.
+            val targets = (listOf(NOTIFICATION_TAG to NOTIFICATION_ID, SUPERX_TAG to NOTIFICATION_ID) +
+                ownedRaw.map { it.tag to it.id }).distinct()
+            targets.forEach { (tag, id) ->
+                try { manager?.cancel(tag, id) }
+                catch (error: RuntimeException) { recordError("通知取消失败", error) }
+                catch (error: LinkageError) { recordError("通知取消接口不可用", error) }
+            }
         }
         return snapshot()
     }
@@ -271,7 +312,19 @@ class VivoIslandProbe(context: Context) {
 
     private fun savedMode(): VivoProbeMode? = runCatching { prefs.getString("mode", null)?.let(VivoProbeMode::valueOf) }.getOrNull()
 
-    private fun notificationTag(mode: VivoProbeMode?): String = if (mode == VivoProbeMode.SUPERX) SUPERX_TAG else NOTIFICATION_TAG
+    private fun notificationTag(mode: VivoProbeMode?): String = if (mode == VivoProbeMode.SUPERX || mode == VivoProbeMode.SUPERX_NAVIGATION) SUPERX_TAG else NOTIFICATION_TAG
+
+    private fun channelDiagnostics(): String {
+        if (Build.VERSION.SDK_INT < 26) return "channelRequestedId=$CHANNEL_ID; requestedImportance=${NotificationManager.IMPORTANCE_HIGH}; currentImportance=unsupported; hasUserSetImportance=unsupported"
+        return try {
+            val channel = manager?.getNotificationChannel(CHANNEL_ID)
+            "channelRequestedId=$CHANNEL_ID; requestedImportance=${NotificationManager.IMPORTANCE_HIGH}; currentImportance=${channel?.importance}; hasUserSetImportance=${if (Build.VERSION.SDK_INT >= 29) channel?.hasUserSetImportance() else "unsupported"}"
+        } catch (error: RuntimeException) {
+            "channelRequestedId=$CHANNEL_ID; requestedImportance=${NotificationManager.IMPORTANCE_HIGH}; currentImportance=unknown:${error.javaClass.simpleName}; hasUserSetImportance=unknown"
+        } catch (error: LinkageError) {
+            "channelRequestedId=$CHANNEL_ID; requestedImportance=${NotificationManager.IMPORTANCE_HIGH}; currentImportance=unknown:${error.javaClass.simpleName}; hasUserSetImportance=unknown"
+        }
+    }
 
     private fun history(): List<String> = runCatching {
         val array = JSONArray(prefs.getString("history", "[]"))
@@ -292,7 +345,7 @@ class VivoIslandProbe(context: Context) {
     private fun describe(label: String, error: Throwable) = "$label（${error.javaClass.simpleName}）"
 
     companion object {
-        const val CHANNEL_ID = "vivo_island_probe_v1"
+        const val CHANNEL_ID = "vivo_island_identity_v2"
         const val NOTIFICATION_TAG = "vivo_island_probe"
         const val SUPERX_TAG = "VIVO_SUPERX_TAG"
         const val NOTIFICATION_ID = 41738

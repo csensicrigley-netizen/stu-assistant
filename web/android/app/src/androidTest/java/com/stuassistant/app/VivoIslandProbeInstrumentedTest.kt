@@ -7,6 +7,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.Bundle
 import android.os.SystemClock
 import android.service.notification.StatusBarNotification
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -53,13 +54,14 @@ class VivoIslandProbeInstrumentedTest {
         }
     }
 
-    @Test fun fiveModesHaveDistinctPayloadsAndHybridIsExplicit() {
+    @Test fun sixModesHaveDistinctPayloadsAndHybridIsExplicit() {
         assumeTrue("Modern modes require API36", Build.VERSION.SDK_INT >= 36)
         VivoProbeMode.entries.forEach { mode ->
             probe.start(mode)
             val posted = awaitMode(mode)
             val n = posted.notification
-            assertEquals(if (mode == VivoProbeMode.SUPERX) VivoIslandProbe.SUPERX_TAG else VivoIslandProbe.NOTIFICATION_TAG, posted.tag)
+            assertEquals(if (mode == VivoProbeMode.SUPERX || mode == VivoProbeMode.SUPERX_NAVIGATION) VivoIslandProbe.SUPERX_TAG else VivoIslandProbe.NOTIFICATION_TAG, posted.tag)
+            assertEquals(VivoIslandProbe.CHANNEL_ID, n.channelId)
             assertTrue(n.flags and Notification.FLAG_ONGOING_EVENT != 0)
             assertTrue(n.timeoutAfter in 1L..VivoIslandProbe.TIMEOUT_MS)
             assertNull(n.contentView)
@@ -76,10 +78,12 @@ class VivoIslandProbeInstrumentedTest {
                     assertEquals(Notification.ProgressStyle::class.java.name, n.extras.getString(Notification.EXTRA_TEMPLATE))
                     assertFalse(n.extras.containsKey(VivoSuperXPayload.OPERATION))
                 }
-                VivoProbeMode.SUPERX -> {
+                VivoProbeMode.SUPERX, VivoProbeMode.SUPERX_NAVIGATION -> {
+                    assertFalse(n.extras.containsKey(LiveUpdateProbe.REQUEST_PROMOTED_EXTRA))
                     assertFalse(n.extras.getBoolean(LiveUpdateProbe.REQUEST_PROMOTED_EXTRA, false))
                     assertEquals(0, n.extras.getInt(VivoSuperXPayload.OPERATION, -1))
-                    assertTrue(VivoSuperXPayload.extrasObserved(n.extras))
+                    assertEquals(if (mode == VivoProbeMode.SUPERX_NAVIGATION) "NAVIGATION" else "TRAIN", n.extras.getString("notification.superx.scene"))
+                    if (mode == VivoProbeMode.SUPERX) assertTrue(VivoSuperXPayload.extrasObserved(n.extras))
                     assertEquals(65809, n.extras.getInt("notification.superx.displays", -1))
                     assertTrue(n.extras.getBundle(VivoSuperXPayload.ISLAND)?.getBoolean("island.superx.forceShow", false) == true)
                     assertEquals(4, n.extras.getBundle(VivoSuperXPayload.ISLAND)?.getInt("island.superx.rightTemplate"))
@@ -97,6 +101,7 @@ class VivoIslandProbeInstrumentedTest {
             awaitCondition("Mode cleanup did not complete") { ownNotifications().isEmpty() }
         }
         assertEquals(2, VivoSuperXPayload.endExtras().getInt(VivoSuperXPayload.OPERATION, -1))
+        assertEquals(NotificationManager.IMPORTANCE_HIGH, manager.getNotificationChannel(VivoIslandProbe.CHANNEL_ID)?.importance)
     }
 
     @Test fun manualProgressUpdateKeepsKeyAndDoesNotExtendExpiration() {
@@ -149,6 +154,69 @@ class VivoIslandProbeInstrumentedTest {
         awaitCondition("End action did not clear the current session") { !probe.snapshot().active }
         probe.advance()
         assertFalse("Updating a stopped session must not resurrect it", probe.snapshot().active)
+    }
+
+    @Test fun rawInventoryKeepsAReceivedNotificationWhoseSessionMarkerWasRemoved() {
+        probe.start(VivoProbeMode.SUPERX_NAVIGATION)
+        val initial = awaitMode(VivoProbeMode.SUPERX_NAVIGATION)
+        val stripped = Notification.Builder.recoverBuilder(context, initial.notification)
+            .setExtras(Bundle(initial.notification.extras).apply { remove(VivoIslandProbe.EXTRA_SESSION) })
+            .build()
+        manager.notify(VivoIslandProbe.SUPERX_TAG, VivoIslandProbe.NOTIFICATION_ID, stripped)
+        awaitCondition("Raw inventory failed to expose a session-stripped notification") {
+            val state = probe.snapshot()
+            state.current == null && !state.active && state.rawActive.any {
+                it.id == VivoIslandProbe.NOTIFICATION_ID && it.tag == VivoIslandProbe.SUPERX_TAG &&
+                    !it.notification.extras.containsKey(VivoIslandProbe.EXTRA_SESSION)
+            }
+        }
+        val state = probe.snapshot()
+        assertFalse(state.active)
+        assertNull(state.current)
+        assertTrue(state.rawActive.all { it.packageName == context.packageName && it.user == android.os.Process.myUserHandle() })
+        assertTrue(probe.historyText().contains("sessionPresent=false"))
+        assertTrue(probe.historyText().contains("mode=SUPERX_NAVIGATION"))
+        assertTrue(probe.historyText().contains("scene=NAVIGATION"))
+        assertTrue(probe.historyText().contains("requestedImportance=4"))
+        probe.advance()
+        assertFalse("Missing session proof must not authorize an update", probe.snapshot().active)
+        probe.finish()
+        awaitCondition("Finish must clean the owned raw notification without requiring its session marker") { ownNotifications().isEmpty() }
+    }
+
+    @Test fun finishClearsRetaggedRawProbeButPreservesADifferentOwnedNotificationId() {
+        val rewrittenTag = "vivo_probe_rom_rewritten_tag"
+        val otherId = VivoIslandProbe.NOTIFICATION_ID + 100
+        val otherTag = "vivo_probe_unrelated_owned_test"
+        try {
+            probe.start(VivoProbeMode.SUPERX_NAVIGATION)
+            val initial = awaitMode(VivoProbeMode.SUPERX_NAVIGATION)
+            val stripped = Notification.Builder.recoverBuilder(context, initial.notification)
+                .setExtras(Bundle(initial.notification.extras).apply { remove(VivoIslandProbe.EXTRA_SESSION) })
+                .build()
+            manager.cancel(VivoIslandProbe.SUPERX_TAG, VivoIslandProbe.NOTIFICATION_ID)
+            manager.notify(rewrittenTag, VivoIslandProbe.NOTIFICATION_ID, stripped)
+            manager.notify(otherTag, otherId, Notification.Builder(context, VivoIslandProbe.CHANNEL_ID)
+                .setSmallIcon(R.drawable.ic_live_probe).setContentTitle("Different owned ID control")
+                .setContentText("This test notification must survive probe.finish")
+                .setTimeoutAfter(30_000L).build())
+            awaitCondition("Raw inventory did not observe both owned notifications") {
+                val state = probe.snapshot()
+                state.current == null && !state.active &&
+                    state.rawActive.any { it.id == VivoIslandProbe.NOTIFICATION_ID && it.tag == rewrittenTag } &&
+                    state.rawActive.any { it.id == otherId && it.tag == otherTag }
+            }
+            probe.finish()
+            awaitCondition("Explicit finish did not clear the retagged reserved probe ID") {
+                probe.snapshot().rawActive.none { it.id == VivoIslandProbe.NOTIFICATION_ID }
+            }
+            assertTrue("The probe must not cancel a different owned ID", manager.activeNotifications.any { it.id == otherId && it.tag == otherTag })
+        } finally {
+            // This fixture alone owns this different-ID notification; the engine
+            // must not remove it as part of ordinary probe cleanup.
+            manager.cancel(otherTag, otherId)
+            manager.cancel(rewrittenTag, VivoIslandProbe.NOTIFICATION_ID)
+        }
     }
 
     private fun ownNotifications(): List<StatusBarNotification> = manager.activeNotifications.filter {
