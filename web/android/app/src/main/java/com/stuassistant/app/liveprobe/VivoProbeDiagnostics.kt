@@ -59,6 +59,10 @@ object VivoProbeDiagnostics {
                 appendLine("posted.customViews=${n.contentView != null || n.bigContentView != null || n.headsUpContentView != null}; groupSummary=${n.flags and Notification.FLAG_GROUP_SUMMARY != 0}; actions=${n.actions?.size ?: 0}")
                 appendLine("posted.whenEpochMs=${n.`when`}; showWhen=${read { n.extras?.getBoolean(Notification.EXTRA_SHOW_WHEN, false) ?: false }}; chronometer=${read { n.extras?.getBoolean(Notification.EXTRA_SHOW_CHRONOMETER, false) ?: false }}; countdown=${read { n.extras?.getBoolean(Notification.EXTRA_CHRONOMETER_COUNT_DOWN, false) ?: false }}")
                 appendLine("posted.shortCriticalText=${if (Build.VERSION.SDK_INT >= 36) read { n.shortCriticalText ?: "none" } else "unavailable(API<36)"}")
+                appendLine("posted.ordinaryProgress=${read { if (n.extras.containsKey(Notification.EXTRA_PROGRESS)) n.extras.getInt(Notification.EXTRA_PROGRESS).toString() else "none" }}")
+                appendLine("posted.progressStyleProgress=${if (Build.VERSION.SDK_INT >= 36) read {
+                    (Notification.Builder.recoverBuilder(app, n).style as? Notification.ProgressStyle)?.progress ?: "none"
+                } else "unavailable(API<36)"}")
                 appendLine("posted.timeoutAfterMs=${if (Build.VERSION.SDK_INT >= 26) read { n.timeoutAfter } else "unavailable(API<26)"}")
                 appendLine(superXFields(n.extras))
                 if (Build.VERSION.SDK_INT >= 26) {
