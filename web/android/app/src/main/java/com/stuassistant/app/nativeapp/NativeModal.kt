@@ -84,6 +84,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.kyant.backdrop.Backdrop
 import com.kyant.shapes.RoundedRectangle
+import com.kyant.shapes.RoundedCornerStyle
+import com.kyant.shapes.UnevenRoundedRectangle
 import com.stuassistant.app.glass.LiquidDialogSurface
 import com.stuassistant.app.glass.LocalLiquidGlassReducedMotion
 import kotlinx.coroutines.Job
@@ -317,10 +319,10 @@ private fun NativeSheetLayer(entry: NativeSheetEntry, active: Boolean, backdrop:
             LiquidDialogSurface(
                 backdrop,
                 modifier = Modifier.align(Alignment.BottomCenter)
-                    // Include safe-area/IME padding in the layer's own-height exit distance.
+                    // Include IME padding in the layer's own-height exit distance.
                     // Motion's lower elastic bound is .6; thresholds use raw pointer distance.
                     .graphicsLayer { translationY = (1f - panelProgress) * size.height + dragDistance * .6f }
-                    .navigationBarsPadding().imePadding()
+                    .imePadding()
                     .widthIn(max = 600.dp).fillMaxWidth().heightIn(max = maxHeight * .88f)
                     .focusProperties {
                         onEnter = { if (!active) cancelFocusChange() }
@@ -362,6 +364,10 @@ private fun NativeSheetLayer(entry: NativeSheetEntry, active: Boolean, backdrop:
                     }
                     // Consume taps on otherwise empty panel space instead of hitting its scrim.
                     .pointerInput(Unit) { detectTapGestures(onTap = {}) },
+                shape = UnevenRoundedRectangle(
+                    topStart = 48.dp, topEnd = 48.dp, bottomEnd = 0.dp, bottomStart = 0.dp,
+                    style = RoundedCornerStyle.Continuous,
+                ),
             ) {
                 Box(
                     Modifier.fillMaxWidth().height(24.dp).clearAndSetSemantics {}
@@ -407,7 +413,8 @@ private fun NativeSheetLayer(entry: NativeSheetEntry, active: Boolean, backdrop:
                 }
                 Column(
                     Modifier.fillMaxWidth().weight(1f, fill = false)
-                        .verticalScroll(rememberScrollState()).padding(start = 20.dp, end = 20.dp, bottom = 32.dp),
+                        .verticalScroll(rememberScrollState()).navigationBarsPadding()
+                        .padding(start = 20.dp, end = 20.dp, bottom = 32.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
                     entry.content.value(this)
