@@ -4,12 +4,16 @@ import { IS_NATIVE, api, apiBase, errorText, needsServer, setApiBase, setToken, 
 import { saveSchool } from "../lib/school";
 import { onBack } from "../lib/native";
 import { Icon } from "../components/Icon";
-import { Logo } from "../components/Logo";
-import { Magnetic } from "../components/Magnetic";
+
+
 import { Segmented } from "../components/Segmented";
-import { rise } from "../lib/motion";
+
+import { Landing } from "../components/Landing";
+
 
 export type Step = "hello" | "account" | "bind";
+
+
 
 /** Matches the CSS breakpoint where the welcome screen splits in two. */
 function useWide(query = "(min-width: 960px)"): boolean {
@@ -43,7 +47,10 @@ export function Welcome({
 }) {
   const wide = useWide();
   const [step, setStep] = useState<Step>(start ?? "hello");
-  const shown: Step = wide && step === "hello" ? "account" : step;
+  /* 2026-10-31：旧的逻辑是"宽屏跳过 hello，直接进表单"——那是左右分栏时代的设计
+     （左栏当介绍、右栏当表单）。现在 hello 自己就是全宽舞台，
+     宽屏也该先看到它，否则用户打开就是一张注册表单。 */
+  const shown: Step = step;
 
   useEffect(
     () =>
@@ -63,130 +70,40 @@ export function Welcome({
     [shown, wide, start, onCancel],
   );
 
+  /* 参考图的版式是**全宽居中**：大标题居中、六张卡横排居中、按钮居中。
+     之前做成"左栏说明 + 右栏表单"，卡片只能塞进 620px 的栏里，
+     叠成一叠只露边的卡片——那不是参考图，是一摞便利贴。
+     现在：hello 步走全宽舞台；account/bind 步才收到窄栏里（表单不该铺满屏）。 */
+  /* hello 步用全新独立落地页（Landing.tsx + landing.css），
+     不套 .welcome 外壳——之前几版把落地页塞进欢迎页的容器里，
+     继承了一堆旧规则，才反复出现"标题把下面截掉"。 */
+  if (shown === "hello") {
+    return <Landing onStart={() => setStep("account")} onPreview={onPreview} />;
+  }
+
   return (
     <div className="welcome">
-      <aside className="welcome__brand" aria-hidden={!wide}>
-        <Intro />
-      </aside>
-      <div className="welcome__main">
-        <AnimatePresence mode="wait" initial={false}>
-          <motion.div
-            key={shown}
-            className="welcome__inner"
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-          >
-            {shown === "hello" && <Hello onStart={() => setStep("account")} onPreview={onPreview} />}
-            {shown === "account" && (
-              <Account
-                notice={notice}
-                onBack={wide ? onCancel : onCancel ?? (() => setStep("hello"))}
-                onPreview={wide ? onPreview : undefined}
-                onDone={() => setStep("bind")}
-              />
-            )}
-            {shown === "bind" && <Bind onDone={onDone} onCancel={onCancel} />}
-          </motion.div>
-        </AnimatePresence>
-        <p className="welcome__credits">联合创始人 小爱 · 大象 · FKL</p>
-      </div>
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------ intro */
-
-function Intro() {
-  return (
-    <div className="intro">
-      <Logo size={64} className="intro__logo" />
-      <h2 className="intro__title">
-        下一节课在哪，
-        <br />
-        作业几点截止。
-      </h2>
-      <p className="intro__lead">教务课表、MySTU 作业和学校通知收在一处，按教务处官方作息算准每一节课。</p>
-      <div className="intro__card" aria-hidden="true">
-        <span className="intro__state">
-          <i /> 正在上课 · 还剩 1 小时 05 分
-        </span>
-        <span className="intro__time">10:00–12:35</span>
-        <span className="intro__course">生物统计学</span>
-        <span className="intro__place">
-          <Icon name="pin" size={16} /> 桑浦山-E305
-        </span>
-        <span className="intro__bar">
-          <span />
-        </span>
-      </div>
-      <ul className="intro__points">
-        <li>
-          <Icon name="shield" size={18} />
-          账号密码由你本人输入，加密存在你自己那份空间里
-        </li>
-        <li>
-          <Icon name="check" size={18} />
-          只读不代办：不交作业、不签到、不缴费
-        </li>
-      </ul>
-    </div>
-  );
-}
-
-function Hello({ onStart, onPreview }: { onStart: () => void; onPreview?: () => void }) {
-  const android = /Android/i.test(navigator.userAgent) && !IS_NATIVE;
-  /*
-   * 首屏的进场是有先后的：标志 → 标题 → 说明 → 三条 → 动作。
-   * 全部走 rise()，延迟由 stagger() 统一出，谁也不许自己写 delay。
-   */
-  return (
-    <div className="hello">
-      <motion.div {...rise(0, { y: 12, scale: 0.96 })}>
-        <Logo size={64} className="hello__logo" />
-      </motion.div>
-      <motion.h1 className="welcome__title" {...rise(1, { y: 8, scale: 1 })}>
-        下一节课在哪，
-        <br />
-        作业几点截止。
-      </motion.h1>
-      <motion.p className="welcome__lead" {...rise(2, { y: 8, scale: 1 })}>
-        教务课表、MySTU 作业和学校通知收在一处，按教务处官方作息算准每一节课。
-      </motion.p>
-      <motion.ul className="welcome__points" {...rise(3, { y: 8, scale: 1 })}>
-        <li>
-          <Icon name="clock" size={18} />
-          <span>现在该去哪间教室，还有几分钟</span>
-        </li>
-        <li>
-          <Icon name="study" size={18} />
-          <span>作业按截止时间排好，考试倒数</span>
-        </li>
-        <li>
-          <Icon name="shield" size={18} />
-          <span>只读不代办，账号密码由你本人输入、加密存在你自己的空间</span>
-        </li>
-      </motion.ul>
-      <motion.div className="welcome__actions" {...rise(4, { y: 8, scale: 1 })}>
-        <Magnetic pull={0.4}>
-          <button type="button" className="btn btn--primary btn--block btn--lg" onClick={onStart}>
-            开始使用
-          </button>
-        </Magnetic>
-        {onPreview && (
-          <button type="button" className="btn btn--ghost btn--block btn--lg" onClick={onPreview}>
-            先看看示例
-          </button>
-        )}
-      </motion.div>
-      {android && (
-        <a className="welcome__apk" href="/download/stu-assistant.apk" download>
-          <Icon name="arrow-right" size={16} />
-          下载安卓 App
-        </a>
-      )}
-      <p className="welcome__fine">个人项目，与汕头大学官方无关。</p>
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.div
+          key={shown}
+          className="welcome__inner"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -8 }}
+          transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+        >
+          {shown === "account" && (
+            <Account
+              notice={notice}
+              onBack={onCancel ?? (() => setStep("hello"))}
+              onPreview={onPreview}
+              onDone={() => setStep("bind")}
+            />
+          )}
+          {shown === "bind" && <Bind onDone={onDone} onCancel={onCancel} />}
+        </motion.div>
+      </AnimatePresence>
+      <p className="welcome__credits">联合创始人 小爱 · 大象 · FKL</p>
     </div>
   );
 }

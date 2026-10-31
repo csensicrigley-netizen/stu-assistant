@@ -4304,26 +4304,43 @@ p.hint {
   color: var(--sea);
 }
 
+/* 宽屏：只有"表单页"分两栏（左介绍 / 右表单）。
+   舞台页（hello）必须整屏居中——之前这条规则无条件生效，
+   把舞台塞进 420px 的左栏，看起来就是"标题把下面截掉"。 */
 @media (min-width: 960px) {
-  .welcome {
+  .welcome:not(.is-stage) {
     grid-template-columns: minmax(420px, 1.05fr) minmax(460px, 1fr);
     place-items: stretch;
     padding: 0;
-    background: var(--bg);
   }
 
   .welcome__brand {
+    /* 两栏共用同一张舞台底，只用一条发丝线分隔 */
     position: relative;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 64px clamp(40px, 6vw, 96px);
-    overflow: hidden;
-    color: var(--brand-ink);
-    background:
-      radial-gradient(70% 55% at 85% 10%, var(--brand-glow-a), transparent 70%),
-      radial-gradient(60% 50% at 0% 100%, var(--brand-glow-b), transparent 70%),
-      var(--brand-bg);
+    padding: 56px clamp(32px, 5vw, 84px);
+    overflow: visible;
+    color: var(--ink);
+    background: transparent;
+  }
+
+  /* 分栏线：一条 1px 的极淡竖线，比整块色差安静得多 */
+  .welcome__brand::before {
+    content: "";
+    position: absolute;
+    top: 8%;
+    bottom: 8%;
+    right: 0;
+    width: 1px;
+    background: linear-gradient(
+      to bottom,
+      transparent,
+      oklch(100% 0 0 / 0.09) 18%,
+      oklch(100% 0 0 / 0.09) 82%,
+      transparent
+    );
   }
 
   .welcome__brand::after {
@@ -4334,7 +4351,7 @@ p.hint {
     bottom: -140px;
     width: 520px;
     height: 520px;
-    border: 46px solid oklch(100% 0 0 / 0.05);
+    border: 46px solid oklch(100% 0 0 / 0.03);
     border-radius: 50%;
   }
 
@@ -4354,8 +4371,11 @@ p.hint {
 .intro {
   position: relative;
   z-index: 1;
+  display: grid;
+  gap: var(--s-4);
   width: 100%;
-  max-width: 480px;
+  /* 2026-10-31：480 太窄，卡片被挤成小方块，整栏也空；放到 620 */
+  max-width: 620px;
 }
 
 .intro__logo {
@@ -4363,19 +4383,21 @@ p.hint {
 }
 
 .intro__title {
-  margin-top: var(--s-8);
-  font-size: clamp(2rem, 3.2vw, 2.75rem);
+  margin-top: 2px;
+  font-size: clamp(1.9rem, 1.15rem + 2.1vw, 2.9rem);
   line-height: 1.22;
-  font-weight: 700;
-  letter-spacing: -0.01em;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  text-wrap: balance;
 }
 
 .intro__lead {
-  margin-top: var(--s-4);
-  font-size: var(--fs-16);
+  font-size: var(--fs-15);
   line-height: 1.7;
-  color: var(--brand-ink-2);
-  max-width: 36ch;
+  color: var(--ink-2);
+  max-width: 30em;
+  text-wrap: pretty;
 }
 
 .intro__card {
@@ -7412,3 +7434,370 @@ html {
 .feedback__range::-moz-range-progress { height: 6px; border-radius: 99px; background: var(--sea); }
 .feedback__range::-moz-range-thumb { width: 18px; height: 18px; border: 3px solid var(--surface); border-radius: 50%; background: var(--sea); }
 .feedback__range:focus-visible { outline: 2px solid var(--sea); outline-offset: 2px; border-radius: 8px; }
+
+/* ================================================================
+   欢迎页 2.5D 重做（2026-10-31）
+   ------------------------------------------------------------------
+   只作用于 .welcome / .intro / .hello 内部，不影响其它页面。
+   卡片本体样式在 fan.css，浮雕阴影在 emboss.css。
+   ================================================================ */
+
+/* 2026-10-31 五版：照参考图的**两层结构**。
+   ── 参考图到底是什么样的 ──
+   外层：奶油/米白纸底（暖白，不是纯白）
+   内层：一块**深色圆角大卡**（近黑），卡片阵列摆在这块深色舞台上
+   所以页面不是"整屏黑"，是"浅色页上放了一块深色舞台"。
+   之前几版把整页做成深色，等于把参考图的外层丢掉了。 */
+.welcome {
+  background: oklch(96.2% 0.012 75);
+  position: relative;
+  isolation: isolate;
+}
+
+[data-theme="dark"] .welcome {
+  background: oklch(16% 0.008 70);
+}
+
+/* 深色舞台：全宽居中那一屏才有，表单页不要 */
+.welcome.is-stage {
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr auto;
+  place-items: center;
+  padding: clamp(18px, 3vw, 40px) 0 0;
+}
+
+.welcome__stage {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 var(--gutter);
+}
+
+.stage {
+  position: relative;
+  display: grid;
+  /* stretch 而不是 center：center 会让每个子项宽度变成 max-content，
+     卡片组被撑到 1696px 把整页顶宽。文字元素自己加 max-width + margin auto。 */
+  justify-items: stretch;
+  gap: 0;
+  padding: clamp(28px, 4vw, 52px) clamp(20px, 3vw, 44px) clamp(28px, 4vw, 44px);
+  border-radius: clamp(24px, 3vw, 40px);
+  background:
+    radial-gradient(70% 46% at 50% 0%, oklch(100% 0 0 / 0.05), transparent 68%),
+    oklch(17.5% 0.01 275);
+  box-shadow:
+    inset 0 1px 0 oklch(100% 0 0 / 0.07),
+    0 2px 4px oklch(40% 0.03 275 / 0.12),
+    0 24px 56px -24px oklch(35% 0.04 275 / 0.4);
+  overflow: hidden;
+  isolation: isolate;
+}
+
+/* 深色舞台上的文字一律反白 */
+.stage__title,
+.stage__lead,
+.stage__clock,
+.stage__points li,
+.stage__fine,
+.stage__apk {
+  color: oklch(97% 0.008 275);
+}
+
+/* 内容压到光晕之上 */
+.welcome__brand,
+.welcome__main {
+  position: relative;
+  z-index: 1;
+}
+
+/* ---------- 桌面左栏 ---------- */
+
+.intro__head,
+.hello__top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* 时钟：一颗呼吸的小点 + 等宽数字，像仪表上的"此刻" */
+.intro__clock,
+.hello__clock {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 11px 5px 9px;
+  border-radius: var(--r-full);
+  font-family: var(--font-num);
+  font-size: var(--fs-12);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--ink-2);
+  background: oklch(100% 0 0 / 0.55);
+  box-shadow: var(--emboss-1);
+}
+[data-theme="dark"] .intro__clock,
+[data-theme="dark"] .hello__clock {
+  background: oklch(100% 0 0 / 0.06);
+}
+
+.intro__clock i,
+.hello__clock i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--cinnabar);
+  box-shadow: 0 0 0 3px oklch(60% 0.15 22 / 0.18);
+}
+
+.intro__title {
+  margin-top: 2px;
+  font-size: clamp(1.9rem, 1.15rem + 2.1vw, 2.9rem);
+  line-height: 1.22;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  text-wrap: balance;
+}
+
+.intro__lead {
+  font-size: var(--fs-15);
+  line-height: 1.7;
+  color: var(--ink-2);
+  max-width: 30em;
+  text-wrap: pretty;
+}
+
+.intro__fan {
+  margin: 4px 0 2px;
+}
+
+.intro__points {
+  display: grid;
+  gap: 9px;
+  margin-top: 4px;
+}
+
+.intro__points li {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  font-size: var(--fs-13);
+  line-height: 1.55;
+  color: var(--ink-2);
+}
+
+.intro__points svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--sea);
+}
+
+/* ---------- 手机首屏 ---------- */
+
+.hello {
+  display: grid;
+  gap: var(--s-3);
+  padding-bottom: var(--s-4);
+}
+
+.hello__fan {
+  margin-top: 2px;
+}
+
+/* 手机上的标题小一档：一屏要同时看到标题、卡片和按钮 */
+@media (max-width: 560px) {
+  .welcome__title {
+    font-size: 1.6rem;
+    line-height: 1.24;
+    margin-top: var(--s-3);
+  }
+  /* 首屏纵向节奏：标题→说明→卡组 三段之间收紧，把卡组提到视线中心 */
+  .hello {
+    gap: 10px;
+  }
+  .hello__fan {
+    margin-top: 6px;
+  }
+  .welcome__lead {
+    font-size: var(--fs-14);
+    line-height: 1.6;
+  }
+  .welcome__actions {
+    margin-top: var(--s-4);
+    gap: 10px;
+  }
+}
+/* ==========================================================================
+   舞台内部（2026-10-31 五版）—— 照参考图：全部居中
+   ========================================================================== */
+
+.stage__top {
+  display: grid;
+  place-items: center;
+  margin-bottom: 14px;
+  max-width: 100%;
+}
+.stage__logo {
+  filter: drop-shadow(0 10px 22px oklch(20% 0.08 40 / 0.5));
+}
+
+.stage__clock {
+  justify-self: center;
+  max-width: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 14px;
+  padding: 5px 12px 5px 10px;
+  border-radius: var(--r-full);
+  font-family: var(--font-num);
+  font-size: var(--fs-12);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: oklch(88% 0.01 275);
+  background: oklch(100% 0 0 / 0.08);
+}
+.stage__clock i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: oklch(72% 0.16 45);
+  box-shadow: 0 0 0 3px oklch(72% 0.16 45 / 0.2);
+}
+
+/* 大标题：参考图是两行居中、很粗、行距紧 */
+.stage__title {
+  margin: 0;
+  justify-self: center;
+  max-width: 100%;
+  text-align: center;
+  font-size: clamp(2rem, 1.1rem + 3.4vw, 3.6rem);
+  line-height: 1.14;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+}
+
+.stage__lead {
+  margin: 16px 0 0;
+  justify-self: center;
+  text-align: center;
+  max-width: 32em;
+  font-size: clamp(0.875rem, 0.8rem + 0.3vw, 1rem);
+  line-height: 1.7;
+  color: oklch(78% 0.012 275);
+  text-wrap: pretty;
+}
+
+/* 卡组：这一屏的主角，上下留足空间 */
+.stage__fan {
+  /* 关键：grid 子项默认 min-width:auto，会被内部的横滑卡组撑宽。
+     归零后横向滚动才真的发生在 .fan 内部。 */
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
+  margin: clamp(22px, 3vw, 34px) 0 clamp(20px, 3vw, 30px);
+}
+.stage__fan > div {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.stage__actions {
+  justify-self: center;
+  max-width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* 主按钮：参考图那种"亮色胶囊压在深底上" */
+.stage__cta {
+  min-width: 180px;
+}
+
+.stage__points {
+  justify-self: center;
+  max-width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  flex-wrap: wrap;
+  margin: clamp(20px, 3vw, 30px) 0 0;
+  padding: 0;
+  list-style: none;
+}
+.stage__points li {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: var(--fs-12);
+  color: oklch(72% 0.012 275);
+}
+.stage__points svg {
+  flex: none;
+  color: oklch(72% 0.16 45);
+}
+
+.stage__apk {
+  margin-top: 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-13);
+  font-weight: 600;
+  color: oklch(80% 0.13 48);
+}
+
+.stage__fine {
+  margin: 18px 0 0;
+  text-align: center;
+  font-size: var(--fs-11);
+  color: oklch(58% 0.012 275);
+}
+
+/* 署名：放在舞台外面（参考图底部是纸底上的小字） */
+.welcome.is-stage .welcome__credits {
+  position: relative;
+  z-index: 1;
+  margin-top: 18px;
+  color: var(--ink-3);
+}
+
+/* 手机：舞台贴边、圆角变小、标题缩一档 */
+@media (max-width: 559px) {
+  .welcome__stage {
+    padding: 0;
+  }
+  .stage {
+    border-radius: 0;
+    padding: 26px 16px 30px;
+    min-height: 100dvh;
+  }
+  .stage__title {
+    font-size: 1.75rem;
+  }
+  .stage__lead {
+    margin-top: 12px;
+    font-size: 0.875rem;
+  }
+  .stage__actions {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+  }
+  .stage__cta {
+    width: 100%;
+  }
+  .stage__points {
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
+  }
+}
