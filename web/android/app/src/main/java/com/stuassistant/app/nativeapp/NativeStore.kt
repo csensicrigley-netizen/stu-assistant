@@ -27,7 +27,12 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /** Owns raw API records, account-scoped persistence and the campus sync lifecycle. */
-class NativeStore(context: Context) {
+class NativeStore internal constructor(
+    context: Context,
+    private val configuredServerForTests: String? = null,
+    private val allowServerChangesForTests: Boolean = false,
+    private val legacyServerForTests: String? = null,
+) {
     private val app = context.applicationContext
     private val prefs = app.getSharedPreferences("stu.native.settings.v1", Context.MODE_PRIVATE)
     private val secure = NativeSecureStorage(app)
@@ -116,7 +121,10 @@ class NativeStore(context: Context) {
         }
     }
 
-    fun setServer(server: String) {
+    /** Fixture-only seam. Product instances always use the packaged service configuration. */
+    internal fun setServer(server: String) {
+        if (configuredServerForTests == null || !allowServerChangesForTests)
+            throw NativeApiError("server_fixed", 0, "服务地址由应用统一配置")
         val normalized = try {
             val candidate = NativeApi.normalizeServer(server)
             if (candidate.isNotBlank()) candidate else NativeApi.normalizeServer(configuredServer())
@@ -311,45 +319,52 @@ class NativeStore(context: Context) {
                 if (!app.getSharedPreferences("native-updates", Context.MODE_PRIVATE).edit().putLong("skip", code).commit())
                     throw NativeApiError("storage_error", 0, "旧更新提醒设置未能保存，请重试")
             }
-            val server = NativeApi.normalizeServer(legacyValue(values, "stu.api").ifBlank { state.value.server })
-            if (server.isNotEmpty()) editor.putString("server", server)
+            val configured = state.value.server
+            // An absent localStorage override used the old APK's BUILD_BASE, not whatever
+            // service a future native build happens to select. Its verified value is metadata.
+            val server = try { NativeApi.normalizeServer(legacyValue(values, "stu.api").ifBlank { legacyServer() }) }
+                catch (_: Exception) { "" }
             val token = legacyValue(values, "stu.token").takeIf { it.isNotBlank() && it != "null" }
             val uid = token?.let(::tokenSubject)
             if (token != null && uid != null && server.isNotEmpty()) {
-                val user = JSONObject().put("id", uid).put("email", legacyValue(values, "stu.account"))
-                secure.write(sessionKey(server), JSONObject().put("token", token).put("user", user))
-                // Old cache lacks a server namespace: refetch it; only local completion IDs migrate.
-                val oldDone = legacyValue(values, "stu.done.v2:$uid").takeIf { it.isNotBlank() }
-                val next = secure.readCache(accountScope(server, uid)) ?: JSONObject()
-                if (oldDone != null) next.put("done", JSONArray(oldDone))
-                secure.writeCache(accountScope(server, uid), next)
-                val account = legacyValue(values, "stu.account")
-                if (account.isNotBlank()) {
-                    val oldSchool = legacyValue(values, "stu.school:$server|$account")
-                    if (oldSchool.isNotBlank()) {
-                        val saved = JSONObject(oldSchool)
-                        val id = saved.optString("account")
-                        val password = saved.optString("password")
-                        if (id.isNotBlank() && password.isNotEmpty()) secure.write(schoolKey(server, uid),
-                            JSONObject().put("id", id).put("password", password).put("remember", true))
+                val native = secure.read(sessionKey(server))
+                val hasNativeSession = native != null && native.optString("token").isNotBlank() &&
+                    native.optJSONObject("user")?.optString("id")?.isNotBlank() == true
+                if (hasNativeSession) {
+                    // A stale WebView must not replace a newer native account or its cache.
+                    secure.write("legacy-retained:${hash(accountScope(server, uid))}",
+                        JSONObject().put("server", server).put("values", legacySnapshot(values, uid)))
+                } else {
+                    val user = JSONObject().put("id", uid).put("email", legacyValue(values, "stu.account"))
+                    secure.write(sessionKey(server), JSONObject().put("token", token).put("user", user))
+                    // Old cache lacks a server namespace: refetch it; only local completion IDs migrate.
+                    val oldDone = legacyValue(values, "stu.done.v2:$uid").takeIf { it.isNotBlank() }
+                    val next = secure.readCache(accountScope(server, uid)) ?: JSONObject()
+                    if (oldDone != null) next.put("done", JSONArray((stringSet(next.optJSONArray("done")) + stringSet(JSONArray(oldDone))).toList()))
+                    secure.writeCache(accountScope(server, uid), next)
+                    val account = legacyValue(values, "stu.account")
+                    if (account.isNotBlank()) {
+                        val oldSchool = legacyValue(values, "stu.school:$server|$account")
+                        if (oldSchool.isNotBlank()) {
+                            val saved = JSONObject(oldSchool)
+                            val id = saved.optString("account")
+                            val password = saved.optString("password")
+                            if (id.isNotBlank() && password.isNotEmpty() && secure.read(schoolKey(server, uid)) == null) secure.write(schoolKey(server, uid),
+                                JSONObject().put("id", id).put("password", password).put("remember", true))
+                        }
                     }
                 }
+                if (server != configured) archiveServer(server)
             } else if (token != null) {
                 // Preserve an encrypted recovery snapshot; never guess the old server/identity.
-                val pending = JSONObject()
-                val account = legacyValue(values, "stu.account")
-                val allowed = setOf("stu.api", "stu.token", "stu.account", "stu.theme", "stu.palette", "stu.haptics.strength", "stu.haptics")
-                for (key in values.keys()) if (key in allowed || (uid != null && key == "stu.done.v2:$uid") ||
-                    (account.isNotBlank() && key.startsWith("stu.school:") && key.endsWith("|$account"))) {
-                    (values.opt(key) as? String)?.let { pending.put(key, it) }
-                }
-                secure.write("legacy.pending", pending)
+                secure.write("legacy.pending", legacySnapshot(values, uid))
             }
             if (!editor.putInt("legacyMigrationVersion", 1).commit()) throw NativeApiError("storage_error", 0, "旧设置迁移未能保存，请重试")
             generation++
             planVersion++
-            mutableState.value = loadSession(server)
-            if (token != null && (uid == null || server.isEmpty())) setError("旧登录数据缺少服务器或身份，请重新登录；旧数据已保留")
+            mutableState.value = loadSession(configured)
+            if (state.value.token == null && token != null && (uid == null || server.isEmpty())) setError("旧登录数据缺少服务器或身份，请重新登录；旧数据已保留")
+            else if (state.value.token == null && token != null && server != configured) setError("服务已更新，请登录；之前的账号和课表数据仍保留在本机")
         }
     }
 
@@ -505,17 +520,53 @@ class NativeStore(context: Context) {
         }
     }
 
-    /** 打包时写进 assets/native-config.json 的服务器；用户不必手填。 */
+    /** Packaged service configuration is authoritative; the override exists only for fixtures. */
     private fun configuredServer(): String = try {
-        app.assets.open("native-config.json").bufferedReader(Charsets.UTF_8).use { JSONObject(it.readText()).optString("server") }
+        configuredServerForTests ?: app.assets.open("native-config.json").bufferedReader(Charsets.UTF_8)
+            .use { JSONObject(it.readText()).optString("server") }
+    } catch (_: Exception) { "" }
+
+    private fun legacyServer(): String = try {
+        legacyServerForTests ?: configuredServerForTests ?: app.assets.open("native-config.json").bufferedReader(Charsets.UTF_8)
+            .use { JSONObject(it.readText()).optString("legacyServer") }
     } catch (_: Exception) { "" }
 
     private fun initialState(): NativeState {
-        // 本机存过的地址优先；但空值不能把打包进去的地址盖掉，
-        // 否则装过早期空配置包的用户会被要求手填服务器。
-        val stored = prefs.getString("server", null)?.takeIf { it.isNotBlank() }
-        val server = try { NativeApi.normalizeServer(stored ?: configuredServer()) } catch (_: Exception) { "" }
-        return loadSession(server)
+        val configured = try {
+            NativeApi.normalizeServer(configuredServer()).takeIf { it.isNotBlank() }
+                ?: throw NativeApiError("server_required")
+        } catch (_: Exception) {
+            // Never silently select an old arbitrary host, reset its session, or forward
+            // its Bearer elsewhere when a build configuration is missing.
+            return appearanceState("").copy(error = "服务暂时不可用，请稍后重试或更新应用")
+        }
+        val previous = try { NativeApi.normalizeServer(prefs.getString("server", "").orEmpty()) }
+            catch (_: Exception) { "" }
+        var problem: String? = null
+        if (previous != configured) {
+            try {
+                if (previous.isNotBlank()) archiveServer(previous)
+                if (!prefs.edit().putString("server", configured).commit())
+                    throw NativeApiError("storage_error", 0, "服务配置未能保存，请重试")
+            } catch (_: Exception) {
+                // Keep the old setting as a recovery pointer if snapshotting failed.
+                problem = "之前的账号数据仍保留在本机；本次配置保存未完成，请稍后重试"
+            }
+        }
+        val loaded = loadSession(configured)
+        return loaded.copy(error = loaded.error ?: problem ?: if (previous.isNotBlank() && previous != configured && loaded.token == null)
+            "服务已更新，请登录；之前的账号和课表数据仍保留在本机" else null)
+    }
+
+    /** Retain recovery metadata as ciphertext; original session/school/cache stay untouched. */
+    private fun archiveServer(server: String) {
+        val saved = secure.read(sessionKey(server)) ?: return
+        val key = "server-archive:${hash(server)}"
+        if (secure.read(key) != null) return
+        val uid = saved.optJSONObject("user")?.optString("id")?.takeIf { it.isNotBlank() }
+        val snapshot = JSONObject().put("version", 1).put("server", server).put("session", copy(saved))
+        if (uid != null) snapshot.put("cacheScope", accountScope(server, uid)).put("schoolKey", schoolKey(server, uid))
+        secure.write(key, snapshot)
     }
 
     private fun loadSession(server: String): NativeState {
@@ -678,6 +729,16 @@ class NativeStore(context: Context) {
     private fun tokenSubject(token: String): String? = try {
         JSONObject(String(Base64.decode(token.split('.')[1], Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING), Charsets.UTF_8)).optString("sub").takeIf { it.isNotBlank() }
     } catch (_: Exception) { null }
+    private fun legacySnapshot(values: JSONObject, uid: String?): JSONObject {
+        val snapshot = JSONObject()
+        val account = legacyValue(values, "stu.account")
+        val allowed = setOf("stu.api", "stu.token", "stu.account", "stu.theme", "stu.palette", "stu.haptics.strength", "stu.haptics", "stu.update.skip")
+        for (key in values.keys()) if (key in allowed || (uid != null && key == "stu.done.v2:$uid") ||
+            (account.isNotBlank() && key.startsWith("stu.school:") && key.endsWith("|$account"))) {
+            (values.opt(key) as? String)?.let { snapshot.put(key, it) }
+        }
+        return snapshot
+    }
     private fun legacyValue(values: JSONObject, key: String): String = values.opt(key) as? String ?: ""
     private fun sessionKey(server: String) = "session:${hash(server)}"
     private fun schoolKey(server: String, uid: String) = "school:${hash(accountScope(server, uid))}"

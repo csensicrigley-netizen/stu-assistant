@@ -91,14 +91,19 @@ class NativeFeedbackSettingsInstrumentedTest {
         try {
             gesture.send(MotionEvent.ACTION_DOWN)
             instrumentation.waitForIdleSync()
-            repeat(pixels) { gesture.moveByOnePixel() }
-            instrumentation.waitForIdleSync()
-
-            val expected = 50f + pixels * 100f / bounds.width()
-            // Accessibility screen bounds and input dispatch can differ by up to
-            // two physical pixels. Keep this tolerance tied to device geometry,
-            // while the pure input-accumulator tests verify exact micro-deltas.
-            val draft = awaitSliderValue(expected, 2.1f * 100f / bounds.width())
+            // Establish a delivered, observable drag before the measured interval.
+            // DOWN acceptance alone does not identify the device's first drag sample.
+            gesture.moveBy(8f)
+            awaitUnsavedDraft()
+            repeat(2) { gesture.moveBy(0f) } // Flush the last moving sample with stationary input.
+            val baseline = awaitStableDraft()
+            var draft = baseline
+            repeat(pixels) { index ->
+                gesture.moveByOnePixel()
+                // Acknowledge every measured 1px input. Losing even one of these
+                // samples fails the normal .01-value tolerance; no wider pixel allowance.
+                draft = awaitSliderValue(baseline + (index + 1) * 100f / bounds.width())
+            }
             assertEquals("Dragging must not publish global settings", 50, savedStrength())
             assertEquals(50, persistedStrength())
             assertTrue("Dragging must not play repeated previews", hapticEvents.isEmpty())
@@ -191,6 +196,26 @@ class NativeFeedbackSettingsInstrumentedTest {
             SystemClock.sleep(30)
         }
         throw AssertionError("Drag never produced an unsaved draft to cancel")
+    }
+
+    private fun awaitStableDraft(): Float {
+        val saved = savedStrength().toFloat()
+        val deadline = SystemClock.uptimeMillis() + 5000
+        var previous: Float? = null
+        var stableSamples = 0
+        while (SystemClock.uptimeMillis() < deadline) {
+            val current = sliderNode()?.rangeInfo?.current
+            if (current != null && kotlin.math.abs(current - saved) > .01f) {
+                stableSamples = if (previous != null && kotlin.math.abs(current - previous) < .001f) stableSamples + 1 else 0
+                if (stableSamples >= 3) return current
+                previous = current
+            } else {
+                previous = null
+                stableSamples = 0
+            }
+            SystemClock.sleep(16)
+        }
+        throw AssertionError("Delivered drag did not settle to an observable draft baseline")
     }
 
     private fun sliderBounds(): Rect {

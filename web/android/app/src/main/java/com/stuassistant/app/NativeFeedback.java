@@ -17,7 +17,7 @@ public final class NativeFeedback implements NativeFeedbackSink, AutoCloseable {
     private boolean vendorPlaying;
     private boolean[] supported = { false, false, false };
     private int[] durations = { 0, 0, 0 };
-    private final int[] primitives = { 8, 1, 7 }; // LOW_TICK, CLICK, TICK; legacy fallback order.
+    private int[] primitives = new int[0];
     private Runnable pendingRelease;
 
     public NativeFeedback(Activity activity) { this.activity = activity; }
@@ -31,12 +31,18 @@ public final class NativeFeedback implements NativeFeedbackSink, AutoCloseable {
         if (!checkedMotor) {
             checkedMotor = true;
             if (Build.VERSION.SDK_INT >= 31) {
+                int[] supportedPrimitives = {
+                    VibrationEffect.Composition.PRIMITIVE_LOW_TICK,
+                    VibrationEffect.Composition.PRIMITIVE_CLICK,
+                    VibrationEffect.Composition.PRIMITIVE_TICK
+                }; // Keep the original LOW_TICK, CLICK, TICK fallback order.
+                primitives = supportedPrimitives;
                 VibratorManager manager = activity.getSystemService(VibratorManager.class);
                 vibrator = manager == null ? null : manager.getDefaultVibrator();
                 if (vibrator != null) {
-                    try { supported = vibrator.arePrimitivesSupported(primitives); }
+                    try { supported = vibrator.arePrimitivesSupported(VibrationEffect.Composition.PRIMITIVE_LOW_TICK, VibrationEffect.Composition.PRIMITIVE_CLICK, VibrationEffect.Composition.PRIMITIVE_TICK); }
                     catch (RuntimeException ignored) { supported = new boolean[3]; }
-                    try { durations = vibrator.getPrimitiveDurations(primitives); }
+                    try { durations = vibrator.getPrimitiveDurations(VibrationEffect.Composition.PRIMITIVE_LOW_TICK, VibrationEffect.Composition.PRIMITIVE_CLICK, VibrationEffect.Composition.PRIMITIVE_TICK); }
                     catch (RuntimeException ignored) { durations = new int[3]; }
                 }
             } else vibrator = activity.getSystemService(Vibrator.class);
@@ -198,7 +204,8 @@ public final class NativeFeedback implements NativeFeedbackSink, AutoCloseable {
 
     private void vibrate(Vibrator motor, VibrationEffect effect) {
         if (Build.VERSION.SDK_INT >= 33) motor.vibrate(effect, new VibrationAttributes.Builder().setUsage(VibrationAttributes.USAGE_PHYSICAL_EMULATION).build());
-        else motor.vibrate(effect);
+        else if (Build.VERSION.SDK_INT >= 26) motor.vibrate(effect);
+        else throw new IllegalStateException("VibrationEffect requires API 26");
     }
     private void played(String kind) { timing.played(kind, SystemClock.uptimeMillis()); }
     private void cancelPendingRelease() {

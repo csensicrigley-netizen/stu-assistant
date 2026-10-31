@@ -143,10 +143,9 @@ private fun NativeAccountForm(
     }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    var server by remember { mutableStateOf(s.server) }
-    var editServer by remember { mutableStateOf(s.server.isBlank()) }
     var busy by remember { mutableStateOf(false) }
     var problem by remember { mutableStateOf<String?>(null) }
+    var retryService by remember { mutableStateOf(false) }
     var requestJob by remember { mutableStateOf<Job?>(null) }
 
     val leave = {
@@ -162,19 +161,12 @@ private fun NativeAccountForm(
         NText("这是助手自己的账号，换手机时用它找回设置。和学校账号分开。", muted = true)
         if (notice != null) Column(Modifier.semantics { liveRegion = LiveRegionMode.Polite }) { NText(notice!!, 14) }
         else if (s.error != null) NError(s.error)
-        NChips(listOf("register" to "注册", "login" to "登录"), mode) { mode = it; problem = null }
-        if (editServer || server.isBlank()) {
-            NField("服务器地址", server, { server = it.take(2048) }, enabled = !busy)
-            NText("由部署这个助手的人提供。", 14, muted = true)
-        } else {
-            NText("连接到 ${try { java.net.URI(server).host ?: server } catch (_: Exception) { server }}", 14, muted = true)
-            NButton("更改", { editServer = true }, haptic = NativeButtonHaptic.Utility)
-        }
+        NChips(listOf("register" to "注册", "login" to "登录"), mode) { mode = it; problem = null; retryService = false }
         NField("邮箱", email, { email = it.take(200) }, enabled = !busy)
         NField("口令", password, { password = it.take(200) }, password = true, enabled = !busy)
         NText(if (mode == "register") "不要用学校密码。忘记口令可以换个邮箱重新注册，课表会重新同步。" else "注册时设置的口令。", 14, muted = true)
         NError(problem)
-        NButton(if (busy) "正在连服务器…" else if (mode == "login") "登录" else "创建并继续", {
+        NButton(if (busy) "正在连服务器…" else if (retryService) "重试" else if (mode == "login") "登录" else "创建并继续", {
             if (!busy) {
                 val address = email.trim()
                 when {
@@ -183,32 +175,24 @@ private fun NativeAccountForm(
                     else -> {
                         busy = true
                         problem = null
+                        retryService = false
                         val secret = password
                         val register = mode == "register"
+                        val configuredServer = s.server
                         requestJob = scope.launch {
                             try {
-                                val raw = server.trim().let { if (it.contains("://") || it.isEmpty()) it else "https://$it" }
-                                val normalized = NativeApi.normalizeServer(raw)
-                                if (normalized.isBlank()) throw NativeApiError("server_required")
-                                // Probe the candidate without touching the saved server/session,
-                                // and never attach the current account's Bearer to that address.
-                                val probe = NativeApi()
-                                val health = try { probe.request(NativeSession(normalized, null, 0L), "/v1/health", auth = false) }
-                                    finally { probe.close() }
-                                if (!health.optBoolean("ok")) throw NativeApiError("server_unavailable", detail = "这个地址没有返回可用的助手服务。")
+                                probeNativeAccountService(configuredServer)
                                 currentCoroutineContext().ensureActive()
-                                store.setServer(normalized)
-                                if (store.state.value.server != normalized) throw NativeApiError("storage_failed", detail = "服务器地址未能保存。")
-                                server = normalized
+                                if (store.state.value.server != configuredServer) throw NativeApiError("session_changed")
                                 store.login(address, secret, register)
                                 currentCoroutineContext().ensureActive()
                                 password = ""
-                                editServer = false
                                 authenticated()
                             } catch (error: CancellationException) {
                                 throw error
                             } catch (error: Exception) {
-                                problem = accountError(error)
+                                retryService = isNativeAccountServiceUnavailable(error)
+                                problem = if (retryService) NATIVE_ACCOUNT_SERVICE_UNAVAILABLE else accountError(error)
                             } finally { busy = false }
                         }
                     }
@@ -218,6 +202,26 @@ private fun NativeAccountForm(
         if (onPreview != null) NButton("先看看示例", { if (busy) requestJob?.cancel(); onPreview() }, modifier = Modifier.fillMaxWidth(), haptic = NativeButtonHaptic.Navigation)
     }
 }
+
+internal const val NATIVE_ACCOUNT_SERVICE_UNAVAILABLE = "服务暂时不可用，请检查网络后重试"
+
+/** A preflight is anonymous and never changes the configured server or the saved account. */
+internal suspend fun probeNativeAccountService(server: String) {
+    val probe = NativeApi()
+    try {
+        val health = probe.request(NativeSession(server, null, 0L), "/v1/health", auth = false)
+        if (health.opt("ok") != true) throw NativeApiError("service_unavailable")
+    } catch (error: CancellationException) {
+        throw error
+    } catch (error: Exception) {
+        throw NativeApiError("service_unavailable", (error as? NativeApiError)?.status ?: 0,
+            NATIVE_ACCOUNT_SERVICE_UNAVAILABLE)
+    } finally { probe.close() }
+}
+
+internal fun isNativeAccountServiceUnavailable(error: Throwable): Boolean = error is NativeApiError &&
+    (error.code in setOf("service_unavailable", "server_unavailable", "server_required", "invalid_server",
+        "network", "timeout", "invalid_json", "invalid_response") || error.status >= 500 || error.status in 300..399)
 
 private data class PendingSchool(val account: String, val password: String, val remember: Boolean)
 private val BIND_TERMINAL = setOf("ok", "failed", "cancelled")
@@ -582,8 +586,7 @@ private fun accountError(error: Throwable): String {
         "network_error" -> "服务器连不上学校系统，可能是网络问题，或学校系统正在维护。"
         "timeout" -> "服务器没有及时响应，稍后再试。"
         "request_timeout" -> "学校系统响应太慢，稍后再试。"
-        "server_required" -> "请填写助手服务器地址。"
-        "invalid_server" -> "服务器地址应为 HTTP 或 HTTPS 地址，不能包含账号、查询参数或片段。"
+        "server_required", "invalid_server", "server_unavailable", "service_unavailable" -> NATIVE_ACCOUNT_SERVICE_UNAVAILABLE
         "invalid_json", "invalid_response" -> "服务器返回的数据不完整，请稍后重试。"
         "authentication_schema_changed" -> "学校登录页面改版了，助手需要更新后才能连接。"
         "authentication_identity_mismatch" -> "登录后的身份和填写的学号不一致，请检查学号。"

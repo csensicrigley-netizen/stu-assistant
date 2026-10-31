@@ -14,7 +14,7 @@
 1. 在开发电脑上打包（把域名换成你的）：
 
    ```powershell
-   powershell -ExecutionPolicy Bypass -File deploy\make-release.ps1 -Server https://你的域名
+   powershell -ExecutionPolicy Bypass -File deploy\make-release.ps1 -Server https://你的域名 -Online
    ```
 
    生成 `release\stu-assistant-server.tar.gz` 和 `release\STU事项助手-1.0.0.apk`。
