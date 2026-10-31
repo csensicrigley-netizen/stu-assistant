@@ -2,6 +2,8 @@
 
 更新：2026-10-30。本文件记录已落地的代码和本轮实际证据，不替代逐项验收。
 
+1.0.36 后续修复见[原生登录与卡片抽屉修复](原生登录与卡片抽屉修复.md)：服务器配置退出正式用户流程，首页可点卡片与抽屉补齐交互反馈。
+
 [首版功能对照表](Compose首版功能对照表.md)的 54 项均已完成代码迁移；**不表示 54 项都已在设备逐项通过**。本轮已完成 APK 资源核验、安装启动和下列限定流程；产物哈希以 `release/` 的构建回执为准。
 
 ## 实现范围与定位
@@ -17,7 +19,7 @@ Android 入口已切为 `NativeActivity`，业务页面由 Compose 承载；Kotl
 | M01–M08；账号／来源、同步、外观、触感、反馈、退出与删除 | `nativeapp/NativeMeScreen.kt`；版本流程在 `NativeUpdates.kt`；反馈播放在 `NativeFeedback.java` |
 | G01–G02；HTTP、会话、局部失败、账号缓存、同步、Plan 写入 | `nativeapp/NativeApi.kt`、`NativeStore.kt`、`NativeState.kt`、`NativeSecureStorage.kt` |
 | G03；路由、返回、IME、Sheet 和底栏互斥 | `NativeActivity.kt`、`nativeapp/NativeModal.kt`、`LiquidGlassBottomBar.kt` |
-| G04；欢迎、预览、服务器、注册／登录、校园绑定与人工挑战 | `nativeapp/NativeAccountScreens.kt` |
+| G04；欢迎、预览、内置后台注册／登录、校园绑定与人工挑战 | `nativeapp/NativeAccountScreens.kt` |
 | G05；医学院 SSO／本地口令、验证码、同步与解除 | `nativeapp/NativeMedicalScreen.kt` |
 | G06；粘贴／CSV／手动导入、预览、校验与保存 | `nativeapp/NativeImportScreen.kt` |
 | G07；公共控件、状态、主题、圆角与字体 | `nativeapp/NativeUi.kt`、`NativeTokens.kt`、`NativeModal.kt`；固定上游控件在 `glass/` |

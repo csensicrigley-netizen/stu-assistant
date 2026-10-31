@@ -97,12 +97,15 @@ sudo bash deploy/install.sh <你的域名>
 安卓包：
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File deploy\make-release.ps1 -Server https://你的域名
+powershell -ExecutionPolicy Bypass -File deploy\make-release.ps1 -Server https://你的域名 -Online
 ```
 
 - 需要你自己准备签名密钥（`android-signing/keystore.properties`），**仓库里不含任何签名材料**
-- 脚本会校验 `web/src/lib/version.ts` 与 `android/app/build.gradle` 的版本号一致，不一致直接中止
+- 版本数字以 `android/app/build.gradle` 为源，运行 `python deploy/sync-version.py --write` 同步网页与后台；打包会校验三处一致
+- 正式后台内置于 `web/android/app/src/main/assets/native-config.json`；空地址会阻止构建，登录页不要求学生填写服务器
 - 产物在 `release/`，同时把版本写进服务端 `latest_version.json`，旧客户端就能收到更新提示
+
+原生本机测试包使用 `deploy/make-native-release.ps1 -Variant Haptics`。交付前先提交源码；APK 及其源码 SHA／版本／哈希记录只保留本机。参见[分支、升级与交付流程](docs/原生登录与卡片抽屉修复.md)。
 
 ---
 

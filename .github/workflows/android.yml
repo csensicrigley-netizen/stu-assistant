@@ -1,0 +1,50 @@
+name: Android source checks
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+      - name: Check generated version numbers
+        run: python3 deploy/sync-version.py
+      - name: Prepare existing Capacitor build dependencies
+        working-directory: web
+        run: |
+          npm ci --no-audit --no-fund
+          mkdir -p dist-android
+          printf '<!doctype html><title>Native build placeholder</title>' > dist-android/index.html
+          npx cap update android
+      - name: Set up Android command-line tools
+        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4
+        with:
+          log-accepted-android-sdk-licenses: false
+      - name: Install Android platform
+        run: sdkmanager 'platforms;android-37.0' 'build-tools;36.0.0'
+      - name: Compile, test and lint the native app
+        working-directory: web/android
+        run: bash gradlew --no-daemon --console=plain --max-workers=2 :app:testDebugUnitTest :app:assembleHaptics :app:assembleDebugAndroidTest :app:lintHaptics
+      # APKs, signing material and device data are deliberately never uploaded.

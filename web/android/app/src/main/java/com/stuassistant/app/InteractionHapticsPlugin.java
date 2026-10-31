@@ -25,7 +25,7 @@ public class InteractionHapticsPlugin extends Plugin {
     private Vibrator vibrator;
     private boolean checkedMotor;
     private boolean[] supported = { false, false, false };
-    private final int[] primitives = { 8, 1, 7 }; // LOW_TICK, CLICK, TICK
+    private int[] primitives = new int[0];
     private Runnable pendingRelease;
     private PluginCall pendingCall;
 
@@ -33,10 +33,16 @@ public class InteractionHapticsPlugin extends Plugin {
         if (!checkedMotor) {
             checkedMotor = true;
             if (Build.VERSION.SDK_INT >= 31) {
+                int[] supportedPrimitives = {
+                    VibrationEffect.Composition.PRIMITIVE_LOW_TICK,
+                    VibrationEffect.Composition.PRIMITIVE_CLICK,
+                    VibrationEffect.Composition.PRIMITIVE_TICK
+                };
+                primitives = supportedPrimitives;
                 VibratorManager manager = getContext().getSystemService(VibratorManager.class);
                 vibrator = manager == null ? null : manager.getDefaultVibrator();
                 if (vibrator != null) {
-                    try { supported = vibrator.arePrimitivesSupported(primitives); }
+                    try { supported = vibrator.arePrimitivesSupported(VibrationEffect.Composition.PRIMITIVE_LOW_TICK, VibrationEffect.Composition.PRIMITIVE_CLICK, VibrationEffect.Composition.PRIMITIVE_TICK); }
                     catch (RuntimeException ignored) { supported = new boolean[3]; }
                 }
             } else vibrator = getContext().getSystemService(Vibrator.class);
@@ -163,7 +169,8 @@ public class InteractionHapticsPlugin extends Plugin {
         if (Build.VERSION.SDK_INT >= 33) {
             // App-controlled mechanical simulation; no privileged bypass flags.
             v.vibrate(effect, new VibrationAttributes.Builder().setUsage(VibrationAttributes.USAGE_PHYSICAL_EMULATION).build());
-        } else v.vibrate(effect);
+        } else if (Build.VERSION.SDK_INT >= 26) v.vibrate(effect);
+        else throw new IllegalStateException("VibrationEffect requires API 26");
     }
 
     @PluginMethod

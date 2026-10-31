@@ -36,8 +36,8 @@ android {
         applicationId "com.stuassistant.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 51
-        versionName "1.0.50"
+        versionCode 52
+        versionName "1.0.51"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -106,6 +106,7 @@ kotlin {
 }
 
 apply from: 'capacitor.build.gradle'
+apply from: 'release-validation.gradle'
 
 try {
     def servicesJSON = file('google-services.json')

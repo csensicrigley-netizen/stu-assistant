@@ -50,7 +50,7 @@ final class RichTapHaptics {
     void rejectDirect() { directStatus = "submission_rejected"; patternFactory = null; }
 
     VibrationEffect createEffect(Context context, RichTapPattern pattern) {
-        if (!supported(context) || patternFactory == null) return null;
+        if (Build.VERSION.SDK_INT < 26 || !supported(context) || patternFactory == null) return null;
         try {
             Object effect = patternFactory.invoke(null, pattern.packet(), 1, 0, 255, 0);
             if (effect instanceof VibrationEffect) return (VibrationEffect) effect;

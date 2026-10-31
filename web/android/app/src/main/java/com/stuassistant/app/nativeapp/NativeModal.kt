@@ -1,8 +1,16 @@
 package com.stuassistant.app.nativeapp
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterExitState
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusGroup
@@ -22,7 +30,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -54,6 +61,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isShiftPressed
@@ -61,6 +69,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.input.pointer.util.addPointerInputChange
 import androidx.compose.ui.platform.LocalDensity
@@ -72,7 +81,6 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.isTraversalGroup
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.kyant.backdrop.Backdrop
 import com.kyant.shapes.RoundedRectangle
@@ -80,17 +88,18 @@ import com.stuassistant.app.glass.LiquidDialogSurface
 import com.stuassistant.app.glass.LocalLiquidGlassReducedMotion
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
-import kotlin.math.roundToInt
 
 /** The interaction contract follows web/src/components/Sheet.tsx, in the same Compose window. */
 private class NativeSheetEntry(
     val title: MutableState<String>,
     val dismiss: MutableState<() -> Unit>,
     val content: MutableState<@Composable ColumnScope.() -> Unit>,
+    val parent: NativeSheetEntry?,
 ) {
     val focus = FocusRequester()
     var containsFocus = false
     var hasBeenPresented = false
+    var requested by mutableStateOf(true)
 }
 
 class NativeSheetController {
@@ -100,6 +109,9 @@ class NativeSheetController {
     private var focusToRestore: FocusRequester? = null
 
     internal fun add(entry: Any) {
+        val sheet = entry as NativeSheetEntry
+        // A retained exiting parent's content cannot open a new live child modal.
+        if (sheet.parent?.requested == false) return
         if (entries.isEmpty()) {
             focusToRestore = backgroundFocus.firstOrNull { it.saveFocusedChild() }
         } else {
@@ -107,6 +119,26 @@ class NativeSheetController {
         }
         entries.add(entry)
     }
+
+    internal fun release(entry: Any) {
+        val sheet = entry as NativeSheetEntry
+        entries.filterIsInstance<NativeSheetEntry>().forEach { candidate ->
+            var ancestor: NativeSheetEntry? = candidate
+            while (ancestor != null) {
+                if (ancestor === sheet) { candidate.requested = false; break }
+                ancestor = ancestor.parent
+            }
+        }
+    }
+
+    internal fun requestDismiss(entry: Any) {
+        val sheet = entry as NativeSheetEntry
+        if (!sheet.requested || sheet !in entries) return
+        release(sheet)
+        sheet.dismiss.value()
+    }
+
+    internal fun finishRemoval(entry: Any) { entries.remove(entry) }
 
     internal fun restoreBackgroundFocus() {
         val target = focusToRestore
@@ -116,6 +148,14 @@ class NativeSheetController {
 }
 
 val LocalNativeSheets = staticCompositionLocalOf { NativeSheetController() }
+private val LocalNativeSheetParent = staticCompositionLocalOf<NativeSheetEntry?> { null }
+
+/** Also intercept the initial pointer pass so retained/hidden children cannot click through. */
+private fun Modifier.blockSheetPointers(): Modifier = pointerInput(Unit) {
+    awaitPointerEventScope {
+        while (true) awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() }
+    }
+}
 
 /**
  * Apply to the page and navigation sibling containers, never the modal host or backdrop source.
@@ -134,7 +174,7 @@ fun Modifier.nativeSheetBackground(controller: NativeSheetController): Modifier 
         .focusRequester(requester)
         .focusRestorer()
         .focusGroup()
-        .then(if (modal) Modifier.clearAndSetSemantics {} else Modifier)
+        .then(if (modal) Modifier.clearAndSetSemantics {}.blockSheetPointers() else Modifier)
 }
 
 /** Register outside the page's capture layer; no Android Dialog/Popup creates another window. */
@@ -145,8 +185,9 @@ fun NSheet(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val controller = LocalNativeSheets.current
-    val entry = remember {
-        NativeSheetEntry(mutableStateOf(title), mutableStateOf(onDismiss), mutableStateOf(content))
+    val parent = LocalNativeSheetParent.current
+    val entry = remember(controller, parent) {
+        NativeSheetEntry(mutableStateOf(title), mutableStateOf(onDismiss), mutableStateOf(content), parent)
     }
     SideEffect {
         entry.title.value = title
@@ -155,7 +196,9 @@ fun NSheet(
     }
     DisposableEffect(controller, entry) {
         controller.add(entry)
-        onDispose { controller.entries.remove(entry) }
+        // The host retains the visual entry until its exit finishes. Keeping entries
+        // nonempty also keeps Activity's navigation and background focus blocked.
+        onDispose { controller.release(entry) }
     }
 }
 
@@ -164,46 +207,61 @@ fun NativeSheetHost(controller: NativeSheetController, backdrop: Backdrop) {
     val entries = controller.entries.filterIsInstance<NativeSheetEntry>()
     val top = entries.lastOrNull()
     val latestTop by rememberUpdatedState(top)
-    BackHandler(enabled = top != null) { latestTop?.dismiss?.value?.invoke() }
+    val topRequested = top?.requested == true
+    val focusManager = LocalFocusManager.current
+    BackHandler(enabled = top != null) { latestTop?.let(controller::requestDismiss) }
 
-    LaunchedEffect(top) {
+    LaunchedEffect(top, topRequested) {
         // Wait until requesters and the background onEnter guards reflect the new stack.
         withFrameNanos { }
         if (latestTop !== top) return@LaunchedEffect
         if (top == null) {
             controller.restoreBackgroundFocus()
-        } else {
+        } else if (top.requested) {
             if (!top.containsFocus) {
                 val restored = top.hasBeenPresented && top.focus.restoreFocusedChild()
-                if (!restored) top.focus.requestFocus(FocusDirection.Next)
+                // The requester points to a nonfocusable focusGroup. Enter selects a
+                // descendant; Next/Previous are only valid for sequential moveFocus.
+                if (!restored) top.focus.requestFocus(FocusDirection.Enter)
             }
             top.hasBeenPresented = true
+        } else if (top.containsFocus) {
+            // No background or underlying-sheet focus until the top's exit completes.
+            focusManager.clearFocus(force = true)
         }
     }
 
     // Keep underlying content composed: it may itself register the next NSheet in the stack.
     entries.forEach { entry ->
-        key(entry) { NativeSheetLayer(entry, entry === top, backdrop) }
+        key(entry) { NativeSheetLayer(entry, entry === top && entry.requested, backdrop,
+            { controller.requestDismiss(entry) }, { controller.finishRemoval(entry) }) }
     }
 }
 
 @Composable
-private fun NativeSheetLayer(entry: NativeSheetEntry, active: Boolean, backdrop: Backdrop) {
+private fun NativeSheetLayer(entry: NativeSheetEntry, active: Boolean, backdrop: Backdrop, requestDismiss: () -> Unit, onHidden: () -> Unit) {
     val colors = LocalNativeColors.current
     val focusManager = LocalFocusManager.current
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
     val reducedMotion = LocalLiquidGlassReducedMotion.current
-    val onDismiss by rememberUpdatedState(entry.dismiss.value)
+    val onDismiss by rememberUpdatedState(requestDismiss)
     val latestActive by rememberUpdatedState(active)
     val latestReducedMotion by rememberUpdatedState(reducedMotion)
     var dragDistance by remember { mutableFloatStateOf(0f) }
     var settling by remember { mutableStateOf<Job?>(null) }
     val distanceThreshold = with(density) { 110.dp.toPx() }
     val velocityThreshold = with(density) { 600.dp.toPx() }
+    val requested = entry.requested
+    val visibility = remember { MutableTransitionState(false).apply { targetState = requested } }
+    SideEffect { visibility.targetState = requested }
+    LaunchedEffect(requested, visibility.isIdle, visibility.currentState) {
+        if (!requested && visibility.isIdle && !visibility.currentState) onHidden()
+    }
 
     fun settle() {
         settling?.cancel()
+        if (!latestActive) return
         if (latestReducedMotion) {
             dragDistance = 0f
         } else {
@@ -218,13 +276,33 @@ private fun NativeSheetLayer(entry: NativeSheetEntry, active: Boolean, backdrop:
         }
     }
 
-    LaunchedEffect(active) { if (!active) { settling?.cancel(); dragDistance = 0f } }
+    LaunchedEffect(active, requested) {
+        if (!active) {
+            settling?.cancel()
+            // A dismissed drag keeps its actual elastic offset as the exit begins.
+            if (requested) dragDistance = 0f
+        }
+    }
+    LaunchedEffect(reducedMotion) {
+        if (reducedMotion) { settling?.cancel(); dragDistance = 0f }
+    }
 
+    AnimatedVisibility(visibleState = visibility, enter = EnterTransition.None, exit = ExitTransition.None, label = "native sheet") {
+    // These values belong to AnimatedVisibility's Transition, so it retains the
+    // content through both animations; independent animateAsState would not do so.
+    val panelProgress by transition.animateFloat(
+        transitionSpec = { if (reducedMotion) snap() else spring(dampingRatio = .8333333f, stiffness = 400f) },
+        label = "sheet slide",
+    ) { if (it == EnterExitState.Visible) 1f else 0f }
+    val scrimProgress by transition.animateFloat(
+        transitionSpec = { if (reducedMotion) snap() else tween(200) }, label = "sheet scrim",
+    ) { if (it == EnterExitState.Visible) 1f else 0f }
     BoxWithConstraints(
-        Modifier.fillMaxSize().then(if (active) Modifier else Modifier.clearAndSetSemantics {}),
+        Modifier.fillMaxSize().then(if (active) Modifier else Modifier.clearAndSetSemantics {}.blockSheetPointers()),
     ) {
         Box(
             Modifier.fillMaxSize()
+                .graphicsLayer { alpha = scrimProgress.coerceIn(0f, 1f) }
                 .background(Color.Black.copy(alpha = .32f))
                 .focusProperties { canFocus = false }
                 .clearAndSetSemantics {}
@@ -235,14 +313,15 @@ private fun NativeSheetLayer(entry: NativeSheetEntry, active: Boolean, backdrop:
                     onClick = onDismiss,
                 ),
         )
-        CompositionLocalProvider(LocalNativeBackdrop provides backdrop) {
+        CompositionLocalProvider(LocalNativeBackdrop provides backdrop, LocalNativeSheetParent provides entry) {
             LiquidDialogSurface(
                 backdrop,
                 modifier = Modifier.align(Alignment.BottomCenter)
+                    // Include safe-area/IME padding in the layer's own-height exit distance.
+                    // Motion's lower elastic bound is .6; thresholds use raw pointer distance.
+                    .graphicsLayer { translationY = (1f - panelProgress) * size.height + dragDistance * .6f }
                     .navigationBarsPadding().imePadding()
                     .widthIn(max = 600.dp).fillMaxWidth().heightIn(max = maxHeight * .88f)
-                    // Motion's lower elastic bound is .6; thresholds use raw pointer distance.
-                    .offset { IntOffset(0, (dragDistance * .6f).roundToInt()) }
                     .focusProperties {
                         onEnter = { if (!active) cancelFocusChange() }
                         onExit = { if (active) cancelFocusChange() }
@@ -263,7 +342,10 @@ private fun NativeSheetLayer(entry: NativeSheetEntry, active: Boolean, backdrop:
                                         // onExit cancels traversal beyond the modal. Restart at its
                                         // first/last descendant, without visiting a background node.
                                         focusManager.clearFocus(force = true)
-                                        entry.focus.requestFocus(direction)
+                                        // Group entry uses 2-D child search. Down starts at
+                                        // its top edge, Up at its bottom edge, preserving
+                                        // forward/reverse wrapping without Next/Previous.
+                                        entry.focus.requestFocus(if (event.isShiftPressed) FocusDirection.Up else FocusDirection.Down)
                                     }
                                 }
                                 true
@@ -332,5 +414,6 @@ private fun NativeSheetLayer(entry: NativeSheetEntry, active: Boolean, backdrop:
                 }
             }
         }
+    }
     }
 }
