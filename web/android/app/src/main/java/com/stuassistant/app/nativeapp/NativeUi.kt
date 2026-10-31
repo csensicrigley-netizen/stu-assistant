@@ -49,11 +49,15 @@ val NativeFontFamily=FontFamily(Font(R.font.stu_regular,FontWeight.Normal),Font(
     BasicText(text,style=TextStyle(color=LocalNativeColors.current.ink,fontSize=size.sp,lineHeight=lineHeight.sp,fontWeight=FontWeight.Bold,fontFamily=NativeFontFamily))
 }
 
-@Composable fun nSelectionFeedback():()->Unit {
+/** Opt-in semantic feedback; visual press interactions do not imply vibration. */
+@Composable fun nHapticFeedback(kind:String):()->Unit {
     val engine = LocalNativeFeedback.current
     val strength by rememberUpdatedState(LocalNativeStrength.current)
-    return remember(engine) { { engine?.play("selection",strength) } }
+    val active = remember(engine,kind) { booleanArrayOf(false) }
+    DisposableEffect(active) { active[0]=true; onDispose { active[0]=false } }
+    return remember(engine,kind,active) { { if(active[0]&&strength>0)engine?.play(kind,strength) } }
 }
+@Composable fun nSelectionFeedback():()->Unit = nHapticFeedback("selection")
 
 @Composable fun NText(text:String,size:Int=16,bold:Boolean=false,muted:Boolean=false) {
     val c=LocalNativeColors.current
@@ -91,23 +95,41 @@ val NativeFontFamily=FontFamily(Font(R.font.stu_regular,FontWeight.Normal),Font(
     }
 }
 
-@Composable fun NButton(label:String,onClick:()->Unit,enabled:Boolean=true,primary:Boolean=false,modifier:Modifier=Modifier) {
+@Composable fun NButton(label:String,onClick:()->Unit,enabled:Boolean=true,primary:Boolean=false,modifier:Modifier=Modifier,mechanical:Boolean=false) {
     val source=remember { MutableInteractionSource() }
-    NativePressFeedback(source)
+    val commitMechanical = if(mechanical)NativePressFeedback(source,enabled)else null
     val c=LocalNativeColors.current
-    LiquidButton(onClick,LocalNativeBackdrop.current,modifier=modifier,enabled=enabled,interactionSource=source,
+    LiquidButton({commitMechanical?.invoke();onClick()},LocalNativeBackdrop.current,modifier=modifier,enabled=enabled,interactionSource=source,
         surfaceColor=if(primary)c.brand.copy(alpha=if(enabled).93f else .35f)else c.surface.copy(alpha=if(enabled).5f else .2f)) {
         BasicText(label,style=TextStyle(color=if(primary)c.onBrand else c.ink.copy(alpha=if(enabled)1f else .45f),fontSize=16.sp,lineHeight=22.sp,fontWeight=FontWeight.SemiBold,fontFamily=NativeFontFamily))
     }
 }
-@Composable internal fun NativePressFeedback(source:MutableInteractionSource) {
+/** Only explicit commit buttons opt into the existing two-phase preset. */
+@Composable internal fun NativePressFeedback(source:MutableInteractionSource,enabled:Boolean=true):()->Unit {
     val engine=LocalNativeFeedback.current
     val strength by rememberUpdatedState(LocalNativeStrength.current)
+    val latestEnabled by rememberUpdatedState(enabled)
+    val pressed=remember(source,engine) {arrayOfNulls<PressInteraction.Press>(1)}
+    val release=remember(source,engine) {{
+        if(pressed[0]!=null) {
+            pressed[0]=null
+            if(strength>0)engine?.play("release",strength)
+        }
+    }}
+    DisposableEffect(pressed) {onDispose {pressed[0]=null}}
     LaunchedEffect(source,engine) {
-        source.interactions.collect { when(it) { is PressInteraction.Press -> engine?.play("press",strength); is PressInteraction.Release -> engine?.play("release",strength); is PressInteraction.Cancel -> engine?.cancel() } }
+        source.interactions.collect { interaction ->
+            when(interaction) {
+                is PressInteraction.Press -> if(latestEnabled&&strength>0) {pressed[0]=interaction;engine?.play("press",strength)}
+                is PressInteraction.Release -> if(pressed[0]===interaction.press)release()
+                // Cancel only this gesture's pairing; do not interrupt other feedback.
+                is PressInteraction.Cancel -> if(pressed[0]===interaction.press)pressed[0]=null
+                else -> Unit
+            }
+        }
     }
+    return release
 }
-
 @Composable fun NCard(content:@Composable ColumnScope.()->Unit) {
     val c=LocalNativeColors.current
     val shape=RoundedRectangle(20.dp)
@@ -116,7 +138,6 @@ val NativeFontFamily=FontFamily(Font(R.font.stu_regular,FontWeight.Normal),Font(
 
 @Composable fun NRow(title:String,subtitle:String="",trailing:String="",onClick:(()->Unit)?=null) {
     val source=remember {MutableInteractionSource()}
-    if(onClick!=null)NativePressFeedback(source)
     Row(Modifier.fillMaxWidth().heightIn(min=48.dp).then(if(onClick!=null)Modifier.clickable(role=Role.Button,interactionSource=source,indication=null,onClick=onClick)else Modifier).padding(vertical=8.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
         Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(2.dp)) {NText(title,16,true);if(subtitle.isNotBlank())NText(subtitle,14,muted=true)}
         if(trailing.isNotEmpty())NText(trailing,14,muted=true)
@@ -125,7 +146,7 @@ val NativeFontFamily=FontFamily(Font(R.font.stu_regular,FontWeight.Normal),Font(
 }
 
 @Composable fun NIconButton(label:String,onClick:()->Unit,enabled:Boolean=true) {
-    val source=remember {MutableInteractionSource()};NativePressFeedback(source)
+    val source=remember {MutableInteractionSource()}
     val ink=LocalNativeColors.current.ink
     Box(Modifier.size(48.dp).semantics {contentDescription=label}.clickable(enabled=enabled,role=Role.Button,interactionSource=source,indication=null,onClick=onClick),contentAlignment=Alignment.Center) {
         Canvas(Modifier.size(18.dp)) {
@@ -138,15 +159,16 @@ val NativeFontFamily=FontFamily(Font(R.font.stu_regular,FontWeight.Normal),Font(
     }
 }
 
-@Composable fun NChips(options:List<Pair<String,String>>,value:String,onSelect:(String)->Unit) {
+@Composable fun NChips(options:List<Pair<String,String>>,value:String,onSelect:(String)->Unit) = NChips(options,value,onSelect,haptic=null)
+@Composable fun NChips(options:List<Pair<String,String>>,value:String,onSelect:(String)->Unit,haptic:String?) {
     if(options.isEmpty())return
     val current by rememberUpdatedState(value)
     val callback by rememberUpdatedState(onSelect)
-    val tick=nSelectionFeedback()
+    val tick=nHapticFeedback(haptic?:"selection")
     val c=LocalNativeColors.current
-    LiquidBottomTabs(selectedTabIndex={options.indexOfFirst{it.first==current}.coerceAtLeast(0)},onTabSelected={i->options.getOrNull(i)?.first?.let{if(it!=current){tick();callback(it)}}},backdrop=LocalNativeBackdrop.current,tabsCount=options.size,modifier=Modifier.fillMaxWidth().semantics { isTraversalGroup=true }) {
+    LiquidBottomTabs(selectedTabIndex={options.indexOfFirst{it.first==current}.coerceAtLeast(0)},onTabSelected={i->options.getOrNull(i)?.first?.let{if(it!=current){if(haptic!=null)tick();callback(it)}}},backdrop=LocalNativeBackdrop.current,tabsCount=options.size,modifier=Modifier.fillMaxWidth().semantics { isTraversalGroup=true }) {
         options.forEach { (key,label)->
-            LiquidBottomTab(onClick={if(key!=current){tick();callback(key)}},modifier=Modifier.semantics { selected=key==current; contentDescription=label }) {
+            LiquidBottomTab(onClick={if(key!=current){if(haptic!=null)tick();callback(key)}},modifier=Modifier.semantics { selected=key==current; contentDescription=label }) {
                 BasicText(label,style=TextStyle(color=if(key==current)c.brand else c.ink,fontSize=15.sp,lineHeight=20.sp,fontWeight=if(key==current)FontWeight.SemiBold else FontWeight.Normal,fontFamily=NativeFontFamily),maxLines=1)
             }
         }

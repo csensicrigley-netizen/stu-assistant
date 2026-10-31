@@ -145,7 +145,7 @@ private fun AcademicText(text: String, color: Color, fontSize: Int = 16, bold: B
 private fun AcademicCheck(checked: Boolean, label: String, enabled: Boolean = true, onToggle: () -> Unit) {
     val colors = LocalNativeColors.current
     val leaf = academicLeafColor()
-    val tick = nSelectionFeedback()
+    val tick = nHapticFeedback("toggle")
     Box(Modifier.size(44.dp).toggleable(checked, enabled = enabled, role = Role.Checkbox, onValueChange = { tick(); onToggle() })
         .semantics { contentDescription = label }, contentAlignment = Alignment.Center) {
         Canvas(Modifier.size(22.dp)) {
@@ -214,7 +214,7 @@ private fun academicTones(): AcademicTones {
 private fun AcademicCta(title: String, subtitle: String, icon: String, onClick: () -> Unit) {
     val c = LocalNativeColors.current
     val tones = academicTones()
-    val source = remember { MutableInteractionSource() }; NativePressFeedback(source)
+    val source = remember { MutableInteractionSource() }
     Row(Modifier.fillMaxWidth().heightIn(min = 68.dp).clip(RoundedCornerShape(20.dp)).background(tones.soft)
         .clickable(role = Role.Button, interactionSource = source, indication = null, onClick = onClick).padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -239,7 +239,7 @@ private fun AcademicDuePreview(task: AcademicTask, now: Long) {
 @Composable
 private fun AcademicNoticePreview(notice: AcademicNotice) {
     val c = LocalNativeColors.current; val context = LocalContext.current
-    val source = remember { MutableInteractionSource() }; NativePressFeedback(source)
+    val source = remember { MutableInteractionSource() }
     Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(c.surface).border(1.dp, c.border, RoundedCornerShape(14.dp))
         .then(notice.url?.let { url -> Modifier.clickable(role = Role.Button, interactionSource = source, indication = null) { nativeOpenLink(context, url) } } ?: Modifier)
         .padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -415,7 +415,7 @@ fun NativeTodayScreen(store: NativeStore, s: NativeState, onNavigate: (String) -
 @Composable
 private fun AcademicNowCard(current: AcademicBlock?, upcoming: AcademicBlock?, later: AcademicNextClass?, blocks: List<AcademicBlock>, minute: Int, status: AcademicDayStatus, onOpen: (AcademicBlock) -> Unit) {
     val colors = LocalNativeColors.current
-    val interaction = remember { MutableInteractionSource() }; NativePressFeedback(interaction)
+    val interaction = remember { MutableInteractionSource() }
     if (status.kind == "closed") { NCard { NText("▣ 停课", 13, true); NText(status.label, 20, true); NText("按教务处校历，今天没有课。", 14, muted = true) }; return }
     val block = current ?: upcoming
     if (block == null) {
@@ -517,7 +517,7 @@ private fun AcademicAgenda(blocks: List<AcademicBlock>, minute: Int, compact: Bo
 private fun AcademicLesson(block: AcademicBlock, onOpen: (AcademicBlock) -> Unit, status: String = "", compact: Boolean = false) {
     val c = LocalNativeColors.current
     val mark = academicCourseColor(block.course.hue)
-    val interaction = remember { MutableInteractionSource() }; NativePressFeedback(interaction)
+    val interaction = remember { MutableInteractionSource() }
     if (compact) {
         Row(Modifier.fillMaxWidth().clickable(role = Role.Button, interactionSource = interaction, indication = null) { onOpen(block) }, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Column(Modifier.width(52.dp).padding(top = 13.dp)) { AcademicText(block.start, if (status == "past") c.muted else c.ink, 14, bold = true); NText(block.end, 12, muted = true) }
@@ -560,7 +560,6 @@ fun NativeWeekScreen(store: NativeStore, s: NativeState, onNavigate: (String) ->
     val total = plans.sumOf { AcademicTimetable.minutes(it.blocks) }
     val isCurrent = position?.week == week
     val colors = LocalNativeColors.current
-    val tick = nSelectionFeedback()
     NPage("课表", term.label, actions = { AcademicMode(store, s, onConnect) }) {
         if (!s.sample && doc == null) AcademicEmpty(if (s.syncing || s.loading) "正在读取课表…" else "还没有课表", if (s.syncing || s.loading) "第一次同步通常要半分钟左右。" else "连接校园账号并同步后，这里会显示你每周的理论课。") {
             if (!s.syncing && !s.loading) { NButton("连医学院教务", { onNavigate("medical") }, primary = true); NButton("手动导入课表", { onNavigate("import") }) }
@@ -580,7 +579,7 @@ fun NativeWeekScreen(store: NativeStore, s: NativeState, onNavigate: (String) ->
             plans.forEachIndexed { index, plan ->
                 val wd = index + 1
                 val on = day == wd
-                Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(if (on) colors.brand.copy(alpha = .10f) else Color.Transparent).selectable(selected = on, role = Role.RadioButton, onClick = { if (!on) { tick(); day = wd } }).semantics { contentDescription = "${AcademicClock.weekdayText(wd)} ${AcademicClock.slash(plan.date)}，${if (plan.status.kind == "closed") "停课" else if (plan.blocks.isEmpty()) "没有课" else "${plan.blocks.size} 节，${AcademicClock.span(AcademicTimetable.minutes(plan.blocks))}"}" }.heightIn(min = 48.dp).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(if (on) colors.brand.copy(alpha = .10f) else Color.Transparent).selectable(selected = on, role = Role.RadioButton, onClick = { if (!on) { day = wd } }).semantics { contentDescription = "${AcademicClock.weekdayText(wd)} ${AcademicClock.slash(plan.date)}，${if (plan.status.kind == "closed") "停课" else if (plan.blocks.isEmpty()) "没有课" else "${plan.blocks.size} 节，${AcademicClock.span(AcademicTimetable.minutes(plan.blocks))}"}" }.heightIn(min = 48.dp).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Row(Modifier.width(44.dp), horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) { NText(listOf("一", "二", "三", "四", "五", "六", "日")[index], 14, true); NText(plan.date.takeLast(2).toInt().toString(), 12, muted = true) }
                     Box(Modifier.weight(1f)) { if (plan.status.kind == "closed") NText(plan.status.label, 12, muted = true) else AcademicRibbon(plan.blocks, if (isCurrent && wd == now.weekday) now.minutes else null, compact = true) }
                     Box(Modifier.width(4.dp).height(22.dp).clip(RoundedCornerShape(2.dp)).background(colors.border), contentAlignment = Alignment.BottomCenter) { Box(Modifier.fillMaxWidth().fillMaxHeight(AcademicTimetable.minutes(plan.blocks).toFloat() / max).background(if (on) colors.brand else colors.muted)) }
@@ -652,6 +651,7 @@ fun NativeItemsScreen(store: NativeStore, s: NativeState, onNavigate: (String) -
     var pending by remember { mutableStateOf<Set<String>>(emptySet()) }
     val selected = day ?: now.date
     val scope = rememberCoroutineScope()
+    val reject = nHapticFeedback("reject")
     val tasks = s.tasks.map(AcademicRecords::task)
     val exams = s.exams.map(AcademicRecords::exam)
     val openTasks = tasks.filter { it.id !in s.done && AcademicRecords.bucket(it, now.ms) != "expired" }
@@ -739,17 +739,22 @@ fun NativeItemsScreen(store: NativeStore, s: NativeState, onNavigate: (String) -
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                 Box(Modifier.weight(1f), propagateMinConstraints = true) {
                                 NButton(if (busy) "保存中…" else "保存", {
+                                    if (busy) return@NButton
                                     formError = when { title.isBlank() -> "标题不能为空。"; start.isEmpty() != end.isEmpty() -> "开始和结束时间要么都填，要么都空。"; start.isNotEmpty() && end <= start -> "结束时间要晚于开始时间。"; else -> null }
-                                    if (formError == null && !busy) {
+                                    if (formError == null) {
                                         busy = true
                                         scope.launch {
                                             try {
                                                 store.createPlan(JSONObject().put("date", selected).put("title", title).put("note", note).put("start", start).put("end", end).put("priority", priority.toInt()))
-                                                title = ""; note = ""; start = ""; end = ""; priority = "0"; formOpen = false; load(true)
-                                            } catch (e: Exception) { formError = academicError(e) } finally { busy = false }
+                                                title = ""; note = ""; start = ""; end = ""; priority = "0"; formOpen = false
+                                                // The write succeeded; a later read failure is not a rejected save.
+                                                try { load(true) } catch (e: CancellationException) { throw e } catch (_: Exception) { }
+                                            } catch (e: CancellationException) { throw e }
+                                            catch (e: Exception) { formError = academicError(e); reject() }
+                                            finally { busy = false }
                                         }
-                                    }
-                                }, enabled = !busy, primary = true)
+                                    } else reject()
+                                }, enabled = !busy, primary = true, mechanical = true)
                                 }
                                 Box(Modifier.weight(1f), propagateMinConstraints = true) { NButton("取消", { formOpen = false; formError = null }, enabled = !busy) }
                             }
@@ -794,11 +799,10 @@ private fun AcademicTimeField(label: String, value: String, onValue: (String) ->
 @Composable
 private fun AcademicDateChoice(date: String, today: String, selected: String, onSelect: () -> Unit) {
     val colors = LocalNativeColors.current
-    val tick = nSelectionFeedback()
     val on = date == selected
     Column(Modifier.width(44.dp).heightIn(min = 56.dp).clip(RoundedCornerShape(18.dp))
         .background(if (on) colors.brand.copy(alpha = .13f) else colors.surface)
-        .selectable(on, role = Role.RadioButton, onClick = { if (!on) { tick(); onSelect() } })
+        .selectable(on, role = Role.RadioButton, onClick = { if (!on) { onSelect() } })
         .semantics { contentDescription = "${AcademicClock.monthDay(date)} ${AcademicClock.weekdayText(AcademicClock.weekday(date))}${if (date == today) "，今天" else ""}" }
         .padding(vertical = 6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         NText(if (date == today) "今天" else AcademicClock.weekdayText(AcademicClock.weekday(date)).removePrefix("周"), 12, muted = !on)
@@ -811,10 +815,11 @@ private fun AcademicDateChoice(date: String, today: String, selected: String, on
 private fun AcademicPlanRow(plan: JSONObject, done: Boolean, busy: Boolean, canUp: Boolean, canDown: Boolean, onToggle: () -> Unit, onDelete: () -> Unit, onMove: (Int) -> Unit) {
     var armed by rememberSaveable(plan.optString("id")) { mutableStateOf(false) }
     val c = LocalNativeColors.current
+    val longPressFeedback = nHapticFeedback("toggle")
     Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(c.surface).border(1.dp, c.border, RoundedCornerShape(14.dp)).padding(start = 2.dp, end = 12.dp, top = 4.dp, bottom = 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             AcademicCheck(done, "${if (done) "取消完成" else "标记完成"}：${plan.optString("title")}", !busy, onToggle)
-            Column(Modifier.weight(1f).combinedClickable(onClick = {}, onLongClick = { armed = true }), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Column(Modifier.weight(1f).combinedClickable(enabled = !busy, hapticFeedbackEnabled = false, onClick = {}, onLongClick = { if (!armed) { armed = true; longPressFeedback() } }), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 AcademicText(plan.optString("title"), if (done) c.muted else c.ink, bold = true, crossed = done, maxLines = 2)
                 if (plan.optString("note").isNotEmpty()) NText(plan.optString("note"), 12, muted = true)
             }
@@ -858,7 +863,7 @@ private fun AcademicTasks(store: NativeStore, s: NativeState, tasks: List<Academ
 private fun AcademicTaskRow(task: AcademicTask, now: Long, done: Boolean, toggle: () -> Unit) {
     val c = LocalNativeColors.current
     val context = LocalContext.current
-    val interaction = remember { MutableInteractionSource() }; NativePressFeedback(interaction)
+    val interaction = remember { MutableInteractionSource() }
     Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).clip(RoundedCornerShape(14.dp)).background(c.surface).border(1.dp, c.border, RoundedCornerShape(14.dp)).padding(start = 2.dp, end = if (task.url != null) 2.dp else 12.dp, top = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             AcademicCheck(done, "${if (done) "取消完成" else "标记完成"}：${task.title}", onToggle = toggle)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
@@ -946,12 +951,11 @@ private fun academicExactNumber(value: Double): String = if (value % 1 == 0.0) v
 @Composable
 private fun AcademicScrollableChoices(options: List<Pair<String, String>>, current: String, onSelect: (String) -> Unit) {
     val colors = LocalNativeColors.current
-    val tick = nSelectionFeedback()
     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         options.forEach { (key, label) ->
             Box(Modifier.heightIn(min = 44.dp).clip(RoundedCornerShape(22.dp))
                 .background(if (key == current) colors.brand.copy(alpha = .13f) else colors.surface)
-                .selectable(key == current, role = Role.RadioButton, onClick = { if (key != current) { tick(); onSelect(key) } })
+                .selectable(key == current, role = Role.RadioButton, onClick = { if (key != current) { onSelect(key) } })
                 .padding(horizontal = 16.dp, vertical = 10.dp), contentAlignment = Alignment.Center) { NText(label, 14, key == current) }
         }
     }

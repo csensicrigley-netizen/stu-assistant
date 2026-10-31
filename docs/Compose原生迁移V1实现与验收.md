@@ -23,7 +23,7 @@ Android 入口已切为 `NativeActivity`，业务页面由 Compose 承载；Kotl
 | G07；公共控件、状态、主题、圆角与字体 | `nativeapp/NativeUi.kt`、`NativeTokens.kt`、`NativeModal.kt`；固定上游控件在 `glass/` |
 | 同包升级的旧存储导入 | `nativeapp/LegacyStorageMigration.kt` 与 `NativeStore.importLegacy` |
 
-Today“全部作业”进入 `items:school`；校历／通知进入校园对应子页。导入和医学院属于课表，保留底栏，点击已选课表可返回且不增加 selection 反馈。Sheet、IME 打开时隐藏底栏；普通按钮按下／释放两段，选择项实际改变才一次 selection。
+Today“全部作业”进入 `items:school`；校历／通知进入校园对应子页。导入和医学院属于课表，保留底栏，点击已选课表可返回且不增加 selection 反馈。Sheet、IME 打开时隐藏底栏。1.0.33 起，普通按钮与浏览操作静默，仅计划「保存」和「确认导入」保留旧两段式，其余按操作语义选择单次或拒绝反馈；见 [触感与滑条修复](Compose触感与滑条修复.md)。
 
 ## 数据与网页边界
 
