@@ -40,9 +40,9 @@ public final class NativeFeedback implements NativeFeedbackSink, AutoCloseable {
                 VibratorManager manager = activity.getSystemService(VibratorManager.class);
                 vibrator = manager == null ? null : manager.getDefaultVibrator();
                 if (vibrator != null) {
-                    try { supported = vibrator.arePrimitivesSupported(supportedPrimitives); }
+                    try { supported = vibrator.arePrimitivesSupported(VibrationEffect.Composition.PRIMITIVE_LOW_TICK, VibrationEffect.Composition.PRIMITIVE_CLICK, VibrationEffect.Composition.PRIMITIVE_TICK); }
                     catch (RuntimeException ignored) { supported = new boolean[3]; }
-                    try { durations = vibrator.getPrimitiveDurations(supportedPrimitives); }
+                    try { durations = vibrator.getPrimitiveDurations(VibrationEffect.Composition.PRIMITIVE_LOW_TICK, VibrationEffect.Composition.PRIMITIVE_CLICK, VibrationEffect.Composition.PRIMITIVE_TICK); }
                     catch (RuntimeException ignored) { durations = new int[3]; }
                 }
             } else vibrator = activity.getSystemService(Vibrator.class);

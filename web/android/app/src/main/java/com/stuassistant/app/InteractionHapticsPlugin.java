@@ -42,7 +42,7 @@ public class InteractionHapticsPlugin extends Plugin {
                 VibratorManager manager = getContext().getSystemService(VibratorManager.class);
                 vibrator = manager == null ? null : manager.getDefaultVibrator();
                 if (vibrator != null) {
-                    try { supported = vibrator.arePrimitivesSupported(supportedPrimitives); }
+                    try { supported = vibrator.arePrimitivesSupported(VibrationEffect.Composition.PRIMITIVE_LOW_TICK, VibrationEffect.Composition.PRIMITIVE_CLICK, VibrationEffect.Composition.PRIMITIVE_TICK); }
                     catch (RuntimeException ignored) { supported = new boolean[3]; }
                 }
             } else vibrator = getContext().getSystemService(Vibrator.class);
