@@ -22,7 +22,7 @@ tasks.register('validateNativeConfiguration') {
         def metadata = new groovy.json.JsonSlurper().parse(versionMetadataFile, 'UTF-8')
         def name = android.defaultConfig.versionName
         def code = android.defaultConfig.versionCode
-        if (!webName.find() || !webCode.find() || webName.group(1) != name ||
+        if (metadata.channel != 'product' || !webName.find() || !webCode.find() || webName.group(1) != name ||
                 webCode.group(1).toInteger() != code || metadata.versionName != name || metadata.versionCode != code) {
             throw new GradleException('Version numbers differ; run python deploy/sync-version.py --write')
         }
