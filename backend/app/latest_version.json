@@ -1,12 +1,12 @@
 {
-  "versionName": "1.0.52",
-  "versionCode": 53,
+  "versionName": "1.0.53",
+  "versionCode": 54,
   "apk": "/download/stu-assistant.apk",
   "notes": [
-    "抽屉打开和关闭时底部导航栏始终保留原位，不再消失或重新出现",
-    "抽屉和蒙层在导航栏上方展开，避免遮挡底栏；退出期间继续防止误触"
+    "抽屉恢复从屏幕底部进出，覆盖在导航栏上方，不再为底栏让位",
+    "底部导航持续保留原位置与状态，抽屉开关不再卸载或重建底栏"
   ],
   "mandatory": false,
-  "releasedAt": "2026-10-31T04:43:05Z",
+  "releasedAt": "2026-10-31T05:06:32Z",
   "minSupported": "1.0.0"
 }
