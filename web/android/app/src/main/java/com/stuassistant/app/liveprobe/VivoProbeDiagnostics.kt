@@ -46,7 +46,8 @@ object VivoProbeDiagnostics {
             appendLine("AppOps 为本应用的只读原始值；DEFAULT 不等于拒绝，未知 API/权限/操作不等于拒绝。")
             if (posted == null) {
                 append("posted=none at capture; missing now does not prove never posted")
-            } else if (posted.packageName != app.packageName || posted.uid != Process.myUid()) {
+            } else if (posted.packageName != app.packageName || posted.user != Process.myUserHandle() ||
+                (Build.VERSION.SDK_INT >= 29 && posted.uid != Process.myUid())) {
                 append("posted=ignored(non-self notification)")
             } else {
                 val n = posted.notification
