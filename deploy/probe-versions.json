@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "lastDeliveredVersionCodes": {
+    "com.stuassistant.app.haptics": 55,
+    "com.stuassistant.app.liveprobe": 56,
+    "com.stuassistant.app.huaweiprobe": 58,
+    "com.stuassistant.app.vivoprobe": 61,
+    "com.autonavi.minimap": 61
+  },
+  "variants": {
+    "Liveprobe": {
+      "applicationId": "com.stuassistant.app.liveprobe",
+      "versionName": "1.0.55-liveprobe.1",
+      "versionCode": 56
+    },
+    "Huaweiprobe": {
+      "applicationId": "com.stuassistant.app.huaweiprobe",
+      "versionName": "1.0.57-huaweiprobe.1",
+      "versionCode": 58
+    },
+    "Vivoprobe": {
+      "applicationId": "com.stuassistant.app.vivoprobe",
+      "versionName": "1.0.59-vivoprobe.1",
+      "versionCode": 60
+    },
+    "Vivoidentity": {
+      "applicationId": "com.stuassistant.app.vivoprobe",
+      "versionName": "1.0.60-vivoidentity.1",
+      "versionCode": 61
+    },
+    "Vivomap": {
+      "applicationId": "com.autonavi.minimap",
+      "versionName": "1.0.60-vivoidentity.1",
+      "versionCode": 61
+    }
+  }
+}

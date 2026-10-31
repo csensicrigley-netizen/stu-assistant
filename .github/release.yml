@@ -1,0 +1,14 @@
+# Device capability probes are tracked in docs/版本与验证构建.md, not product release notes.
+# This config only filters generated notes; it never publishes or tags a release.
+changelog:
+  exclude:
+    labels:
+      - device-probe
+      - release-maintenance
+  categories:
+    - title: 产品功能与修复
+      labels:
+        - product-change
+    - title: 其他产品变更（发布前核对）
+      labels:
+        - "*"

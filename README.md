@@ -101,11 +101,13 @@ powershell -ExecutionPolicy Bypass -File deploy\make-release.ps1 -Server https:/
 ```
 
 - 需要你自己准备签名密钥（`android-signing/keystore.properties`），**仓库里不含任何签名材料**
-- 版本数字以 `android/app/build.gradle` 为源，运行 `python deploy/sync-version.py --write` 同步网页与后台；打包会校验三处一致
+- 产品版本以 `android/app/build.gradle` 的 `defaultConfig` 为源，运行 `python deploy/sync-version.py --write` 同步网页与后台；机型探针使用独立的 `deploy/probe-versions.json`，不能推动产品版本或更新提示
 - 正式后台内置于 `web/android/app/src/main/assets/native-config.json`；空地址会阻止构建，登录页不要求学生填写服务器
 - 产物在 `release/`，同时把版本写进服务端 `latest_version.json`，旧客户端就能收到更新提示
 
 原生本机测试包使用 `deploy/make-native-release.ps1 -Variant Haptics`。交付前先提交源码；APK 及其源码 SHA／版本／哈希记录只保留本机。参见[分支、升级与交付流程](docs/原生登录与卡片抽屉修复.md)。
+
+当前产品功能基线为 `1.0.54` / code55；`1.0.55–1.0.60` 是已交付的独立通知实验编号，不代表正式功能升级。完整 App 的本机验证、机型探针、网页源码变化与实际生产发布分别登记，见[版本与验证构建](docs/版本与验证构建.md)。
 
 ---
 
