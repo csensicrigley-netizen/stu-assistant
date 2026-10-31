@@ -137,6 +137,7 @@ class NativeStore(context: Context) {
             val nextTheme = theme?.takeIf { it in setOf("system", "light", "dark") } ?: state.value.theme
             val nextPalette = palette?.takeIf { it in setOf("sweet", "classic") } ?: state.value.palette
             val nextStrength = strength?.coerceIn(0, 100) ?: state.value.hapticStrength
+            if (nextTheme == state.value.theme && nextPalette == state.value.palette && nextStrength == state.value.hapticStrength) return
             prefs.edit().putString("theme", nextTheme).putString("palette", nextPalette)
                 .putInt("strength", nextStrength).apply()
             mutableState.value = state.value.copy(theme = nextTheme, palette = nextPalette,

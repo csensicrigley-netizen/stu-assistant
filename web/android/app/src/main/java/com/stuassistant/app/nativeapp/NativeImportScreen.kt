@@ -40,6 +40,7 @@ internal fun nativeImportDocument(doc:AcademicTimetableDoc):JSONObject = JSONObj
 @Composable fun NativeImportScreen(store:NativeStore,s:NativeState,onNavigate:(String)->Unit) {
     val context=LocalContext.current
     val scope=rememberCoroutineScope()
+    val rejectFeedback=nHapticFeedback("reject")
     val semester=remember {(AcademicCalendar.position()?.term?:AcademicCalendar.currentOrNext(AcademicClock.moment().date)).id}
     var step by remember {mutableStateOf(0)}
     var school by remember {mutableStateOf<String?>(null)}
@@ -120,9 +121,9 @@ internal fun nativeImportDocument(doc:AcademicTimetableDoc):JSONObject = JSONObj
                 NError(problem)
                 NButton(if(busy=="save")"正在导入…"else if(errors.isNotEmpty())"先导入读懂的 ${courses.size} 门"else"确认导入",{scope.launch {
                     busy="save";problem=null
-                    try {val res=store.request("/v1/timetable/import/save","POST",JSONObject().put("doc",nativeImportDocument(doc!!)).put("school",school).put("note",note));if(res.optBoolean("ok")){savedAt=res.optString("semester",semester);go(3);store.reloadAfterMutation()}else{raw=JSONObject(raw.toString()).put("errors",res.optJSONArray("errors")?:JSONArray().put("导入没有成功，再试一次"));problem="这份课表没通过服务端校验，看看下面红字。"}}
-                    catch(e:CancellationException){throw e}catch(_:Exception){problem="导入没有送出去，检查一下网络再试一次。"}finally{busy=null}
-                }},courses.isNotEmpty()&&busy==null,true,Modifier.fillMaxWidth())
+                    try {val res=store.request("/v1/timetable/import/save","POST",JSONObject().put("doc",nativeImportDocument(doc!!)).put("school",school).put("note",note));if(res.optBoolean("ok")){savedAt=res.optString("semester",semester);go(3);store.reloadAfterMutation()}else{raw=JSONObject(raw.toString()).put("errors",res.optJSONArray("errors")?:JSONArray().put("导入没有成功，再试一次"));problem="这份课表没通过服务端校验，看看下面红字。";rejectFeedback()}}
+                    catch(e:CancellationException){throw e}catch(_:Exception){problem="导入没有送出去，检查一下网络再试一次。";rejectFeedback()}finally{busy=null}
+                }},courses.isNotEmpty()&&busy==null,true,Modifier.fillMaxWidth(),mechanical=true)
                 if(courses.isEmpty())NText("一门课都没解析出来，先回去改一下。每一行至少要有课程名和「周几 第几节」。",14,muted=true)
                 else if(errors.isNotEmpty())NText("也可以先导进去，回头把那几行改好再导入一次 —— 同一学期是整份覆盖，不会留两份。",14,muted=true)
             }
@@ -182,8 +183,8 @@ internal fun nativeImportDocument(doc:AcademicTimetableDoc):JSONObject = JSONObj
 }
 
 @Composable private fun ImportChoice(label:String,selected:Boolean,description:String=label,onClick:()->Unit) {
-    val c=LocalNativeColors.current;val tick=nSelectionFeedback()
-    Box(Modifier.heightIn(min=48.dp).clip(RoundedRectangle(12.dp)).background(if(selected)c.brand.copy(alpha=.15f)else c.surface).toggleable(value=selected,role=Role.Checkbox){tick();onClick()}.semantics{contentDescription=description}.padding(horizontal=12.dp,vertical=10.dp),contentAlignment=Alignment.Center){NText(label,14,bold=selected)}
+    val c=LocalNativeColors.current
+    Box(Modifier.heightIn(min=48.dp).clip(RoundedRectangle(12.dp)).background(if(selected)c.brand.copy(alpha=.15f)else c.surface).toggleable(value=selected,role=Role.Checkbox){onClick()}.semantics{contentDescription=description}.padding(horizontal=12.dp,vertical=10.dp),contentAlignment=Alignment.Center){NText(label,14,bold=selected)}
 }
 
 @Composable private fun ImportPreviewGrid(courses:List<AcademicCourse>) {

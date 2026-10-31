@@ -62,7 +62,7 @@ class NativeActivity:ComponentActivity() {
     val context=androidx.compose.ui.platform.LocalContext.current
     val activity=context as ComponentActivity
     SideEffect {WindowCompat.getInsetsController(activity.window,activity.window.decorView).apply {isAppearanceLightStatusBars=!dark;isAppearanceLightNavigationBars=!dark}}
-    val reduced=remember {Settings.Global.getFloat(context.contentResolver,Settings.Global.ANIMATOR_DURATION_SCALE,1f)==0f}
+    val reduced=remember(resumeEpoch) {Settings.Global.getFloat(context.contentResolver,Settings.Global.ANIMATOR_DURATION_SCALE,1f)==0f}
     var route by rememberSaveable {mutableStateOf("today")}
     var campusView by rememberSaveable {mutableStateOf("notices")}
     var connect by rememberSaveable {mutableStateOf(false)}
@@ -93,15 +93,17 @@ class NativeActivity:ComponentActivity() {
             Box(Modifier.fillMaxSize().layerBackdrop(page).nativeSheetBackground(sheets)) {
                 if(!ready) NPage("STU 事项助手"){NLoading()}
                 else if(needsWelcome||connect) NativeWelcomeScreen(store,s,start=gateStart,onDone={connect=false;store.reloadAfterMutation()},onCancel=if(gateCancelable){{connect=false}}else null)
-                else when {
-                    route=="today"->NativeTodayScreen(store,s,navigate,onConnect)
-                    route=="week"->NativeWeekScreen(store,s,navigate,onConnect)
-                    route.startsWith("items")->NativeItemsScreen(store,s,navigate,onConnect,route.substringAfter(':',"all"))
-                    route.startsWith("campus")->NativeCampusScreen(store,s,campusView,onConnect,{campusView=it})
-                    route=="me"->NativeMeScreen(store,s,onConnect,{connect=false;route="today"})
-                    route=="medical"->NativeMedicalScreen(store,s,navigate)
-                    route=="import"->NativeImportScreen(store,s,navigate)
-                    else->NativeTodayScreen(store,s,navigate,onConnect)
+                else NativePageTransition(NativePageRoute(route,campusView),reduced) { snapshot ->
+                    when {
+                        snapshot.route=="today"->NativeTodayScreen(store,s,navigate,onConnect)
+                        snapshot.route=="week"->NativeWeekScreen(store,s,navigate,onConnect)
+                        snapshot.route.startsWith("items")->NativeItemsScreen(store,s,navigate,onConnect,snapshot.route.substringAfter(':',"all"))
+                        snapshot.route.startsWith("campus")->NativeCampusScreen(store,s,snapshot.campusView,onConnect,{campusView=it})
+                        snapshot.route=="me"->NativeMeScreen(store,s,onConnect,{connect=false;route="today"})
+                        snapshot.route=="medical"->NativeMedicalScreen(store,s,navigate)
+                        snapshot.route=="import"->NativeImportScreen(store,s,navigate)
+                        else->NativeTodayScreen(store,s,navigate,onConnect)
+                    }
                 }
             }
             if(ready&&!needsWelcome&&!connect&&!ime&&sheets.entries.isEmpty()) {

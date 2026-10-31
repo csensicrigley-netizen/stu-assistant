@@ -134,6 +134,8 @@ private fun NativeAccountForm(
 ) {
     val scope = rememberCoroutineScope()
     val authenticated by rememberUpdatedState(onAuthenticated)
+    val confirmFeedback = nHapticFeedback("confirm")
+    val rejectFeedback = nHapticFeedback("reject")
     val back by rememberUpdatedState(onBack)
     val expired = s.error?.let { it.contains("登录") && it.contains("过期") } == true
     var notice by remember { mutableStateOf<String?>(if (expired) "登录已过期，请重新登录。" else null) }
@@ -178,8 +180,8 @@ private fun NativeAccountForm(
             if (!busy) {
                 val address = email.trim()
                 when {
-                    address.length < 3 || !address.contains('@') || address.startsWith('@') || address.endsWith('@') -> problem = "请填写完整的邮箱地址。"
-                    password.length < 8 -> problem = "填写的内容格式不对，检查一下邮箱和口令（至少 8 位）。"
+                    address.length < 3 || !address.contains('@') || address.startsWith('@') || address.endsWith('@') -> { problem = "请填写完整的邮箱地址。"; rejectFeedback() }
+                    password.length < 8 -> { problem = "填写的内容格式不对，检查一下邮箱和口令（至少 8 位）。"; rejectFeedback() }
                     else -> {
                         busy = true
                         problem = null
@@ -204,11 +206,13 @@ private fun NativeAccountForm(
                                 currentCoroutineContext().ensureActive()
                                 password = ""
                                 editServer = false
+                                confirmFeedback()
                                 authenticated()
                             } catch (error: CancellationException) {
                                 throw error
                             } catch (error: Exception) {
                                 problem = accountError(error)
+                                rejectFeedback()
                             } finally { busy = false }
                         }
                     }
@@ -226,6 +230,8 @@ private val BIND_TERMINAL = setOf("ok", "failed", "cancelled")
 private fun NativeCampusBind(store: NativeStore, s: NativeState, onDone: () -> Unit, onCancel: (() -> Unit)?) {
     val scope = rememberCoroutineScope()
     val done by rememberUpdatedState(onDone)
+    val confirmFeedback = nHapticFeedback("confirm")
+    val rejectFeedback = nHapticFeedback("reject")
     val cancel by rememberUpdatedState(onCancel)
     val serial = remember { Mutex() }
     var account by remember { mutableStateOf(s.schoolId) }
@@ -310,6 +316,7 @@ private fun NativeCampusBind(store: NativeStore, s: NativeState, onDone: () -> U
                         store.reloadAfterMutation()
                         if (rememberProblem != null) problem = rememberProblem
                         ready = true
+                        if ((errors?.length() ?: 0) == 0) confirmFeedback()
                         if ((errors?.length() ?: 0) == 0 && problem == null && !leaving) done()
                         return@LaunchedEffect
                     }
@@ -318,6 +325,7 @@ private fun NativeCampusBind(store: NativeStore, s: NativeState, onDone: () -> U
                         pending = null
                         answers.clear()
                         problem = bindFailure(snapshot)
+                        rejectFeedback()
                         return@LaunchedEffect
                     }
                     "cancelled" -> {
@@ -409,7 +417,7 @@ private fun NativeCampusBind(store: NativeStore, s: NativeState, onDone: () -> U
                                         answers.remove(challengeId)
                                     }
                                 } catch (error: CancellationException) { throw error }
-                                catch (error: Exception) { problem = accountError(error) }
+                                catch (error: Exception) { problem = accountError(error); rejectFeedback() }
                                 finally { submitting = null }
                             }
                         }
@@ -435,8 +443,8 @@ private fun NativeCampusBind(store: NativeStore, s: NativeState, onDone: () -> U
         } else if (!running && state != "ok") {
             NButton(if (starting) "连接中…" else "连接", {
                 when {
-                    !agree -> problem = "请先确认本人只读授权。"
-                    account.trim().length < 3 || password.isEmpty() -> problem = "请填写校园账号和学校统一认证密码。"
+                    !agree -> { problem = "请先确认本人只读授权。"; rejectFeedback() }
+                    account.trim().length < 3 || password.isEmpty() -> { problem = "请填写校园账号和学校统一认证密码。"; rejectFeedback() }
                     else -> {
                         starting = true; problem = null; ready = false; pollingFinished = false; answers.clear()
                         val credentials = PendingSchool(account.trim(), password, rememberPassword)
@@ -451,7 +459,7 @@ private fun NativeCampusBind(store: NativeStore, s: NativeState, onDone: () -> U
                                 job = checked
                                 jobId = checked.getString("job_id")
                             } catch (error: CancellationException) { pending = null; throw error }
-                            catch (error: Exception) { pending = null; problem = accountError(error) }
+                            catch (error: Exception) { pending = null; problem = accountError(error); rejectFeedback() }
                             finally { starting = false }
                         }
                     }
@@ -519,7 +527,7 @@ private fun AccountQrContent(content: String, encoded: String) {
 /** A consent checkbox keeps checked semantics; it is neither a push button nor a switch. */
 @Composable
 private fun AccountCheckbox(checked: Boolean, onCheckedChange: (Boolean) -> Unit, enabled: Boolean, label: AnnotatedString) {
-    val tick = nSelectionFeedback()
+    val tick = nHapticFeedback("toggle")
     val colors = LocalNativeColors.current
     val alpha = if (enabled) 1f else .45f
     val shape = RoundedRectangle(4.dp)

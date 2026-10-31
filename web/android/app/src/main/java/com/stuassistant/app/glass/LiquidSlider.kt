@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -66,12 +67,14 @@ fun LiquidSlider(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     onValueChangeFinished: () -> Unit = {},
+    onValueChangeCancelled: () -> Unit = {},
 ) {
     require(valueRange.start.isFinite() && valueRange.endInclusive.isFinite() && valueRange.endInclusive > valueRange.start)
     require(visibilityThreshold.isFinite() && visibilityThreshold > 0f)
     val latestValue by rememberUpdatedState(value)
     val latestOnValueChange by rememberUpdatedState(onValueChange)
     val latestOnValueChangeFinished by rememberUpdatedState(onValueChangeFinished)
+    val latestOnValueChangeCancelled by rememberUpdatedState(onValueChangeCancelled)
     val reducedMotion = LocalLiquidGlassReducedMotion.current
     val isLightTheme = !(LocalLiquidGlassDarkTheme.current ?: isSystemInDarkTheme())
     val accentColor = LocalLiquidGlassAccentColor.current ?:
@@ -98,7 +101,12 @@ fun LiquidSlider(
 
         val isLtr = LocalLayoutDirection.current == LayoutDirection.Ltr
         val animationScope = rememberCoroutineScope()
-        var didDrag by remember { mutableStateOf(false) }
+        var didDrag by remember(trackWidth, isLtr, valueRange, reducedMotion, enabled) { mutableStateOf(false) }
+        var isDragging by remember(trackWidth, isLtr, valueRange, reducedMotion, enabled) { mutableStateOf(false) }
+        var dragValue by remember(trackWidth, isLtr, valueRange, reducedMotion, enabled) {
+            mutableFloatStateOf(latestValue().coerceIn(valueRange))
+        }
+        val dragInput = remember(trackWidth, isLtr, valueRange, reducedMotion, enabled) { SliderDragValue(valueRange) }
         val dampedDragAnimation = remember(animationScope, trackWidth, isLtr, valueRange, visibilityThreshold, reducedMotion, enabled) {
             DampedDragAnimation(
                 animationScope = animationScope,
@@ -108,32 +116,39 @@ fun LiquidSlider(
                 initialScale = 1f,
                 pressedScale = if (reducedMotion) 1f else 1.5f,
                 reducedMotion = reducedMotion,
-                onDragStarted = { didDrag = false },
+                onDragStarted = {
+                    didDrag = false
+                    dragInput.start(latestValue())
+                    dragValue = dragInput.value
+                    isDragging = true
+                },
                 onDragStopped = {
                     if (didDrag) {
-                        latestOnValueChange(targetValue)
+                        latestOnValueChange(dragInput.value)
                         latestOnValueChangeFinished()
                     }
                     didDrag = false
+                    isDragging = false
                 },
                 onDragCancelled = {
                     didDrag = false
+                    latestOnValueChangeCancelled()
+                    isDragging = false
                     animateToValue(latestValue().coerceIn(valueRange))
                 },
                 onDrag = { _, dragAmount ->
-                    if (!didDrag) {
-                        didDrag = dragAmount.x != 0f
+                    if (dragAmount.x != 0f) {
+                        didDrag = true
+                        dragValue = dragInput.dragBy(dragAmount.x, trackWidth, isLtr)
+                        latestOnValueChange(dragValue)
                     }
-                    val delta = (valueRange.endInclusive - valueRange.start) * (dragAmount.x / trackWidth)
-                    latestOnValueChange(
-                        if (isLtr) (targetValue + delta).coerceIn(valueRange)
-                        else (targetValue - delta).coerceIn(valueRange)
-                    )
                 }
             )
         }
         LaunchedEffect(dampedDragAnimation) {
-            snapshotFlow { latestValue() }
+            // Keep upstream spring motion, but never use its asynchronous target
+            // as the next input position or let external rounding replace a drag.
+            snapshotFlow { if (isDragging) dragValue else latestValue().coerceIn(valueRange) }
                 .collectLatest { value ->
                     if (dampedDragAnimation.targetValue != value) {
                         dampedDragAnimation.updateValue(value)

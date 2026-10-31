@@ -1,11 +1,8 @@
 package com.stuassistant.app.nativeapp
 
 import android.graphics.BitmapFactory
-import android.os.SystemClock
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -31,6 +28,7 @@ import kotlin.math.roundToInt
 fun NativeMeScreen(store: NativeStore, s: NativeState, onConnect: () -> Unit, onSignOut: () -> Unit) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val toggleFeedback = nHapticFeedback("toggle")
     var busy by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
     var confirmDelete by remember { mutableStateOf(false) }
@@ -136,9 +134,9 @@ fun NativeMeScreen(store: NativeStore, s: NativeState, onConnect: () -> Unit, on
         NText("外观", 20, true)
         NCard {
             NText("主题", 14, true)
-            NChips(listOf("system" to "跟随系统", "light" to "浅色", "dark" to "深色"), s.theme, { store.setAppearance(theme = it) })
+            NChips(listOf("system" to "跟随系统", "light" to "浅色", "dark" to "深色"), s.theme, { store.setAppearance(theme = it); toggleFeedback() })
             NText("色系", 14, true)
-            NChips(listOf("sweet" to "樱粉", "classic" to "海蓝"), s.palette, { store.setAppearance(palette = it) })
+            NChips(listOf("sweet" to "樱粉", "classic" to "海蓝"), s.palette, { store.setAppearance(palette = it); toggleFeedback() })
             NText("跟手机系统的深浅色走，装到桌面之后也不会跳。", 14, muted = true)
         }
         NativeFeedbackSettings(store, s)
@@ -201,17 +199,7 @@ fun NativeMeScreen(store: NativeStore, s: NativeState, onConnect: () -> Unit, on
 
 @Composable
 private fun NativeMeConnectCard(title: String, subtitle: String, onClick: () -> Unit) {
-    val source = remember { MutableInteractionSource() }
-    val engine = LocalNativeFeedback.current
-    val strength by rememberUpdatedState(LocalNativeStrength.current)
-    LaunchedEffect(source, engine) {
-        source.interactions.collect { interaction -> when (interaction) {
-            is PressInteraction.Press -> engine?.play("press", strength)
-            is PressInteraction.Release -> engine?.play("release", strength)
-            is PressInteraction.Cancel -> engine?.cancel()
-        } }
-    }
-    LiquidButton(onClick, LocalNativeBackdrop.current, interactionSource = source,
+    LiquidButton(onClick, LocalNativeBackdrop.current,
         modifier = Modifier.fillMaxWidth(), surfaceColor = LocalNativeColors.current.surface.copy(alpha = .5f)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
@@ -225,31 +213,35 @@ private fun NativeMeConnectCard(title: String, subtitle: String, onClick: () -> 
 }
 
 @Composable
-private fun NativeFeedbackSettings(store: NativeStore, s: NativeState) {
+internal fun NativeFeedbackSettings(store: NativeStore, s: NativeState) {
     val engine = LocalNativeFeedback.current
-    var strength by remember { mutableIntStateOf(s.hapticStrength) }
-    var lastPreview by remember { mutableLongStateOf(Long.MIN_VALUE) }
-    LaunchedEffect(s.hapticStrength) { strength = s.hapticStrength }
+    // A drag owns its continuous draft. Global preferences only change on commit.
+    var draft by remember { mutableFloatStateOf(s.hapticStrength.toFloat()) }
+    var editing by remember { mutableStateOf(false) }
+    LaunchedEffect(s.hapticStrength) { if (!editing) draft = s.hapticStrength.toFloat() }
+    val strength = draft.roundToInt().coerceIn(0, 100)
     NText("触感反馈", 20, true)
     NCard {
-        NRow("按键强度", trailing = if (strength == 0) "已关闭" else strength.toString())
-        LiquidSlider(value = { strength.toFloat() }, onValueChange = { value ->
-            val next = value.roundToInt().coerceIn(0, 100)
-            if (next != strength) {
-                strength = next
-                store.setAppearance(strength = next)
-                val now = SystemClock.elapsedRealtime()
-                if (next > 0 && (lastPreview == Long.MIN_VALUE || now - lastPreview >= 60)) {
-                    lastPreview = now
-                    engine?.play("selection", next)
-                }
-            }
-        }, valueRange = 0f..100f, visibilityThreshold = 1f, backdrop = LocalNativeBackdrop.current,
+        NRow("触感强度", trailing = if (strength == 0) "已关闭" else strength.toString())
+        LiquidSlider(value = { draft }, onValueChange = { value ->
+            editing = true
+            draft = value.coerceIn(0f, 100f)
+            if (draft.roundToInt() == 0) engine?.cancel()
+        }, onValueChangeFinished = {
+            val committed = draft.roundToInt().coerceIn(0, 100)
+            draft = committed.toFloat()
+            store.setAppearance(strength = committed)
+            editing = false
+            if (committed == 0) engine?.cancel() else engine?.play("preview", committed)
+        }, onValueChangeCancelled = {
+            draft = store.state.value.hapticStrength.toFloat()
+            editing = false
+        }, valueRange = 0f..100f, visibilityThreshold = .01f, backdrop = LocalNativeBackdrop.current,
             modifier = Modifier.fillMaxWidth().height(56.dp).semantics {
-                contentDescription = "按键强度"
+                contentDescription = "触感强度"
                 stateDescription = if (strength == 0) "已关闭" else "$strength%"
             })
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { NText("0", 14, muted = true); NText("100", 14, muted = true) }
-        NText("滑动感受力度，调到0即可关闭。", 14, muted = true)
+        NText("松手试听，0 为关闭。", 14, muted = true)
     }
 }

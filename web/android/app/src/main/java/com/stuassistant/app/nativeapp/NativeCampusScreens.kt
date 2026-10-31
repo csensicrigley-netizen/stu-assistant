@@ -176,7 +176,6 @@ private fun CampusNotices(store: NativeStore, s: NativeState, now: AcademicMomen
     }
     CampusNoticeSearch(query, { query = it })
     if (sources.size > 1) {
-        val tick = nSelectionFeedback()
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).selectableGroup(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             (listOf("all") + sources).forEach { key ->
                 val c = LocalNativeColors.current
@@ -185,7 +184,7 @@ private fun CampusNotices(store: NativeStore, s: NativeState, now: AcademicMomen
                 Box(Modifier.heightIn(min = 48.dp).clip(shape)
                     .background(if (selected) c.brand.copy(alpha = .14f) else c.surface)
                     .border(1.dp, if (selected) c.brand else c.border, shape)
-                    .selectable(selected = selected, role = Role.RadioButton) { if (source != key) { tick(); source = key } }
+                    .selectable(selected = selected, role = Role.RadioButton) { if (source != key) { source = key } }
                     .padding(horizontal = 14.dp, vertical = 10.dp), contentAlignment = Alignment.Center) {
                     NText(if (key == "all") "全部" else AcademicRecords.source(key), 14, selected)
                 }
@@ -348,7 +347,6 @@ private fun CampusLife(store: NativeStore, s: NativeState, now: AcademicMoment, 
     CampusSection("充电桩", chargeNote) {
         if (charging.isEmpty()) CampusSkeletonGrid(6, 2, 84)
         else {
-            val tick = nSelectionFeedback()
             sortedPlaces.chunked(2).forEach { pair ->
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     pair.forEach { p ->
@@ -358,7 +356,7 @@ private fun CampusLife(store: NativeStore, s: NativeState, now: AcademicMoment, 
                         Column(Modifier.weight(1f).heightIn(min = 84.dp).clip(shape)
                             .background(if (selected) c.brand.copy(alpha = .10f) else c.surface)
                             .border(1.dp, if (selected) c.brand.copy(alpha = .4f) else c.border, shape)
-                            .clickable(role = Role.Button) { tick(); place = if (selected) null else p.name }
+                            .clickable(role = Role.Button) { place = if (selected) null else p.name }
                             .padding(horizontal = 16.dp, vertical = 12.dp)
                             .semantics {
                                 this.selected = selected
