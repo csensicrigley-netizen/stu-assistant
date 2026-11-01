@@ -37,6 +37,9 @@ import java.util.concurrent.CopyOnWriteArrayList
 class NativeCalendarOnlineTest {
     private val inst = InstrumentationRegistry.getInstrumentation()
     private fun find(text: String): AccessibilityNodeInfo? {
+        // UIAutomation may retain the outgoing AnimatedContent tree after a day slide.
+        // Read the current window, not stale virtual nodes from the preceding day/test.
+        if (android.os.Build.VERSION.SDK_INT >= 33) inst.uiAutomation.clearCache()
         val root = inst.uiAutomation.rootInActiveWindow ?: return null
         val queue = ArrayDeque<AccessibilityNodeInfo>(); queue.add(root)
         while (queue.isNotEmpty()) {
