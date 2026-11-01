@@ -94,7 +94,8 @@ class NativeActivity:ComponentActivity() {
     CompositionLocalProvider(LocalCalendarComposer provides {calendarOpen=true},LocalNativeColors provides colors,LocalNativePalette provides s.palette,LocalNativeForegroundEpoch provides resumeEpoch,LocalNativeBackdrop provides base,LocalNativeFeedback provides feedback,LocalNativeStrength provides s.hapticStrength,LocalNativeConnect provides onConnect,LocalNativeSheets provides sheets,LocalLiquidGlassDarkTheme provides dark,LocalLiquidGlassAccentColor provides colors.brand,LocalLiquidGlassReducedMotion provides reduced) {
         Box(Modifier.fillMaxSize().background(colors.bg)) {
             Box(Modifier.fillMaxSize().layerBackdrop(base).background(colors.bg))
-            Box(Modifier.fillMaxSize().layerBackdrop(page).nativeSheetBackground(sheets)) {
+            Box(Modifier.fillMaxSize().layerBackdrop(page).nativeSheetBackground(sheets)
+                .then(if(calendarOpen) Modifier.clearAndSetSemantics {} else Modifier)) {
                 if(!ready) NPage("STU 事项助手"){NLoading()}
                 else if(needsWelcome||connect) NativeWelcomeScreen(store,s,start=gateStart,onDone={connect=false;store.reloadAfterMutation()},onCancel=if(gateCancelable){{connect=false}}else null)
                 else NativePageTransition(NativePageRoute(route,campusView),reduced) { snapshot ->
@@ -117,7 +118,8 @@ class NativeActivity:ComponentActivity() {
                 val urgent=s.tasks.map(AcademicRecords::task).count {it.id !in s.done&&AcademicRecords.bucket(it) in listOf("today","overdue")}
                 val reconnect=s.sources.count {it.optString("state")=="need_login"&&it.optString("source") in academicStrings(s.user?.optJSONArray("bound"))}
                 val tabs=listOf(GlassNavigationTab("today","今天"),GlassNavigationTab("week","课表"),GlassNavigationTab("items","事项",urgent),GlassNavigationTab("campus","校园"),GlassNavigationTab("me","我的",reconnect))
-                Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height((104+bottom).dp).nativeSheetBackground(sheets)) {
+                Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height((104+bottom).dp).nativeSheetBackground(sheets)
+                    .then(if(calendarOpen) Modifier.clearAndSetSemantics {} else Modifier)) {
                     LiquidGlassBottomBar(GlassNavigationState(current,tabs,dark,s.palette,s.hapticStrength,bottom,reduced),combined) {next->
                         // Also reject a selection queued before the sheet opened.
                         if(sheets.entries.isEmpty()&&!calendarOpen) {
@@ -130,7 +132,9 @@ class NativeActivity:ComponentActivity() {
             if(ready) NativeUpdatePrompt(store,combined,Modifier.align(Alignment.BottomCenter).padding(start=12.dp,end=12.dp,bottom=(104+bottom).dp))
             NativeSheetHost(sheets,combined)
             AnimatedVisibility(calendarOpen&&s.token!=null&&!s.preview, enter=slideInVertically(tween(420)){ -it/12 }+fadeIn(tween(220)), exit=slideOutVertically(tween(260)){ -it/12 }+fadeOut(tween(220))) {
-                NativeCalendarComposer(store,s) {calendarOpen=false}
+                CompositionLocalProvider(LocalNativeBackdrop provides combined) {
+                    NativeCalendarComposer(store,s) {calendarOpen=false}
+                }
             }
         }
     }
