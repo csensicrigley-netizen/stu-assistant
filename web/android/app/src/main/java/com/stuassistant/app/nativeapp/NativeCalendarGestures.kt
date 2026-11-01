@@ -6,50 +6,49 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.*
 import androidx.compose.ui.unit.dp
+import kotlin.math.floor
 
-/** One gesture owner across empty track, event bodies and grips. Viewport changes
- * never restart pointer input; a second finger always promotes the gesture to zoom. */
-@Composable internal fun Modifier.calendarGestures(date: String, marks: List<CalendarMark>, scale: Float,
+/** One owner for three-day pan, pinch, move and resize. Model changes never
+ * restart input. All hit rectangles share the renderer's viewport calculation.
+ */
+@Composable internal fun Modifier.calendarGestures(date: String, slots: List<CalendarSlot>,
     viewport: () -> Pair<Float, Float>, updateViewport: (Float, Float) -> Unit, active: (Boolean) -> Unit,
     onEdit: (Int, String, Long, Long?) -> Unit, selectByDrag: (Int) -> Unit,
     onTap: (CalendarMark) -> Unit, onCreate: (Long) -> Unit, onScrollTick: () -> Unit): Modifier {
-    val latestMarks by rememberUpdatedState(marks)
+    val latestSlots by rememberUpdatedState(slots)
+    val setActive by rememberUpdatedState(active)
     val currentViewport by rememberUpdatedState(viewport)
     val update by rememberUpdatedState(updateViewport)
     val edit by rememberUpdatedState(onEdit)
     val select by rememberUpdatedState(selectByDrag)
     val tap by rememberUpdatedState(onTap)
     val create by rememberUpdatedState(onCreate)
-    val currentScale by rememberUpdatedState(scale)
     val scrollTick by rememberUpdatedState(onScrollTick)
     return pointerInput(date) {
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false)
-            active(true)
+            setActive(true)
             val (baseStart, baseMinutes) = currentViewport()
-            val tickMinutes = calendarMinorTick(baseMinutes)
-            var lastTick = kotlin.math.floor(baseStart / tickMinutes).toInt()
-            var lastTickAt = 0L
-            val midnight = AcademicClock.dayStart(date)
+            val centerDay = AcademicClock.dayStart(date)
+            val height = size.height.toFloat().coerceAtLeast(1f)
             val width = size.width.toFloat()
-            fun x(time: Long) = ((time - midnight) / 60000f - baseStart) / baseMinutes * width
-            val sy = currentScale
-            val hit = latestMarks.asReversed().firstOrNull { mark ->
-                if (mark.item < 0) false else {
-                    val a = x(mark.start)
-                    val right = mark.end?.let(::x) ?: a
-                    val left = if (mark.end == null) a - 24.dp.toPx() else a
-                    val end = if (mark.end == null) a + 56.dp.toPx() else maxOf(right, a + 48.dp.toPx())
-                    down.position.x in left..end && down.position.y in (66.dp.toPx()*sy)..(210.dp.toPx()*sy)
-                }
+            val gutter = 52.dp.toPx()
+            val dayWidth = ((width-gutter-12.dp.toPx())/3f).coerceAtLeast(1f)
+            val geometry = calendarBoxes(latestSlots, centerDay, baseStart, baseMinutes, width, height, density)
+            val box = geometry.asReversed().firstOrNull { b ->
+                b.slot.mark.item >= 0 && down.position.x in b.left..b.right && down.position.y in b.top..b.bottom
             }
-            val grow = hit?.let { it.end == null && it.field == "schedule" &&
-                down.position.x > x(it.start) + 18.dp.toPx() && down.position.y in (112.dp.toPx()*sy)..(156.dp.toPx()*sy) } == true
-            val edge = if (hit?.end == null) 0 else when {
-                down.position.x < x(hit.start) + 18.dp.toPx() -> -1
-                down.position.x > maxOf(x(hit.end), x(hit.start) + 48.dp.toPx()) - 18.dp.toPx() -> 1
+            val hit = box?.slot?.mark
+            val grow = box != null && hit?.end == null && hit?.field == "schedule" &&
+                down.position.x > box.right - 28.dp.toPx() && down.position.y > box.anchorY + 8.dp.toPx()
+            val edge = if (hit?.end == null || box == null) 0 else when {
+                down.position.y < box.top + 14.dp.toPx() && hit.start >= box.slot.midnight -> -1
+                down.position.y > box.bottom - 14.dp.toPx() && hit.end <= box.slot.midnight+86400000L -> 1
                 else -> 0
             }
+            val tickMinutes = calendarMinorTick(baseMinutes)
+            var lastTick = floor(baseStart/tickMinutes).toInt()
+            var lastTickAt = 0L
             var multi = false
             var moved = false
             var edited = false
@@ -68,13 +67,13 @@ import androidx.compose.ui.unit.dp
                         val zoom = event.calculateZoom()
                         val pan = event.calculatePan()
                         if (centroid != Offset.Unspecified && zoom.isFinite() && zoom > 0f) {
-                            val next = (minutes / zoom).coerceIn(120f, 1440f)
-                            update((start + centroid.x / width * (minutes - next) - pan.x / width * minutes).coerceIn(0f, 1440f-next), next)
+                            val next = (minutes/zoom).coerceIn(120f, 1440f)
+                            update((start + centroid.y/height*(minutes-next) - pan.y/height*minutes)
+                                .coerceIn(0f,1440f-next), next)
                         }
                         event.changes.forEach { it.consume() }
-                    } else if (multi) {
-                        event.changes.forEach { it.consume() }
-                    } else {
+                    } else if (multi) event.changes.forEach { it.consume() }
+                    else {
                         val pointer = event.changes.firstOrNull { it.id == down.id }
                         if (pointer != null) {
                             val delta = pointer.position - down.position
@@ -85,27 +84,32 @@ import androidx.compose.ui.unit.dp
                             if (moved && pointer.pressed) {
                                 pointer.consume()
                                 if (hit == null) {
-                                    val start = (baseStart - delta.x / width * baseMinutes).coerceIn(0f,1440f-baseMinutes)
+                                    val start = (baseStart-delta.y/height*baseMinutes).coerceIn(0f,1440f-baseMinutes)
                                     update(start, baseMinutes)
-                                    val tick = kotlin.math.floor(start / tickMinutes).toInt()
+                                    val tick = floor(start/tickMinutes).toInt()
                                     if (tick != lastTick) {
                                         lastTick = tick
-                                        // One soft tick per crossed division; never queue a burst
-                                        // after a fast swipe or vibrate against the day boundary.
-                                        if (pointer.uptimeMillis - lastTickAt >= 80L) {
-                                            scrollTick(); lastTickAt = pointer.uptimeMillis
-                                        }
+                                        if (pointer.uptimeMillis-lastTickAt >= 80L) { scrollTick(); lastTickAt = pointer.uptimeMillis }
                                     }
-                                }
-                                else {
-                                    val shift = (delta.x / width * baseMinutes * 60000).toLong()
-                                    a = if (edge == 1 || grow) hit.start else (hit.start + shift).coerceIn(midnight, midnight+86340000)
+                                } else {
+                                    val shift = (delta.y/height*baseMinutes*60000).toLong()
+                                    val originalDay = AcademicClock.dayStart(AcademicClock.moment(hit.start).date)
+                                    val dayDelta = if (edge == 0 && !grow) {
+                                        val targetColumn = floor((down.position.x+delta.x-gutter)/dayWidth).toInt().coerceIn(0,2)
+                                        (centerDay+(targetColumn-1)*86400000L) - box!!.slot.midnight
+                                    } else 0L
+                                    val targetDay = originalDay + dayDelta
+                                    a = when {
+                                        edge == 1 || grow -> hit.start
+                                        edge == -1 -> (hit.start+shift).coerceIn(originalDay, maxOf(originalDay, hit.end!!-60000L))
+                                        else -> (hit.start+shift+dayDelta).coerceIn(targetDay, targetDay+86340000L)
+                                    }
                                     b = when {
-                                        grow -> (hit.start + shift).coerceAtMost(midnight+86400000).takeIf { it > hit.start }
+                                        grow -> (hit.start+shift).coerceAtMost(originalDay+86400000L).takeIf { it > hit.start }
                                         hit.end == null -> null
-                                        edge == -1 -> hit.end.coerceAtLeast(a+60000)
-                                        edge == 1 -> (hit.end+shift).coerceAtMost(midnight+86400000).takeIf { it > hit.start+300000 }
-                                        else -> a + (hit.end-hit.start)
+                                        edge == -1 -> hit.end
+                                        edge == 1 -> (hit.end+shift).coerceAtMost(originalDay+86400000L).takeIf { it > hit.start+300000L }
+                                        else -> a + hit.end-hit.start
                                     }
                                     edit(hit.item, hit.field, a, b); edited = true
                                 }
@@ -113,8 +117,10 @@ import androidx.compose.ui.unit.dp
                             if (!pointer.pressed && !moved) {
                                 pointer.consume()
                                 if (hit != null) tap(hit)
-                                else if (pointer.uptimeMillis - down.uptimeMillis >= viewConfiguration.longPressTimeoutMillis) {
-                                    create(CalendarDrafts.snap(midnight+((baseStart+down.position.x/width*baseMinutes)*60000).toLong()))
+                                else if (down.position.x >= gutter && pointer.uptimeMillis-down.uptimeMillis >= viewConfiguration.longPressTimeoutMillis) {
+                                    val column = floor((down.position.x-gutter)/dayWidth).toInt().coerceIn(0,2)
+                                    val day = centerDay+(column-1)*86400000L
+                                    create(CalendarDrafts.snap(day+((baseStart+down.position.y/height*baseMinutes)*60000).toLong()))
                                 }
                             }
                         }
@@ -127,7 +133,7 @@ import androidx.compose.ui.unit.dp
                 complete = true
             } finally {
                 if (!complete && edited && hit != null) edit(hit.item, hit.field, hit.start, hit.end)
-                active(false)
+                setActive(false)
             }
         }
     }
