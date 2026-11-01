@@ -68,7 +68,7 @@ class NativeCalendarCounterInstrumentedTest {
                 }
                 return count
             }
-            fun shot(name: String? = null): Bitmap = inst.uiAutomation.takeScreenshot().also { bmp ->
+            fun shot(name: String? = null): Bitmap = calendarDeviceScreenshot(inst).also { bmp ->
                 if (name != null) File(inst.targetContext.getExternalFilesDir(null), name).outputStream().use {
                     bmp.compress(Bitmap.CompressFormat.PNG, 100, it)
                 }
