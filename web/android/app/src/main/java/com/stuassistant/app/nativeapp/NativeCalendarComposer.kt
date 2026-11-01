@@ -167,7 +167,8 @@ fun NativeCalendarComposer(store: NativeStore, s: NativeState, close: () -> Unit
                 // NButton retains the project's paired press/release haptics, including disposal.
                 NButton(if (phase == "input") "↑" else "×", { if (phase == "input") submit(false) else back() },
                     enabled = !saving && (phase != "input" || text.isNotBlank()), primary = phase == "input",
-                    modifier = Modifier.size(48.dp).onGloballyPositioned { origin = it.boundsInRoot().center })
+                    modifier = Modifier.size(48.dp).semantics { contentDescription = if (phase == "input") "提交事项" else "关闭建议" }
+                        .onGloballyPositioned { origin = it.boundsInRoot().center })
             }
             AnimatedVisibility(phase == "input" && (manualMenu || error != null), enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
                 Column(Modifier.padding(horizontal = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {

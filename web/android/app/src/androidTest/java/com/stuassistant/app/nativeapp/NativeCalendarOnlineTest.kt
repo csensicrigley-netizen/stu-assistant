@@ -126,7 +126,7 @@ class NativeCalendarOnlineTest {
             }))
             Thread.sleep(300)
             val anchor = bounds("日历输入栏")
-            val submit = bounds("↑")
+            val submit = bounds("提交事项")
             assertEquals("Submit must be circular", submit.width(), submit.height())
             assertTrue("Submit needs breathing room inside input", anchor.right - submit.right > 0)
             screenshot("calendar-input.png")

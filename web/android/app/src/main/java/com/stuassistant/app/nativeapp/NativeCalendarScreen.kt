@@ -9,7 +9,7 @@ import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
+import com.kyant.shapes.RoundedRectangle
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -120,6 +120,7 @@ internal fun CalendarTimeline(day: String, onDay: (String) -> Unit, drafts: List
     existing: List<CalendarMark>, doc: AcademicTimetableDoc?, onEdit: (Int, String, Long, Long?) -> Unit, onSelect: (Int) -> Unit) {
     val colors = LocalNativeColors.current
     val density = LocalDensity.current
+    val blockShape = remember { RoundedRectangle(16.dp) }
     var windowStart by remember { mutableFloatStateOf(8f * 60) }
     var windowMinutes by remember { mutableFloatStateOf(6f * 60) }
     val displayedStart by animateFloatAsState(windowStart, tween(180, easing = FastOutSlowInEasing), label = "time-window")
@@ -231,9 +232,9 @@ internal fun CalendarTimeline(day: String, onDay: (String) -> Unit, drafts: List
                                 Box(Modifier.size(20.dp).clip(CircleShape).background(tint).border(2.dp, colors.bg, CircleShape))
                             }
                         } else {
-                            Box(Modifier.fillMaxWidth().padding(top = 26.dp).height(72.dp).clip(RoundedCornerShape(15.dp))
+                            Box(Modifier.fillMaxWidth().padding(top = 26.dp).height(72.dp).clip(blockShape)
                                 .background(tint.copy(alpha = if (editable) .94f else .20f))
-                                .border(if (editable) 1.5.dp else 1.dp, tint.copy(alpha = if (editable) 1f else .32f), RoundedCornerShape(15.dp)), contentAlignment = Alignment.Center) {
+                                .border(if (editable) 1.5.dp else 1.dp, tint.copy(alpha = if (editable) 1f else .32f), blockShape), contentAlignment = Alignment.Center) {
                                 BasicText(mark.title, Modifier.padding(horizontal = 12.dp), style = TextStyle(color = if (editable) colors.onBrand else colors.ink, fontSize = 13.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 if (editable) {
                                     Box(Modifier.align(Alignment.CenterStart).padding(start = 5.dp).width(2.dp).height(20.dp).background(colors.onBrand.copy(alpha = .75f)))
