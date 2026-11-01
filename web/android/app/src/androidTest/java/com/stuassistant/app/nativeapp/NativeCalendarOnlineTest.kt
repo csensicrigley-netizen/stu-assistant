@@ -21,6 +21,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.kyant.backdrop.backdrops.*
 import com.stuassistant.app.NativeActivity
+import com.stuassistant.app.NativeFeedbackSink
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 import org.junit.Assert.*
@@ -29,6 +30,7 @@ import org.junit.runner.RunWith
 import java.io.File
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.CopyOnWriteArrayList
 
 /** Opt-in real Internet/Jev test. Isolated app data and a disposable STU account. */
 @RunWith(AndroidJUnit4::class)
@@ -89,6 +91,11 @@ class NativeCalendarOnlineTest {
         var scenario: ActivityScenario<NativeActivity>? = null
         var registered = false
         var cleanupSession: NativeSession? = null
+        val feedbackEvents = CopyOnWriteArrayList<String>()
+        val feedback = object : NativeFeedbackSink {
+            override fun play(kind: String, strength: Int) { feedbackEvents.add(kind) }
+            override fun cancel() = Unit
+        }
         try {
             assertEquals("Packaged service must be the production STU origin", "https://stu.oyishi.asia", store.state.value.server)
             store.login("android-calendar-${UUID.randomUUID()}@example.invalid", UUID.randomUUID().toString(), true)
@@ -100,7 +107,7 @@ class NativeCalendarOnlineTest {
                 val state by store.state.collectAsState()
                 Box(Modifier.fillMaxSize()) {
                     Box(Modifier.fillMaxSize().layerBackdrop(backdrop).background(Color.White))
-                    CompositionLocalProvider(LocalNativeBackdrop provides backdrop) {
+                    CompositionLocalProvider(LocalNativeBackdrop provides backdrop, LocalNativeFeedback provides feedback, LocalNativeStrength provides 72) {
                         NativeCalendarComposer(store, state) { closed.set(true) }
                     }
                 }
@@ -119,14 +126,21 @@ class NativeCalendarOnlineTest {
             }))
             Thread.sleep(300)
             val anchor = bounds("日历输入栏")
+            val submit = bounds("↑")
+            assertEquals("Submit must be circular", submit.width(), submit.height())
+            assertTrue("Submit needs breathing room inside input", anchor.right - submit.right > 0)
             screenshot("calendar-input.png")
             tap("↑")
+            Thread.sleep(500)
+            assertEquals("Submit needs one press and one release", listOf("press", "release"), feedbackEvents.toList())
+            screenshot("calendar-loading.png")
             waitFor("确认", 100000)
             Thread.sleep(700)
             val after = bounds("日历输入栏")
             assertEquals("Input anchor moved during expansion", anchor.top, after.top)
             assertNotNull(find("建议"))
-            for (unwanted in listOf("建议安排", "尚未保存", "确认保存", "拖动改时间")) assertNull(find(unwanted))
+            for (unwanted in listOf("建议安排", "尚未保存", "确认保存", "拖动改时间", "回到事项", "返回修改", "有时间或含义待确认，请检查后再保存")) assertNull(find(unwanted))
+            assertNull("Options must start collapsed", find("优先级"))
             screenshot(if (deadlineOnly) "calendar-deadline.png" else "calendar-online.png")
             tap("后一天"); Thread.sleep(350); tap("前一天"); Thread.sleep(350)
             val drag = bounds("可拖动")
@@ -138,6 +152,10 @@ class NativeCalendarOnlineTest {
             }
             event(MotionEvent.ACTION_UP, down, drag.exactCenterX()+60f, drag.top+drag.height()*.45f)
             screenshot("calendar-dragged.png")
+            tap("事件选项"); Thread.sleep(400)
+            waitFor("优先级")
+            screenshot("calendar-options.png")
+            tap("事件选项"); Thread.sleep(350)
             tap("确认")
             val deadline = SystemClock.uptimeMillis() + 10000
             while (!closed.get() && SystemClock.uptimeMillis() < deadline) Thread.sleep(100)
