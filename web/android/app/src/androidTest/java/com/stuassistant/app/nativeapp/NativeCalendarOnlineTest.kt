@@ -157,10 +157,10 @@ class NativeCalendarOnlineTest {
         val y = drag.top + drag.height() * .45f
         event(MotionEvent.ACTION_DOWN, down, drag.exactCenterX(), y)
         repeat(12) { step ->
-            event(MotionEvent.ACTION_MOVE, down, drag.exactCenterX() + (step+1)*5f, y)
+            event(MotionEvent.ACTION_MOVE, down, drag.exactCenterX(), y + (step+1)*5f)
             Thread.sleep(16)
         }
-        event(MotionEvent.ACTION_UP, down, drag.exactCenterX()+60f, y)
+        event(MotionEvent.ACTION_UP, down, drag.exactCenterX(), y+60f)
         Thread.sleep(250)
     }
     private fun screenshot(name: String) {
@@ -172,22 +172,22 @@ class NativeCalendarOnlineTest {
     private fun panTimeline(direction: Int) {
         val r = bounds("日历时间线")
         val time = SystemClock.uptimeMillis()
-        val y = r.top + r.height() * .20f
-        val start = r.exactCenterX()
-        val distance = r.width() * .18f * direction
-        event(MotionEvent.ACTION_DOWN, time, start, y)
+        val x = r.left + r.width() * .06f
+        val start = r.exactCenterY()
+        val distance = r.height() * .18f * direction
+        event(MotionEvent.ACTION_DOWN, time, x, start)
         repeat(12) { step ->
-            event(MotionEvent.ACTION_MOVE, time, start + distance * (step+1)/12, y)
+            event(MotionEvent.ACTION_MOVE, time, x, start + distance * (step+1)/12)
             Thread.sleep(16)
         }
-        event(MotionEvent.ACTION_UP, time, start+distance, y)
+        event(MotionEvent.ACTION_UP, time, x, start+distance)
         Thread.sleep(200)
     }
     private fun pinch(centerX: Float, y: Float, from: Float, to: Float) {
         val time = SystemClock.uptimeMillis()
         fun send(action: Int, count: Int, half: Float) {
             val props = Array(count) { i -> MotionEvent.PointerProperties().apply { id = i; toolType = MotionEvent.TOOL_TYPE_FINGER } }
-            val coords = Array(count) { i -> MotionEvent.PointerCoords().apply { x = centerX + if (i == 0) -half else half; this.y = y; pressure = 1f; size = 1f } }
+            val coords = Array(count) { i -> MotionEvent.PointerCoords().apply { x = centerX; this.y = y + if (i == 0) -half else half; pressure = 1f; size = 1f } }
             val e = MotionEvent.obtain(time, SystemClock.uptimeMillis(), action, count, props, coords, 0, 0, 1f, 1f, 0, 0, InputDevice.SOURCE_TOUCHSCREEN, 0)
             try { assertTrue(inst.uiAutomation.injectInputEvent(e, true)) } finally { e.recycle() }
         }
@@ -197,6 +197,52 @@ class NativeCalendarOnlineTest {
         send(MotionEvent.ACTION_POINTER_UP or (1 shl MotionEvent.ACTION_POINTER_INDEX_SHIFT), 2, to)
         send(MotionEvent.ACTION_UP, 1, to)
         Thread.sleep(250)
+    }
+    @Test fun threeDayDragAndBothResizeHandlesKeepTheirMeaning() {
+        val start = AcademicClock.dayStart("2026-11-02") + 14*3600000L
+        val initial = CalendarDrafts.edit(JSONObject().put("title","跨列测试"),"schedule",start,start+3600000L)
+        val latest = java.util.concurrent.atomic.AtomicReference(initial)
+        ActivityScenario.launch<NativeActivity>(Intent(inst.targetContext,NativeActivity::class.java).putExtra("preview",true)).use { scenario ->
+            scenario.onActivity { activity -> activity.setContent {
+                var draft by remember { mutableStateOf(initial) }
+                val backdrop = rememberLayerBackdrop()
+                Box(Modifier.fillMaxSize().background(Color.White).layerBackdrop(backdrop)) {
+                    CompositionLocalProvider(LocalNativeBackdrop provides backdrop) {
+                        Box(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
+                            CalendarTimeline("2026-11-02",{},listOf(draft),0,emptyList(),null,
+                                { _,field,a,b -> draft=CalendarDrafts.edit(draft,field,a,b);latest.set(draft) },{}, {})
+                        }
+                    }
+                }
+            } }
+            waitFor("跨列测试")
+            Thread.sleep(500)
+            fun drag(x:Float,y:Float,dx:Float,dy:Float) {
+                val time=SystemClock.uptimeMillis()
+                event(MotionEvent.ACTION_DOWN,time,x,y)
+                repeat(16) { i -> event(MotionEvent.ACTION_MOVE,time,x+dx*(i+1)/16,y+dy*(i+1)/16);Thread.sleep(16) }
+                event(MotionEvent.ACTION_UP,time,x+dx,y+dy)
+                Thread.sleep(300)
+            }
+            var r=bounds("跨列测试")
+            val chart=bounds("日历时间线")
+            val scale=inst.targetContext.resources.displayMetrics.density
+            val column=(chart.width()-64*scale)/3
+            drag(r.exactCenterX(),r.exactCenterY(),column,0f)
+            assertEquals("Moving between columns must change only date",start+86400000L,CalendarDrafts.start(latest.get()))
+            assertEquals(3600000L,CalendarDrafts.end(latest.get())!!-CalendarDrafts.start(latest.get())!!)
+            r=bounds("跨列测试")
+            val oldEnd=CalendarDrafts.end(latest.get())!!
+            drag(r.exactCenterX(),r.top+6*scale,0f,-chart.height()*.08f)
+            assertTrue(CalendarDrafts.start(latest.get())!!<start+86400000L)
+            assertEquals("Top grip must keep end fixed",oldEnd,CalendarDrafts.end(latest.get()))
+            r=bounds("跨列测试")
+            val oldStart=CalendarDrafts.start(latest.get())!!
+            drag(r.exactCenterX(),r.bottom-6*scale,0f,chart.height()*.08f)
+            assertEquals("Bottom grip must keep start fixed",oldStart,CalendarDrafts.start(latest.get()))
+            assertTrue(CalendarDrafts.end(latest.get())!!>oldEnd)
+            screenshot("calendar-three-day-resized.png")
+        }
     }
     @Test fun realJevKeyboardDragAndEncryptedPersistence() = runBlocking {
         runFlow("明天下午两点到三点和导师开会，明天下午五点前交报告", false)
@@ -282,7 +328,7 @@ class NativeCalendarOnlineTest {
                 assertEquals("Resting timeline must stay silent", ticksAfter, feedbackEvents.count { it == "selection" })
                 panTimeline(-1)
                 val original = waitFor("安排").contentDescription.toString()
-                val half = block.width() * .2f
+                val half = block.height() * .2f
                 val minutes = waitFor("日历时间线").stateDescription.toString().substringAfter(':').toInt()
                 pinch(block.exactCenterX(), block.top + block.height()*.45f, half, half*2)
                 val zoomed = waitFor("日历时间线").stateDescription.toString().substringAfter(':').toInt()
@@ -296,7 +342,7 @@ class NativeCalendarOnlineTest {
             if (!deadlineOnly) {
                 val tick = bounds("12:00")
                 moveEvent("截止")
-                assertEquals("Selecting by dragging must not shift the time axis", tick.left, bounds("12:00").left)
+                assertEquals("Selecting by dragging must not shift the time axis", tick.top, bounds("12:00").top)
             }
             screenshot("calendar-dragged.png")
             tap(if (deadlineOnly) "可拖动" else "安排"); Thread.sleep(500)
