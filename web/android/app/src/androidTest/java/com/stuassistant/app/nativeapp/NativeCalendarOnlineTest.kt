@@ -85,6 +85,18 @@ class NativeCalendarOnlineTest {
         event(MotionEvent.ACTION_DOWN, t, r.exactCenterX(), r.exactCenterY())
         event(MotionEvent.ACTION_UP, t, r.exactCenterX(), r.exactCenterY())
     }
+    private fun moveEvent(text: String) {
+        val drag = bounds(text)
+        val down = SystemClock.uptimeMillis()
+        val y = drag.top + drag.height() * .45f
+        event(MotionEvent.ACTION_DOWN, down, drag.exactCenterX(), y)
+        repeat(12) { step ->
+            event(MotionEvent.ACTION_MOVE, down, drag.exactCenterX() + (step+1)*5f, y)
+            Thread.sleep(16)
+        }
+        event(MotionEvent.ACTION_UP, down, drag.exactCenterX()+60f, y)
+        Thread.sleep(250)
+    }
     private fun screenshot(name: String) {
         val file = File(inst.targetContext.getExternalFilesDir(null), name)
         file.outputStream().use { inst.uiAutomation.takeScreenshot().compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
@@ -157,14 +169,12 @@ class NativeCalendarOnlineTest {
             screenshot(if (deadlineOnly) "calendar-deadline.png" else "calendar-online.png")
             tap("后一天"); Thread.sleep(600); screenshot("calendar-next-day.png")
             tap("前一天"); Thread.sleep(600); screenshot("calendar-return-day.png")
-            val drag = bounds("可拖动")
-            val down = SystemClock.uptimeMillis()
-            event(MotionEvent.ACTION_DOWN, down, drag.exactCenterX(), drag.top + drag.height() * .45f)
-            repeat(12) { step ->
-                event(MotionEvent.ACTION_MOVE, down, drag.exactCenterX() + (step+1)*5f, drag.top + drag.height() * .45f)
-                Thread.sleep(16)
+            moveEvent(if (deadlineOnly) "可拖动" else "安排")
+            if (!deadlineOnly) {
+                val tick = bounds("12:00")
+                moveEvent("截止")
+                assertEquals("Selecting by dragging must not shift the time axis", tick.left, bounds("12:00").left)
             }
-            event(MotionEvent.ACTION_UP, down, drag.exactCenterX()+60f, drag.top+drag.height()*.45f)
             screenshot("calendar-dragged.png")
             tap("事件选项"); Thread.sleep(400)
             waitFor("优先级")
@@ -181,6 +191,10 @@ class NativeCalendarOnlineTest {
                 assertNotNull("Jev must return an exact deadline", CalendarDrafts.deadline(draft))
                 assertNull("A deadline must not invent a scheduled block", CalendarDrafts.start(draft))
                 assertNotEquals("Dragging the deadline did not change its value", "17:00", AcademicClock.clockAt(CalendarDrafts.deadline(draft)!!))
+            } else {
+                val draft = saved.map { it.getJSONObject("draft") }.first { CalendarDrafts.start(it) != null }
+                assertNotEquals("Dragging the range did not change its start", "14:00", AcademicClock.clockAt(CalendarDrafts.start(draft)!!))
+                assertEquals("Moving a range must preserve duration", 3600000L, CalendarDrafts.end(draft)!! - CalendarDrafts.start(draft)!!)
             }
             val account = store.calendarAccount()
             val batch = saved.first().getString("batch")
