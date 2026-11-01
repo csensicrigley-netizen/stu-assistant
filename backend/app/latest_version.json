@@ -1,7 +1,7 @@
 {
   "channel": "product",
-  "versionName": "1.1.0",
-  "versionCode": 56,
+  "versionName": "1.1.1",
+  "versionCode": 57,
   "apk": "/download/stu-assistant.apk",
   "notes": [
     "原生智能日历：顶部输入、真实在线 Jev 识别与可拖动时间线",
