@@ -48,7 +48,9 @@ private val CalendarRevealEase = CubicBezierEasing(.18f, .48f, .22f, 1f)
 
 /** Feathered circular reveal in this layer's coordinate system, seeded at Submit. */
 private fun Modifier.calendarReveal(progress: Float, origin: Offset) = graphicsLayer {
-    compositingStrategy = CompositingStrategy.Offscreen
+    // A mask needs an offscreen buffer only while revealing. Keeping that buffer
+    // at rest clips button shadows to the body's rectangular layout bounds.
+    compositingStrategy = if (progress < .9999f) CompositingStrategy.Offscreen else CompositingStrategy.Auto
 }.drawWithContent {
     if (progress > 0f) {
         drawContent()
@@ -245,7 +247,7 @@ fun NativeCalendarComposer(store: NativeStore, s: NativeState, inputBackdrop: Ba
                             }
                         }
                     }
-                    AnimatedVisibility(phase == "review" && !options && precise == null, enter = fadeIn(tween(280)) + expandVertically(), exit = fadeOut(tween(180)) + shrinkVertically()) {
+                    AnimatedVisibility(phase == "review" && !options && precise == null, enter = fadeIn(tween(280)) + expandVertically(clip = false), exit = fadeOut(tween(180)) + shrinkVertically(clip = false)) {
                         Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             NError(error)
                             NButton(if (saving) "保存中…" else "确认", {
