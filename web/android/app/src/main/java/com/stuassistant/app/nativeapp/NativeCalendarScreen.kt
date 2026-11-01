@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.Color
@@ -118,7 +119,8 @@ internal fun CalendarTimeline(day: String, onDay: (String) -> Unit, drafts: List
     existing: List<CalendarMark>, doc: AcademicTimetableDoc?, onEdit: (Int, String, Long, Long?) -> Unit, onSelect: (Int) -> Unit, onPrecise: (CalendarMark) -> Unit) {
     val colors = LocalNativeColors.current
     val density = LocalDensity.current
-    val blockShape = remember { RoundedRectangle(16.dp) }
+    val blockShape = remember { RoundedRectangle(18.dp) }
+    val scrollTick = nSelectionFeedback()
     var windowStart by remember { mutableFloatStateOf(8f * 60) }
     var windowMinutes by remember { mutableFloatStateOf(6f * 60) }
     var gesturing by remember { mutableStateOf(false) }
@@ -144,7 +146,7 @@ internal fun CalendarTimeline(day: String, onDay: (String) -> Unit, drafts: List
         NButton("‹", { onDay(AcademicClock.addDays(day, -1)) }, modifier = Modifier.size(48.dp).semantics { contentDescription = "前一天" })
         Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
             CalendarCounter("${AcademicClock.monthDay(day)} · ${AcademicClock.weekdayText(AcademicClock.weekday(day))}", AcademicClock.dayStart(day),
-                TextStyle(color = colors.ink, fontSize = 18.sp, fontFamily = NativeFontFamily, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold), duration = 280)
+                TextStyle(color = colors.ink, fontSize = 18.sp, fontFamily = NativeFontFamily, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold))
         }
         NButton("›", { onDay(AcademicClock.addDays(day, 1)) }, modifier = Modifier.size(48.dp).semantics { contentDescription = "后一天" })
     }
@@ -171,27 +173,48 @@ internal fun CalendarTimeline(day: String, onDay: (String) -> Unit, drafts: List
                 active = { gesturing = it }, onEdit = onEdit,
                 selectByDrag = { index -> keepWindowForSelection = index.takeIf { it != currentSelected }; onSelect(index) },
                 onTap = { onSelect(it.item); onPrecise(it) },
-                onCreate = { onEdit(selected, "schedule", it, null) })
+                onCreate = { onEdit(selected, "schedule", it, null) }, onScrollTick = scrollTick)
                 .layerBackdrop(track)) {
             Box(Modifier.fillMaxSize()) {
-                val step = if (windowMinutes > 720) 360 else if (windowMinutes > 300) 120 else 60
+                val minor = calendarMinorTick(windowMinutes)
+                val step = minor * 4
+                // A quiet precision ruler replaces the heavy full-height grid and
+                // tinted rectangular lane. Events remain the strongest objects.
+                Canvas(Modifier.fillMaxSize()) {
+                    val rail = 58.dp.toPx() * chartScale
+                    drawLine(colors.ink.copy(alpha = .09f), androidx.compose.ui.geometry.Offset(0f, rail),
+                        androidx.compose.ui.geometry.Offset(size.width, rail), 1.dp.toPx())
+                    for (minute in 0..1440 step minor) {
+                        val px = (minute - displayedStart) / windowMinutes * width
+                        if (px < 0f || px > width) continue
+                        val major = minute % step == 0
+                        val length = (if (major) 16.dp else 7.dp).toPx() * chartScale
+                        drawLine(colors.ink.copy(alpha = if (major) .38f else .22f),
+                            androidx.compose.ui.geometry.Offset(px, rail - length),
+                            androidx.compose.ui.geometry.Offset(px, rail), 1.dp.toPx())
+                        if (major) drawLine(Brush.verticalGradient(listOf(colors.ink.copy(alpha = .10f), Color.Transparent),
+                            startY = rail + 12.dp.toPx(), endY = 190.dp.toPx()*chartScale),
+                            androidx.compose.ui.geometry.Offset(px, rail + 12.dp.toPx()),
+                            androidx.compose.ui.geometry.Offset(px, 190.dp.toPx()*chartScale), 1.dp.toPx())
+                    }
+                    drawLine(colors.brand.copy(alpha = .12f), androidx.compose.ui.geometry.Offset(0f, 126.dp.toPx()*chartScale),
+                        androidx.compose.ui.geometry.Offset(size.width, 126.dp.toPx()*chartScale), 1.dp.toPx())
+                }
                 for (minute in 0..1440 step step) {
                     val px = (minute - displayedStart) / windowMinutes * width
                     if (px in -30f..(width + 30)) {
-                        Box(Modifier.offset { IntOffset(px.roundToInt(), cy(54).roundToPx()) }.width(1.dp).height(cy(140)).background(colors.ink.copy(alpha = .14f)))
-                        Box(Modifier.offset { IntOffset((px - 24.dp.toPx()).roundToInt(), cy(20).roundToPx()) }.width(48.dp), contentAlignment = Alignment.Center) {
-                            BasicText(AcademicClock.clock(minute), style = TextStyle(color = colors.ink.copy(alpha = .72f), fontSize = 12.sp, fontFamily = NativeFontFamily))
+                        Box(Modifier.offset { IntOffset((px - 24.dp.toPx()).roundToInt(), cy(13).roundToPx()) }.width(48.dp), contentAlignment = Alignment.Center) {
+                            BasicText(AcademicClock.clock(minute), style = TextStyle(color = colors.ink.copy(alpha = .82f), fontSize = 12.sp, fontFamily = NativeFontFamily, fontFeatureSettings = "tnum"))
                         }
                     }
                 }
-                Box(Modifier.fillMaxWidth().padding(top = cy(90)).height(cy(72)).background(colors.brand.copy(alpha = .055f)))
-                Box(Modifier.fillMaxWidth().padding(top = cy(126)).height(1.dp).background(colors.brand.copy(alpha = .16f)))
             }
             marks.forEach { mark -> key(mark.key) {
                 val left = x(mark.start)
                 val right = mark.end?.let(::x) ?: left
                 if (right >= -48 && left <= width + 48) {
                     val editable = mark.item >= 0
+                    val focused = editable && mark.item == selected
                     val tint = when { mark.field == "deadline" -> if (colors.bg.luminance() > .5f) Color(0xFFD63760) else Color(0xFFFF809D); editable -> colors.brand; mark.source == "course" -> colors.muted; else -> Color(0xFF398A79) }
                     val point = mark.end == null
                     val targetWidth = if (point) 48.dp else with(density) { (right-left).coerceAtLeast(48.dp.toPx()).toDp() }
@@ -203,19 +226,27 @@ internal fun CalendarTimeline(day: String, onDay: (String) -> Unit, drafts: List
                         }
                     Box(modifier) {
                         if (point) {
-                            Box(Modifier.align(Alignment.TopCenter).padding(top = cy(8)).width(9.dp).height(cy(94)).background(tint.copy(alpha = .12f)))
-                            Box(Modifier.align(Alignment.TopCenter).padding(top = cy(8)).width(3.dp).height(cy(94)).background(tint))
+                            Box(Modifier.align(Alignment.TopCenter).padding(top = cy(8)).width(8.dp).height(cy(94))
+                                .background(Brush.horizontalGradient(listOf(Color.Transparent, tint.copy(alpha = .17f), Color.Transparent))))
+                            Box(Modifier.align(Alignment.TopCenter).padding(top = cy(8)).width(2.dp).height(cy(94)).background(tint))
                             Box(Modifier.align(Alignment.TopCenter).padding(top = cy(82)).size(36.dp).clip(CircleShape).background(tint.copy(alpha = .17f)), contentAlignment = Alignment.Center) {
-                                Box(Modifier.size(20.dp).clip(CircleShape).background(tint).border(2.dp, colors.bg, CircleShape))
+                                Box(Modifier.size(20.dp).shadow(5.dp, CircleShape, ambientColor = tint, spotColor = tint)
+                                    .clip(CircleShape).background(tint).border(2.dp, colors.bg, CircleShape))
                             }
+                            CalendarCounter(AcademicClock.clockAt(mark.start), mark.start,
+                                TextStyle(color = tint, fontSize = 11.sp, fontFamily = NativeFontFamily, fontFeatureSettings = "tnum"), Modifier.align(Alignment.BottomCenter))
                         } else {
-                            Box(Modifier.fillMaxWidth().padding(top = cy(26)).height(cy(72)).clip(blockShape)
-                                .background(tint.copy(alpha = if (editable) .94f else .20f))
-                                .border(if (editable) 1.5.dp else 1.dp, tint.copy(alpha = if (editable) 1f else .32f), blockShape), contentAlignment = Alignment.Center) {
-                                BasicText(mark.title, Modifier.padding(horizontal = 12.dp), style = TextStyle(color = if (editable) colors.onBrand else colors.ink, fontSize = 13.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Box(Modifier.fillMaxWidth().padding(top = cy(if (focused) 26 else 33)).height(cy(if (focused) 72 else 58))
+                                .shadow(if (focused) 9.dp else 0.dp, blockShape, ambientColor = tint.copy(alpha = .25f), spotColor = tint.copy(alpha = .30f))
+                                .clip(blockShape)
+                                .background(Brush.verticalGradient(if (editable) listOf(tint.copy(alpha = if (focused) .88f else .64f), tint.copy(alpha = if (focused) 1f else .78f))
+                                    else listOf(tint.copy(alpha = .15f), tint.copy(alpha = .22f))))
+                                .border(1.dp, if (editable) colors.onBrand.copy(alpha = .22f) else tint.copy(alpha = .20f), blockShape), contentAlignment = Alignment.Center) {
+                                BasicText(mark.title, Modifier.padding(horizontal = 12.dp), style = TextStyle(color = if (editable) colors.onBrand else colors.ink, fontSize = 12.sp,
+                                    lineHeight = 17.sp, fontFamily = NativeFontFamily, fontWeight = if (focused) androidx.compose.ui.text.font.FontWeight.SemiBold else androidx.compose.ui.text.font.FontWeight.Normal), maxLines = 2, overflow = TextOverflow.Ellipsis)
                                 if (editable) {
-                                    Box(Modifier.align(Alignment.CenterStart).padding(start = 5.dp).width(2.dp).height(cy(20)).background(colors.onBrand.copy(alpha = .75f)))
-                                    Box(Modifier.align(Alignment.CenterEnd).padding(end = 5.dp).width(2.dp).height(cy(20)).background(colors.onBrand.copy(alpha = .75f)))
+                                    Box(Modifier.align(Alignment.CenterStart).padding(start = 5.dp).width(2.dp).height(cy(18)).clip(CircleShape).background(colors.onBrand.copy(alpha = .70f)))
+                                    Box(Modifier.align(Alignment.CenterEnd).padding(end = 5.dp).width(2.dp).height(cy(18)).clip(CircleShape).background(colors.onBrand.copy(alpha = .70f)))
                                 }
                             }
                         }
@@ -233,12 +264,13 @@ internal fun CalendarTimeline(day: String, onDay: (String) -> Unit, drafts: List
             }
             // Feather the full-bleed edges without enclosing the timeline in a card.
             listOf(true, false).forEach { leftEdge ->
-                val mask = Brush.horizontalGradient(if (leftEdge) listOf(Color.Black, Color.Transparent) else listOf(Color.Transparent, Color.Black))
-                Box(Modifier.align(if (leftEdge) Alignment.CenterStart else Alignment.CenterEnd).width(24.dp).fillMaxHeight()
+                val mask = Brush.horizontalGradient(if (leftEdge) listOf(Color.Black, Color.Black.copy(alpha = .72f), Color.Transparent)
+                    else listOf(Color.Transparent, Color.Black.copy(alpha = .72f), Color.Black))
+                Box(Modifier.align(if (leftEdge) Alignment.CenterStart else Alignment.CenterEnd).width((maxWidth * .15f).coerceIn(44.dp, 64.dp)).fillMaxHeight()
                     .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
                     .drawWithContent { drawContent(); drawRect(mask, blendMode = BlendMode.DstIn) }
-                    .drawPlainBackdrop(backdrop = track, shape = { RectangleShape }, effects = { blur(4.dp.toPx()) })
-                    .background(colors.bg.copy(alpha = .55f)))
+                    .drawPlainBackdrop(backdrop = track, shape = { RectangleShape }, effects = { blur(10.dp.toPx()) })
+                    .background(colors.bg.copy(alpha = .82f)))
             }
         }
     }

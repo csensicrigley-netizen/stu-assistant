@@ -35,6 +35,13 @@ import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.CopyOnWriteArrayList
 
+// UiAutomation.takeScreenshot intermittently returns null with the emulator IME.
+// Shell capture uses the same real display and includes the keyboard reliably.
+internal fun calendarDeviceScreenshot(inst: android.app.Instrumentation): android.graphics.Bitmap =
+    android.os.ParcelFileDescriptor.AutoCloseInputStream(inst.uiAutomation.executeShellCommand("screencap -p")).use {
+        android.graphics.BitmapFactory.decodeStream(it) ?: error("Device screenshot could not be decoded")
+    }
+
 /** Opt-in real Internet/Jev test. Isolated app data and a disposable STU account. */
 @RunWith(AndroidJUnit4::class)
 @SdkSuppress(minSdkVersion = 33)
@@ -158,7 +165,23 @@ class NativeCalendarOnlineTest {
     }
     private fun screenshot(name: String) {
         val file = File(inst.targetContext.getExternalFilesDir(null), name)
-        file.outputStream().use { inst.uiAutomation.takeScreenshot().compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+        val bitmap = calendarDeviceScreenshot(inst)
+        try { file.outputStream().use { bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) } }
+        finally { bitmap.recycle() }
+    }
+    private fun panTimeline(direction: Int) {
+        val r = bounds("日历时间线")
+        val time = SystemClock.uptimeMillis()
+        val y = r.top + r.height() * .20f
+        val start = r.exactCenterX()
+        val distance = r.width() * .18f * direction
+        event(MotionEvent.ACTION_DOWN, time, start, y)
+        repeat(12) { step ->
+            event(MotionEvent.ACTION_MOVE, time, start + distance * (step+1)/12, y)
+            Thread.sleep(16)
+        }
+        event(MotionEvent.ACTION_UP, time, start+distance, y)
+        Thread.sleep(200)
     }
     private fun pinch(centerX: Float, y: Float, from: Float, to: Float) {
         val time = SystemClock.uptimeMillis()
@@ -251,6 +274,13 @@ class NativeCalendarOnlineTest {
             tap("前一天"); Thread.sleep(600); screenshot("calendar-return-day.png")
             if (!deadlineOnly) {
                 val block = bounds("安排")
+                val ticksBefore = feedbackEvents.count { it == "selection" }
+                panTimeline(1)
+                val ticksAfter = feedbackEvents.count { it == "selection" }
+                assertTrue("Axis pan must emit bounded scale ticks", ticksAfter - ticksBefore in 1..4)
+                Thread.sleep(200)
+                assertEquals("Resting timeline must stay silent", ticksAfter, feedbackEvents.count { it == "selection" })
+                panTimeline(-1)
                 val original = waitFor("安排").contentDescription.toString()
                 val half = block.width() * .2f
                 val minutes = waitFor("日历时间线").stateDescription.toString().substringAfter(':').toInt()

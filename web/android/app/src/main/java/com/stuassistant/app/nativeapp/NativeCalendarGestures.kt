@@ -12,7 +12,7 @@ import androidx.compose.ui.unit.dp
 @Composable internal fun Modifier.calendarGestures(date: String, marks: List<CalendarMark>, scale: Float,
     viewport: () -> Pair<Float, Float>, updateViewport: (Float, Float) -> Unit, active: (Boolean) -> Unit,
     onEdit: (Int, String, Long, Long?) -> Unit, selectByDrag: (Int) -> Unit,
-    onTap: (CalendarMark) -> Unit, onCreate: (Long) -> Unit): Modifier {
+    onTap: (CalendarMark) -> Unit, onCreate: (Long) -> Unit, onScrollTick: () -> Unit): Modifier {
     val latestMarks by rememberUpdatedState(marks)
     val currentViewport by rememberUpdatedState(viewport)
     val update by rememberUpdatedState(updateViewport)
@@ -21,11 +21,15 @@ import androidx.compose.ui.unit.dp
     val tap by rememberUpdatedState(onTap)
     val create by rememberUpdatedState(onCreate)
     val currentScale by rememberUpdatedState(scale)
+    val scrollTick by rememberUpdatedState(onScrollTick)
     return pointerInput(date) {
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false)
             active(true)
             val (baseStart, baseMinutes) = currentViewport()
+            val tickMinutes = calendarMinorTick(baseMinutes)
+            var lastTick = kotlin.math.floor(baseStart / tickMinutes).toInt()
+            var lastTickAt = 0L
             val midnight = AcademicClock.dayStart(date)
             val width = size.width.toFloat()
             fun x(time: Long) = ((time - midnight) / 60000f - baseStart) / baseMinutes * width
@@ -80,7 +84,19 @@ import androidx.compose.ui.unit.dp
                             }
                             if (moved && pointer.pressed) {
                                 pointer.consume()
-                                if (hit == null) update((baseStart - delta.x / width * baseMinutes).coerceIn(0f,1440f-baseMinutes), baseMinutes)
+                                if (hit == null) {
+                                    val start = (baseStart - delta.x / width * baseMinutes).coerceIn(0f,1440f-baseMinutes)
+                                    update(start, baseMinutes)
+                                    val tick = kotlin.math.floor(start / tickMinutes).toInt()
+                                    if (tick != lastTick) {
+                                        lastTick = tick
+                                        // One soft tick per crossed division; never queue a burst
+                                        // after a fast swipe or vibrate against the day boundary.
+                                        if (pointer.uptimeMillis - lastTickAt >= 80L) {
+                                            scrollTick(); lastTickAt = pointer.uptimeMillis
+                                        }
+                                    }
+                                }
                                 else {
                                     val shift = (delta.x / width * baseMinutes * 60000).toLong()
                                     a = if (edge == 1 || grow) hit.start else (hit.start + shift).coerceIn(midnight, midnight+86340000)
@@ -115,4 +131,11 @@ import androidx.compose.ui.unit.dp
             }
         }
     }
+}
+
+internal fun calendarMinorTick(minutes: Float): Int = when {
+    minutes <= 180 -> 15
+    minutes <= 480 -> 30
+    minutes <= 900 -> 60
+    else -> 120
 }
