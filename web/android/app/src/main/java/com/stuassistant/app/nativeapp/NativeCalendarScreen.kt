@@ -1,12 +1,8 @@
 package com.stuassistant.app.nativeapp
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTransformGestures
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import com.kyant.shapes.RoundedRectangle
@@ -18,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.Color
@@ -29,7 +26,7 @@ import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.drawPlainBackdrop
 import com.kyant.backdrop.effects.blur
-import androidx.compose.ui.input.pointer.pointerInput
+import com.kyant.backdrop.effects.lens
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.text.TextStyle
@@ -120,206 +117,192 @@ fun NativeCalendarItemsScreen(store: NativeStore, s: NativeState, onConnect: () 
 
 @Composable
 internal fun CalendarTimeline(day: String, onDay: (String) -> Unit, drafts: List<JSONObject>, selected: Int,
-    existing: List<CalendarMark>, doc: AcademicTimetableDoc?, onEdit: (Int, String, Long, Long?) -> Unit, onSelect: (Int) -> Unit) {
+    existing: List<CalendarMark>, doc: AcademicTimetableDoc?, onEdit: (Int, String, Long, Long?) -> Unit, onSelect: (Int) -> Unit, onPrecise: (CalendarMark) -> Unit) {
     val colors = LocalNativeColors.current
     val density = LocalDensity.current
-    val blockShape = remember { RoundedRectangle(16.dp) }
-    var windowStart by remember { mutableFloatStateOf(8f * 60) }
-    var windowMinutes by remember { mutableFloatStateOf(6f * 60) }
-    val displayedStart by animateFloatAsState(windowStart, tween(180, easing = FastOutSlowInEasing), label = "time-window")
-    var precise by remember { mutableStateOf<CalendarMark?>(null) }
+    val reduced = com.stuassistant.app.glass.LocalLiquidGlassReducedMotion.current
+    val blockShape = remember { RoundedRectangle(12.dp) }
+    val scrollTick = nSelectionFeedback()
+    var windowStart by remember { mutableFloatStateOf(8f*60) }
+    var windowMinutes by remember { mutableFloatStateOf(360f) }
+    var gesturing by remember { mutableStateOf(false) }
+    val displayedStart by animateFloatAsState(windowStart, if (gesturing) snap() else tween(220, easing = FastOutSlowInEasing), label = "calendar-hour-window")
     var keepWindowForSelection by remember { mutableStateOf<Int?>(null) }
     val currentSelected by rememberUpdatedState(selected)
-    BackHandler(precise != null) { precise = null }
     val currentMarks = calendarMarks(drafts)
     LaunchedEffect(selected) {
-        if (keepWindowForSelection == selected) {
-            keepWindowForSelection = null
-            return@LaunchedEffect
-        }
-        val mark = currentMarks.firstOrNull { it.item == selected }
-        if (mark != null) {
-            val duration = ((mark.end ?: mark.start) - mark.start) / 60000f
-            windowMinutes = (duration + 240).coerceIn(360f, 1440f)
-            val minute = AcademicClock.moment(mark.start).minutes.toFloat() + duration / 2
-            windowStart = (minute - windowMinutes / 2).coerceIn(0f, 1440f - windowMinutes)
+        if (keepWindowForSelection == selected) { keepWindowForSelection = null; return@LaunchedEffect }
+        currentMarks.firstOrNull { it.item == selected }?.let { mark ->
+            val duration = ((mark.end ?: mark.start)-mark.start)/60000f
+            windowMinutes = (duration+240).coerceIn(360f,1440f)
+            val center = AcademicClock.moment(mark.start).minutes + duration/2
+            windowStart = (center-windowMinutes/2).coerceIn(0f,1440f-windowMinutes)
         }
     }
-    Column(Modifier.fillMaxWidth()) {
-    Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp), verticalAlignment = Alignment.CenterVertically) {
-        NButton("‹", { onDay(AcademicClock.addDays(day, -1)) }, modifier = Modifier.size(48.dp).semantics { contentDescription = "前一天" })
-        Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-            CalendarCounter("${AcademicClock.monthDay(day)} · ${AcademicClock.weekdayText(AcademicClock.weekday(day))}", AcademicClock.dayStart(day),
-                TextStyle(color = colors.ink, fontSize = 18.sp, fontFamily = NativeFontFamily, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold), duration = 280)
+    Column(Modifier.fillMaxSize()) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp), verticalAlignment = Alignment.CenterVertically) {
+            NButton("‹", { onDay(AcademicClock.addDays(day,-1)) }, modifier = Modifier.size(48.dp).semantics { contentDescription = "前一天" })
+            Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                CalendarCounter(day.take(7).replace("-", "年")+"月", AcademicClock.dayStart(day),
+                    TextStyle(color = colors.ink, fontSize = 17.sp, fontFamily = NativeFontFamily, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold))
+            }
+            NButton("›", { onDay(AcademicClock.addDays(day,1)) }, modifier = Modifier.size(48.dp).semantics { contentDescription = "后一天" })
         }
-        NButton("›", { onDay(AcademicClock.addDays(day, 1)) }, modifier = Modifier.size(48.dp).semantics { contentDescription = "后一天" })
-    }
-    AnimatedContent(day, Modifier.fillMaxWidth().clipToBounds(), transitionSpec = {
-        val sign = if (targetState > initialState) 1 else -1
-        (slideInHorizontally(tween(280, easing = FastOutSlowInEasing)) { sign * it } + fadeIn(tween(180))) togetherWith
-            (slideOutHorizontally(tween(280, easing = FastOutSlowInEasing)) { -sign * it } + fadeOut(tween(180)))
-    }, label = "timeline-day-slide") { date ->
-        val midnight = AcademicClock.dayStart(date)
-        val courses = AcademicTimetable.planFor(doc, date).blocks.map { CalendarMark(it.key, it.course.title,
-            midnight + it.startMin * 60000L, midnight + it.endMin * 60000L, source = "course") }
-        val marks = (courses + existing + currentMarks).filter { it.start < midnight + 86400000 && (it.end ?: it.start) >= midnight }
-            .sortedBy { if (it.item == selected) 2 else if (it.item >= 0) 1 else 0 }
-        BoxWithConstraints(Modifier.fillMaxWidth().height(220.dp).clipToBounds()) {
-            val track = rememberLayerBackdrop()
-            val width = constraints.maxWidth.toFloat()
-            fun x(ms: Long) = ((ms - midnight) / 60000f - displayedStart) / windowMinutes * width
-            fun at(px: Float) = midnight + ((displayedStart + px / width * windowMinutes) * 60000).toLong()
-            Box(Modifier.fillMaxSize().layerBackdrop(track)) {
-            Box(Modifier.fillMaxSize().pointerInput(date, windowMinutes) {
-                detectTransformGestures { centroid, pan, zoom, _ ->
-                    val old = windowMinutes
-                    val next = (old / zoom).coerceIn(120f, 1440f)
-                    windowStart = (windowStart + centroid.x / width * (old - next) - pan.x / width * old).coerceIn(0f, 1440f - next)
-                    windowMinutes = next
-                }
-            }.pointerInput(date, windowMinutes, windowStart, selected) {
-                detectTapGestures(onLongPress = { position ->
-                    onEdit(selected, "schedule", CalendarDrafts.snap(at(position.x)), null)
-                })
-            }) {
-                val step = if (windowMinutes > 720) 360 else if (windowMinutes > 300) 120 else 60
-                for (minute in 0..1440 step step) {
-                    val px = (minute - displayedStart) / windowMinutes * width
-                    if (px in -30f..(width + 30)) {
-                        Box(Modifier.offset { IntOffset(px.roundToInt(), 54.dp.roundToPx()) }.width(1.dp).height(140.dp).background(colors.ink.copy(alpha = .14f)))
-                        Box(Modifier.offset { IntOffset((px - 24.dp.toPx()).roundToInt(), 20.dp.roundToPx()) }.width(48.dp), contentAlignment = Alignment.Center) {
-                            BasicText(AcademicClock.clock(minute), style = TextStyle(color = colors.ink.copy(alpha = .72f), fontSize = 12.sp, fontFamily = NativeFontFamily))
+        AnimatedContent(day, Modifier.weight(1f).fillMaxWidth().clipToBounds(), transitionSpec = {
+            val sign = if (targetState > initialState) 1 else -1
+            (slideInHorizontally(tween(320, easing = FastOutSlowInEasing)) { sign*it/3 }+fadeIn(tween(220))) togetherWith
+                (slideOutHorizontally(tween(280, easing = FastOutSlowInEasing)) { -sign*it/3 }+fadeOut(tween(220)))
+        }, label = "calendar-three-days") { date ->
+            val centerDay = AcademicClock.dayStart(date)
+            val dates = (-1..1).map { AcademicClock.addDays(date,it) }
+            val all = existing + currentMarks + dates.flatMap { d ->
+                val midnight = AcademicClock.dayStart(d)
+                AcademicTimetable.planFor(doc,d).blocks.map { CalendarMark("course-$d-${it.key}",it.course.title,
+                    midnight+it.startMin*60000L,midnight+it.endMin*60000L,source="course") }
+            }
+            val naturalSlots = dates.flatMap { calendarDaySlots(all, AcademicClock.dayStart(it)) }
+            var heldColumns by remember(date) { mutableStateOf<Map<String,Pair<Int,Int>>>(emptyMap()) }
+            val slots = naturalSlots.map { slot -> heldColumns[slot.mark.key]?.let { slot.copy(column=it.first,columns=it.second) } ?: slot }
+                .sortedBy { if(it.mark.item == selected) 2 else if(it.mark.item >= 0) 1 else 0 }
+            Column(Modifier.fillMaxSize()) {
+                Row(Modifier.fillMaxWidth().height(42.dp).padding(start=52.dp,end=12.dp), verticalAlignment=Alignment.CenterVertically) {
+                    dates.forEach { d ->
+                        val chosen = d == date
+                        Row(Modifier.weight(1f).fillMaxHeight().clickable { if(!chosen) { scrollTick(); onDay(d) } },
+                            horizontalArrangement=Arrangement.Center, verticalAlignment=Alignment.CenterVertically) {
+                            NText(AcademicClock.weekdayText(AcademicClock.weekday(d)),11,muted=true)
+                            Spacer(Modifier.width(5.dp))
+                            Box(Modifier.size(26.dp).clip(CircleShape).background(if(chosen)colors.brand else Color.Transparent), contentAlignment=Alignment.Center) {
+                                CalendarCounter(d.takeLast(2).toInt().toString(),AcademicClock.dayStart(d),
+                                    TextStyle(color=if(chosen)colors.onBrand else colors.ink,fontSize=14.sp,fontFamily=NativeFontFamily,fontWeight=androidx.compose.ui.text.font.FontWeight.SemiBold))
+                            }
                         }
                     }
                 }
-                Box(Modifier.fillMaxWidth().padding(top = 90.dp).height(72.dp).background(colors.brand.copy(alpha = .055f)))
-                Box(Modifier.fillMaxWidth().padding(top = 126.dp).height(1.dp).background(colors.brand.copy(alpha = .16f)))
-            }
-            marks.forEach { mark -> key(mark.key) {
-                val left = x(mark.start)
-                val right = mark.end?.let(::x) ?: left
-                if (right >= -48 && left <= width + 48) {
-                    val editable = mark.item >= 0
-                    val tint = when { mark.field == "deadline" -> if (colors.bg.luminance() > .5f) Color(0xFFD63760) else Color(0xFFFF809D); editable -> colors.brand; mark.source == "course" -> colors.muted; else -> Color(0xFF398A79) }
-                    var delta by remember { mutableFloatStateOf(0f) }
-                    var edge by remember { mutableIntStateOf(0) }
-                    val currentEdit by rememberUpdatedState(onEdit)
-                    val currentMark by rememberUpdatedState(mark)
-                    val point = mark.end == null
-                    val targetWidth = if (point) 48.dp else with(density) { (right-left).coerceAtLeast(48.dp.toPx()).toDp() }
-                    val offset = if (point) left - with(density) { 24.dp.toPx() } else left
-                    val modifier = Modifier.offset { IntOffset(offset.roundToInt(), 66.dp.roundToPx()) }.width(targetWidth).height(144.dp)
-                        .semantics(mergeDescendants = true) {
-                            contentDescription = "${mark.title} ${if (mark.field == "deadline") "截止" else "安排"} ${CalendarDrafts.iso(mark.start)}${if (editable) " 可拖动" else " 只读"}"
-                            if (editable) onClick(label = "修改时间") { onSelect(mark.item); precise = mark; true }
+                BoxWithConstraints(Modifier.weight(1f).fillMaxWidth().clipToBounds().calendarViewportFeather().semantics {
+                    contentDescription="日历时间线"; stateDescription="可见分钟:${windowMinutes.roundToInt()}"
+                }) {
+                    val track = rememberLayerBackdrop()
+                    val width = constraints.maxWidth.toFloat()
+                    val height = constraints.maxHeight.toFloat()
+                    val gutter = with(density) { 52.dp.toPx() }
+                    val dayWidth = (width-gutter-with(density){12.dp.toPx()})/3
+                    val boxes = calendarBoxes(slots,centerDay,displayedStart,windowMinutes,width,height,density.density)
+                    val hourPixels = height*60/windowMinutes
+                    val major = when { hourPixels >= with(density){40.dp.toPx()} -> 60; hourPixels >= with(density){20.dp.toPx()} -> 120; else -> 240 }
+                    Box(Modifier.fillMaxSize().calendarGestures(date,slots,
+                        viewport={windowStart to windowMinutes}, updateViewport={start,minutes->windowStart=start;windowMinutes=minutes},
+                        active={isActive->
+                            if(isActive)heldColumns=naturalSlots.associate{it.mark.key to (it.column to it.columns)}
+                            else heldColumns=emptyMap()
+                            gesturing=isActive
+                        },onEdit=onEdit,
+                        selectByDrag={index->keepWindowForSelection=index.takeIf{it!=currentSelected};onSelect(index)},
+                        onTap={onSelect(it.item);onPrecise(it)},onCreate={onEdit(selected,"schedule",it,null)},onScrollTick=scrollTick)
+                        .layerBackdrop(track)) {
+                        Canvas(Modifier.fillMaxSize()) {
+                            for(column in 0..3) {
+                                val x=gutter+column*dayWidth
+                                drawLine(colors.ink.copy(alpha=.07f),androidx.compose.ui.geometry.Offset(x,0f),androidx.compose.ui.geometry.Offset(x,height),1.dp.toPx())
+                            }
+                            for(minute in 0..1440 step (major/2)) {
+                                val y=(minute-displayedStart)/windowMinutes*height
+                                if(y !in 0f..height)continue
+                                drawLine(colors.ink.copy(alpha=if(minute%major==0).13f else .055f),
+                                    androidx.compose.ui.geometry.Offset(gutter,y),androidx.compose.ui.geometry.Offset(width-12.dp.toPx(),y),1.dp.toPx())
+                            }
                         }
-                    Box(modifier.then(if (editable) Modifier.pointerInput(mark.key, windowMinutes, date) {
-                        var original = currentMark
-                        detectDragGestures(onDragStart = { pos ->
-                            original = currentMark; delta = 0f
-                            // Selecting by dragging must not pan/zoom the axis underneath the finger.
-                            keepWindowForSelection = original.item.takeIf { it != currentSelected }
-                            onSelect(original.item)
-                            edge = if (original.end == null) 0 else when {
-                                pos.x < 18.dp.toPx() -> -1
-                                pos.x > size.width - 18.dp.toPx() -> 1
-                                else -> 0
+                        for(minute in 0..1440 step major) {
+                            val y=(minute-displayedStart)/windowMinutes*height
+                            if(y in -20f..(height+20)) Box(Modifier.offset{IntOffset(0,(y-7.dp.toPx()).roundToInt())}.width(44.dp),contentAlignment=Alignment.CenterEnd) {
+                                BasicText(AcademicClock.clock(minute),style=TextStyle(color=colors.muted,fontSize=10.sp,fontFamily=NativeFontFamily,fontFeatureSettings="tnum"))
                             }
-                        }, onDrag = { change, amount ->
-                            change.consume(); delta += amount.x
-                            val shift = (delta / width * windowMinutes * 60000).toLong()
-                            val a = original.start; val b = original.end
-                            val newStart = if (edge == 1) a else (a + shift).coerceIn(midnight, midnight + 86340000)
-                            val newEnd = when { b == null -> null; edge == -1 -> b.coerceAtLeast(newStart + 60000); edge == 1 -> (b + shift).coerceAtMost(midnight + 86400000).takeIf { it > a + 300000 }; else -> newStart + (b-a) }
-                            currentEdit(original.item, original.field, newStart, newEnd)
-                        }, onDragEnd = {
-                            val m = currentMark
-                            currentEdit(m.item, m.field, CalendarDrafts.snap(m.start), m.end?.let(CalendarDrafts::snap)?.takeIf { it > CalendarDrafts.snap(m.start) })
-                        }, onDragCancel = { currentEdit(original.item, original.field, original.start, original.end) })
-                    }.pointerInput(mark.key) { detectTapGestures { onSelect(currentMark.item); precise = currentMark } } else Modifier)) {
-                        if (point) {
-                            Box(Modifier.align(Alignment.TopCenter).padding(top = 8.dp).width(9.dp).height(94.dp).background(tint.copy(alpha = .12f)))
-                            Box(Modifier.align(Alignment.TopCenter).padding(top = 8.dp).width(3.dp).height(94.dp).background(tint))
-                            Box(Modifier.align(Alignment.TopCenter).padding(top = 82.dp).size(36.dp).clip(CircleShape).background(tint.copy(alpha = .17f)), contentAlignment = Alignment.Center) {
-                                Box(Modifier.size(20.dp).clip(CircleShape).background(tint).border(2.dp, colors.bg, CircleShape))
-                            }
-                        } else {
-                            Box(Modifier.fillMaxWidth().padding(top = 26.dp).height(72.dp).clip(blockShape)
-                                .background(tint.copy(alpha = if (editable) .94f else .20f))
-                                .border(if (editable) 1.5.dp else 1.dp, tint.copy(alpha = if (editable) 1f else .32f), blockShape), contentAlignment = Alignment.Center) {
-                                BasicText(mark.title, Modifier.padding(horizontal = 12.dp), style = TextStyle(color = if (editable) colors.onBrand else colors.ink, fontSize = 13.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                if (editable) {
-                                    Box(Modifier.align(Alignment.CenterStart).padding(start = 5.dp).width(2.dp).height(20.dp).background(colors.onBrand.copy(alpha = .75f)))
-                                    Box(Modifier.align(Alignment.CenterEnd).padding(end = 5.dp).width(2.dp).height(20.dp).background(colors.onBrand.copy(alpha = .75f)))
+                        }
+                        boxes.forEach { rect ->
+                            val mark=rect.slot.mark
+                            val segment=((rect.slot.midnight-AcademicClock.dayStart(AcademicClock.moment(mark.start).date))/86400000L).toInt()
+                            key(mark.key,segment) {
+                                val left by animateFloatAsState(rect.left,if(reduced)snap()else tween(160),label="calendar-event-column")
+                                val eventWidth by animateFloatAsState(rect.width,if(reduced||gesturing)snap()else tween(180),label="calendar-event-width")
+                                if(rect.bottom>=-48 && rect.top<=height+48) {
+                                    val editable=mark.item>=0
+                                    val focused=editable&&mark.item==selected
+                                    val point=mark.end==null
+                                    val tint=when {mark.field=="deadline"->if(colors.bg.luminance()>.5f)Color(0xFFD63760)else Color(0xFFFF809D)
+                                        editable->colors.brand;mark.source=="course"->colors.muted;else->Color(0xFF398A79)}
+                                    val position=Modifier.offset{IntOffset(left.roundToInt(),rect.top.roundToInt())}
+                                        .width(with(density){eventWidth.toDp()}).requiredHeight(with(density){rect.height.toDp()})
+                                        .semantics(mergeDescendants=true) {
+                                            contentDescription="${mark.title} ${if(mark.field=="deadline")"截止" else "安排"} ${CalendarDrafts.iso(mark.start)}${if(editable)" 可拖动" else " 只读"}"
+                                            if(editable)onClick(label="修改时间"){onSelect(mark.item);onPrecise(mark);true}
+                                        }
+                                    if(point) Box(position) {
+                                        Box(Modifier.align(Alignment.Center).fillMaxWidth().height(2.dp).background(tint))
+                                        Box(Modifier.align(Alignment.CenterStart).size(22.dp).clip(CircleShape).background(tint.copy(alpha=.18f)),contentAlignment=Alignment.Center) {
+                                            Box(Modifier.size(12.dp).clip(CircleShape).background(tint).border(1.5.dp,colors.bg,CircleShape))
+                                        }
+                                        BasicText(mark.title,Modifier.align(Alignment.TopStart).padding(start=3.dp,end=3.dp),
+                                            style=TextStyle(color=tint,fontSize=10.sp,fontFamily=NativeFontFamily),maxLines=1,overflow=TextOverflow.Ellipsis)
+                                        if(editable&&mark.field=="schedule")Box(Modifier.align(Alignment.BottomEnd).size(20.dp).semantics{contentDescription="拖出时长"},contentAlignment=Alignment.Center){
+                                            Box(Modifier.size(8.dp).border(1.5.dp,tint,CircleShape))
+                                        }
+                                    } else Box(position.shadow(if(focused)6.dp else 0.dp,blockShape,ambientColor=tint.copy(alpha=.2f),spotColor=tint.copy(alpha=.25f))
+                                        .clip(blockShape).background(Brush.verticalGradient(if(editable)listOf(tint.copy(alpha=if(focused).89f else .65f),tint.copy(alpha=if(focused)1f else .80f))
+                                            else listOf(tint.copy(alpha=.15f),tint.copy(alpha=.23f))))
+                                        .border(1.dp,if(editable)colors.onBrand.copy(alpha=.2f)else tint.copy(alpha=.18f),blockShape)) {
+                                        Column(Modifier.fillMaxSize().padding(horizontal=7.dp,vertical=8.dp),verticalArrangement=Arrangement.Center) {
+                                            BasicText(mark.title,style=TextStyle(color=if(editable)colors.onBrand else colors.ink,fontSize=11.sp,lineHeight=15.sp,fontFamily=NativeFontFamily,
+                                                fontWeight=if(focused)androidx.compose.ui.text.font.FontWeight.SemiBold else androidx.compose.ui.text.font.FontWeight.Normal),
+                                                maxLines=if(rect.height>=with(density){68.dp.toPx()})2 else 1,overflow=TextOverflow.Ellipsis)
+                                            if(rect.height>=with(density){68.dp.toPx()}) {
+                                                Spacer(Modifier.height(3.dp))
+                                                CalendarCounter(AcademicClock.clockAt(mark.start),mark.start,TextStyle(color=if(editable)colors.onBrand.copy(alpha=.8f)else colors.muted,fontSize=10.sp,fontFamily=NativeFontFamily))
+                                            }
+                                        }
+                                        if(editable) {
+                                            Box(Modifier.align(Alignment.TopCenter).padding(top=4.dp).width(20.dp).height(2.dp).clip(CircleShape).background(colors.onBrand.copy(alpha=.65f)))
+                                            Box(Modifier.align(Alignment.BottomCenter).padding(bottom=4.dp).width(20.dp).height(2.dp).clip(CircleShape).background(colors.onBrand.copy(alpha=.65f)))
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
-                    // A point's separate hollow tail grows a range; the main round grip always moves the point.
-                    if (point && editable && mark.field == "schedule") {
-                        Box(Modifier.offset { IntOffset((left + 12.dp.toPx()).roundToInt(), 112.dp.roundToPx()) }.size(44.dp)
-                            .semantics { contentDescription = "拖出时长" }
-                            .pointerInput(mark.key, date, windowMinutes) {
-                                var start = mark.start; var distance = 0f
-                                detectDragGestures(onDragStart = { start = currentMark.start; distance = 0f }, onDrag = { change, amount ->
-                                    change.consume(); distance += amount.x
-                                    // Keep this grip mounted for the full gesture; commit on release.
-                                    delta = distance
-                                }, onDragEnd = {
-                                    val end = CalendarDrafts.snap(start + (distance / width * windowMinutes * 60000).toLong())
-                                    currentEdit(mark.item, "schedule", start, end.takeIf { it > start }); delta = 0f
-                                }, onDragCancel = { delta = 0f })
-                            }, contentAlignment = Alignment.Center) {
-                            Box(Modifier.offset { IntOffset(delta.roundToInt(), 0) }.size(9.dp).border(1.5.dp, colors.brand, CircleShape))
-                        }
-                    }
+                    CalendarEdgeMaterial(track, (maxHeight*.28f).coerceIn(56.dp,96.dp))
+
                 }
-            } }
-            }
-            // Feather the full-bleed edges without enclosing the timeline in a card.
-            listOf(true, false).forEach { leftEdge ->
-                val mask = Brush.horizontalGradient(if (leftEdge) listOf(Color.Black, Color.Transparent) else listOf(Color.Transparent, Color.Black))
-                Box(Modifier.align(if (leftEdge) Alignment.CenterStart else Alignment.CenterEnd).width(24.dp).fillMaxHeight()
-                    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-                    .drawWithContent { drawContent(); drawRect(mask, blendMode = BlendMode.DstIn) }
-                    .drawPlainBackdrop(backdrop = track, shape = { RectangleShape }, effects = { blur(4.dp.toPx()) })
-                    .background(colors.bg.copy(alpha = .55f)))
             }
         }
-    }
-    if (currentMarks.none { it.item == selected }) Box(Modifier.padding(horizontal = 24.dp)) {
-        NRow("时间", trailing = "未安排  ＋", onClick = {
-            precise = CalendarMark("new-$selected", drafts[selected].optString("title"),
-                AcademicClock.dayStart(day) + 14 * 3600000L, null, item = selected)
-        })
-    }
-    AnimatedVisibility(precise != null, enter = expandVertically(tween(240)) + fadeIn(), exit = shrinkVertically(tween(200)) + fadeOut()) {
-        precise?.let { mark -> CalendarPrecise(mark, { start, end -> onEdit(mark.item, mark.field, start, end); precise = null }, { precise = null }) }
-    }
+        if(currentMarks.none{it.item==selected})Box(Modifier.padding(horizontal=24.dp)) {
+            NRow("时间",trailing="未安排  ＋",onClick={onPrecise(CalendarMark("new-$selected",drafts[selected].optString("title"),AcademicClock.dayStart(day)+14*3600000L,null,item=selected))})
+        }
     }
 }
 
-@Composable private fun CalendarPrecise(mark: CalendarMark, save: (Long, Long?) -> Unit, close: () -> Unit) {
+@Composable internal fun CalendarPrecise(mark: CalendarMark, save: (Long, Long?) -> Unit) {
     var date by remember(mark.key) { mutableStateOf(AcademicClock.moment(mark.start).date) }
     var start by remember(mark.key) { mutableStateOf(AcademicClock.clockAt(mark.start)) }
     var end by remember(mark.key) { mutableStateOf(mark.end?.let(AcademicClock::clockAt).orEmpty()) }
     var error by remember { mutableStateOf<String?>(null) }
-    Column(Modifier.padding(horizontal = 24.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        NText(mark.title, 17, true)
-        NField("日期", date, { date = it }, placeholder = "2026-11-02")
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Box(Modifier.weight(1f)) { NField(if (mark.field == "deadline") "截止" else "时间", start, { start = it }, placeholder = "14:00") }
-            if (mark.field == "schedule") Box(Modifier.weight(1f)) { NField("结束（可空）", end, { end = it }, placeholder = "15:00") }
+    Column(Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Box(Modifier.semantics(mergeDescendants = true) { contentDescription = "精确日期" }) {
+            NField("日期", date, { date = it; error = null }, placeholder = "2026-11-02")
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Box(Modifier.weight(1f).semantics(mergeDescendants = true) { contentDescription = "精确开始时间" }) {
+                NField(if (mark.field == "deadline") "截止" else "开始", start, { start = it; error = null }, placeholder = "14:00")
+            }
+            if (mark.field == "schedule") Box(Modifier.weight(1f).semantics(mergeDescendants = true) { contentDescription = "精确结束时间" }) {
+                NField("结束", end, { end = it; error = null }, placeholder = "可空")
+            }
         }
         NError(error)
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-            NButton("取消", close)
+        Spacer(Modifier.weight(1f))
             NButton("完成", {
                 val a = AcademicClock.parseTime("${date}T$start:00")
                 val b = if (end.isBlank()) null else AcademicClock.parseTime("${date}T$end:00")
-                if (a == null || (end.isNotBlank() && (b == null || b <= a))) error = "请填写有效日期和时间，结束需晚于开始"
+                if (a == null || (end.isNotBlank() && (b == null || b <= a))) error = "日期或时间无效，结束需晚于开始"
                 else save(a, b)
-            }, primary = true)
-        }
+            }, primary = true, modifier = Modifier.fillMaxWidth())
     }
 }
