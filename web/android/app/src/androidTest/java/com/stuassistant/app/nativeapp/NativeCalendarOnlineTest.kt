@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SdkSuppress
@@ -90,11 +91,14 @@ class NativeCalendarOnlineTest {
         event(MotionEvent.ACTION_UP, t, r.exactCenterX(), r.exactCenterY())
     }
     private fun tapField(description: String) {
+        inst.uiAutomation.clearCache()
         val queue = ArrayDeque<AccessibilityNodeInfo>()
-        queue.add(waitFor(description))
+        queue.add(inst.uiAutomation.rootInActiveWindow)
         while (queue.isNotEmpty()) {
             val node = queue.removeFirst()
-            if (node.isEditable) {
+            // NField exposes the label on an inner semantics node; the editable
+            // parent itself has no contentDescription in Compose's Android tree.
+            if (node.contentDescription?.toString() == description) {
                 val r = Rect(); node.getBoundsInScreen(r)
                 val t = SystemClock.uptimeMillis()
                 event(MotionEvent.ACTION_DOWN, t, r.exactCenterX(), r.exactCenterY())
@@ -103,7 +107,42 @@ class NativeCalendarOnlineTest {
             }
             repeat(node.childCount) { node.getChild(it)?.let(queue::add) }
         }
+        screenshot("calendar-field-target-failure.png")
+        val dump = StringBuilder()
+        queue.add(inst.uiAutomation.rootInActiveWindow)
+        while (queue.isNotEmpty()) {
+            val node = queue.removeFirst(); val r = Rect(); node.getBoundsInScreen(r)
+            dump.appendLine("$r editable=${node.isEditable} text=${node.text} desc=${node.contentDescription}")
+            repeat(node.childCount) { node.getChild(it)?.let(queue::add) }
+        }
+        File(inst.targetContext.getExternalFilesDir(null), "calendar-field-tree.txt").writeText(dump.toString())
         error("Editable input missing: $description")
+    }
+    @Test fun compactTimeEditorKeepsAllFieldsUsable() {
+        val a = AcademicClock.parseTime("2026-11-02T14:00:00")!!
+        var saved = false
+        ActivityScenario.launch<NativeActivity>(Intent(inst.targetContext, NativeActivity::class.java).putExtra("preview", true)).use { scenario ->
+            scenario.onActivity { activity -> activity.setContent {
+                val base = rememberLayerBackdrop()
+                Box(Modifier.fillMaxSize()) {
+                    Box(Modifier.fillMaxSize().layerBackdrop(base).background(Color.White))
+                    CompositionLocalProvider(LocalNativeBackdrop provides base) {
+                        Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding()) {
+                            Spacer(Modifier.height(96.dp))
+                            CalendarPrecise(CalendarMark("qa", "英语课", a, a+3600000)) { _, _ -> saved = true }
+                        }
+                    }
+                }
+            } }
+            waitFor("精确日期")
+            tapField("开始"); Thread.sleep(700)
+            screenshot("calendar-compact-time-fields.png")
+            assertNotNull(focusedInput())
+            waitFor("精确结束时间"); waitFor("精确日期")
+            tap("完成")
+            Thread.sleep(200)
+            assertTrue(saved)
+        }
     }
     private fun moveEvent(text: String) {
         val drag = bounds(text)
@@ -235,7 +274,7 @@ class NativeCalendarOnlineTest {
             waitFor("精确开始时间")
             if (!deadlineOnly) waitFor("精确结束时间")
             assertNull("Time editor must replace Confirm, not overlap it", find("确认"))
-            tapField("精确开始时间"); Thread.sleep(700)
+            tapField(if (deadlineOnly) "截止" else "开始"); Thread.sleep(700)
             screenshot("calendar-precise-keyboard.png")
             assertNotNull("Time field must receive keyboard focus", focusedInput())
             waitFor("精确日期")

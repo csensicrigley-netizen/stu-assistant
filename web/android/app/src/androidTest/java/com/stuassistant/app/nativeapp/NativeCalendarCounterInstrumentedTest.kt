@@ -86,10 +86,18 @@ class NativeCalendarCounterInstrumentedTest {
             inst.waitForIdleSync()
             scenario.onActivity { value.value = "1000000" }
             Thread.sleep(900)
-            inst.uiAutomation.clearCache()
-            assertTrue("Latest rollover value must be displayed",
-                inst.uiAutomation.rootInActiveWindow.findAccessibilityNodeInfosByText("1000000").isNotEmpty())
             val settled = shot("calendar-counter-settled.png")
+            if (android.os.Build.VERSION.SDK_INT >= 33) inst.uiAutomation.clearCache()
+            val nodes = ArrayDeque<android.view.accessibility.AccessibilityNodeInfo>()
+            nodes.add(inst.uiAutomation.rootInActiveWindow)
+            var latestFound = false
+            while (nodes.isNotEmpty()) {
+                val node = nodes.removeFirst()
+                if (node.text?.toString() == "1000000") latestFound = true
+                repeat(node.childCount) { node.getChild(it)?.let(nodes::add) }
+            }
+            assertTrue("Latest rollover value must be displayed",
+                latestFound)
             assertTrue("Rollover must settle into readable digits", ink(settled) > baseline * .7)
             settled.recycle()
             scenario.onActivity { reduced.value = true; value.value = "235959" }
