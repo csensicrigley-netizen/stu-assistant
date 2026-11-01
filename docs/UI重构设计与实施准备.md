@@ -226,7 +226,7 @@ LastWave 迷你播放器的持续状态模式可转译为“当前课程”入�
 
 圆角模型同时包含曲线类型、尺寸、各角配置与容器关系。普通四分之一圆和连续曲率圆角分别处理；Apple 的 `.continuous` 不能直接等同于某个固定指数超椭圆，也不能把社区拟合称为 Apple 原始算法。[Apple continuous](https://developer.apple.com/documentation/swiftui/roundedcornerstyle/continuous)
 
-Android 优先评估 [Kyant0 Shapes](https://github.com/Kyant0/Shapes/tree/032af02e0ee88bd050d77997f25dd8adc2c49e1d) 的连续圆角。其官方介绍提供 G2 连续形状；形状实际输出、Backdrop 的透镜边界和轮廓类型必须在同一依赖组合下验证。[Backdrop 圆角教程](https://kyant.gitbook.io/backdrop/tutorials/smoother-rounded-corners)
+Android 新增及重设计的界面默认使用 [Kyant0 Shapes](https://github.com/Kyant0/Shapes/tree/032af02e0ee88bd050d77997f25dd8adc2c49e1d) 的连续圆角（2026-11-01 确认；项目已固定依赖 1.2.1）。`RoundedRectangle` 默认 Continuous；`Capsule` 按短边一半计算半径，等宽高且最大半径时输出圆形。非对称圆角使用 `UnevenRoundedRectangle`；常规形状不得逐组件手写另一套曲线。其官方介绍提供 G2 连续形状；形状实际输出、Backdrop 的透镜边界和轮廓类型必须在同一依赖组合下验证。[Backdrop 圆角教程](https://kyant.gitbook.io/backdrop/tutorials/smoother-rounded-corners)
 
 Web 可保留普通圆角作为兼容基础，再评估 `corner-shape` 的渐进增强。其超椭圆参数是 CSS 规范自己的定义，与 Apple 连续圆角参数不能互换；必须对实际浏览器和 WebView 使用支持检测。[CSS 规范](https://www.w3.org/TR/css-borders-4/#corner-shaping)
 
@@ -252,6 +252,8 @@ Web 可保留普通圆角作为兼容基础，再评估 `corner-shape` 的渐进
 - 图像裁剪遵守所在容器的内轮廓；圆角不能裁掉课程文字、输入光标和重要状态。
 - 按压、展开与形状过渡可被新操作打断，保持轮廓连续，避免结束时切换到另一套圆角。
 - 视觉圆角与有效触控范围分开定义，小控件依然预留足够触控空间。
+- 输入区域内的圆形提交按钮采用 48 × 48 dp，围绕按钮保留均衡空间；当前智能日历输入区域 72 dp 高，上下各 12 dp。取消硬边输入卡片时，背景改用宽范围柔边模糊，不为追求“同心”重新添加边框。
+- 所有具体半径和间距是本项目设计决策，不是 Shapes 自动提供的布局规则。`RoundedRectangle(16.dp)` 可作为事件时间段的起点，裁剪与描边引用同一个实例。
 
 ### 6.4 学术依据的用途
 
