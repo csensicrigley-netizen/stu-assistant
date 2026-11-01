@@ -122,6 +122,7 @@ internal fun CalendarTimeline(day: String, onDay: (String) -> Unit, drafts: List
     val density = LocalDensity.current
     val reduced = com.stuassistant.app.glass.LocalLiquidGlassReducedMotion.current
     val blockShape = remember { RoundedRectangle(12.dp) }
+    val edgeShape = remember { RoundedRectangle(0.dp) }
     val scrollTick = nSelectionFeedback()
     var windowStart by remember { mutableFloatStateOf(8f*60) }
     var windowMinutes by remember { mutableFloatStateOf(360f) }
@@ -275,7 +276,7 @@ internal fun CalendarTimeline(day: String, onDay: (String) -> Unit, drafts: List
                         Box(Modifier.align(if(top)Alignment.TopCenter else Alignment.BottomCenter).fillMaxWidth().height((maxHeight*.16f).coerceIn(36.dp,64.dp))
                             .graphicsLayer{compositingStrategy=CompositingStrategy.Offscreen}
                             .drawWithContent{drawContent();drawRect(mask,blendMode=BlendMode.DstIn)}
-                            .drawPlainBackdrop(backdrop=track,shape={RectangleShape},effects={
+                            .drawPlainBackdrop(backdrop=track,shape={edgeShape},effects={
                                 blur(7.dp.toPx())
                                 if(!reduced)lens(6.dp.toPx(),12.dp.toPx(),chromaticAberration=true)
                             }).background(colors.bg.copy(alpha=.72f)))
