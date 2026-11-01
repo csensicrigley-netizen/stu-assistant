@@ -71,6 +71,66 @@ class NativeStore internal constructor(
         }
     }
 
+    /** Explicit user submission only; no background uploads or automatic retries. */
+    suspend fun inferCalendar(text: String): JSONObject {
+        val owner = session()
+        requireSignedIn(owner)
+        if (owner.server.trimEnd('/') != "https://stu.oyishi.asia")
+            throw NativeApiError("calendar_server", 0, "此服务器尚未接入智能日历，可使用手动记录")
+        val body = JSONObject().put("text", text).put("context", JSONObject()
+            .put("reference_at", java.time.OffsetDateTime.now(AcademicClock.zone).toString())
+            .put("timezone", "Asia/Shanghai"))
+        val result = api.request(owner.copy(server = "https://stu-mcp.com"),
+            "/api/calendar/v2/mobile/parse", "POST", body)
+        ensureCurrent(owner)
+        return result
+    }
+
+    private fun calendarKey(): String {
+        val current = state.value
+        val uid = userId(current) ?: throw NativeApiError("not_signed_in", 401, "请先登录助手账号")
+        if (current.preview) throw NativeApiError("preview", 0, "体验模式不能保存真实事项")
+        return "calendar-v1:" + accountScope(current.server, uid)
+    }
+
+    suspend fun calendarItems(): List<JSONObject> = withContext(Dispatchers.IO) {
+        synchronized(lock) { academicObjects(secure.readCache(calendarKey())?.optJSONArray("items")).map(::copy) }
+    }
+
+    /** One encrypted atomic batch; stable batch IDs prevent double-confirm duplicates. */
+    suspend fun saveCalendar(batchId: String, drafts: List<JSONObject>, expectedAccount: String) = withContext(Dispatchers.IO) {
+        synchronized(lock) {
+            val key = calendarKey()
+            if (key != expectedAccount) throw NativeApiError("account_changed", 0, "账号已切换，请重新打开")
+            val document = secure.readCache(key) ?: JSONObject().put("items", JSONArray())
+            val items = academicObjects(document.optJSONArray("items"))
+            if (items.any { it.optString("batch") == batchId }) return@synchronized
+            require(drafts.isNotEmpty() && drafts.size <= 8)
+            val added = drafts.map { draft ->
+                require(draft.optString("title").isNotBlank())
+                JSONObject().put("id", java.util.UUID.randomUUID().toString()).put("batch", batchId)
+                    .put("draft", copy(draft)).put("done", false).put("created_at", System.currentTimeMillis())
+            }
+            secure.writeCache(key, document.put("items", JSONArray(items + added)))
+            mutableState.value = state.value.copy(calendarRevision = state.value.calendarRevision + 1,
+                calendarLastBatch = batchId, calendarFocusDate = CalendarDrafts.date(drafts.first()))
+        }
+    }
+
+    fun calendarAccount(): String = synchronized(lock) { calendarKey() }
+
+    suspend fun toggleCalendar(id: String, expectedAccount: String) = withContext(Dispatchers.IO) {
+        synchronized(lock) {
+            val key = calendarKey()
+            if (key != expectedAccount) throw NativeApiError("account_changed")
+            val document = secure.readCache(key) ?: return@synchronized
+            academicObjects(document.optJSONArray("items")).firstOrNull { it.optString("id") == id }
+                ?.let { it.put("done", !it.optBoolean("done")) }
+            secure.writeCache(key, document)
+            mutableState.value = state.value.copy(calendarRevision = state.value.calendarRevision + 1)
+        }
+    }
+
     suspend fun login(email: String, passphrase: String, register: Boolean = false) {
         withContext(Dispatchers.IO) {
         val owner = session()
@@ -300,7 +360,11 @@ class NativeStore internal constructor(
         val owner = session()
         val response = requestOwned(owner, "/v1/account", "DELETE")
         if (!response.optBoolean("ok")) throw invalidResponse("服务器没有确认删除账号")
-        synchronized(lock) { ensureCurrent(owner); clearSession(owner, true, null) }
+        synchronized(lock) {
+            ensureCurrent(owner)
+            secure.removeCache(calendarKey())
+            clearSession(owner, true, null)
+        }
     }
 
     fun legacyMigrationDone(): Boolean = prefs.getInt("legacyMigrationVersion", 0) >= 1
