@@ -122,7 +122,6 @@ internal fun CalendarTimeline(day: String, onDay: (String) -> Unit, drafts: List
     val density = LocalDensity.current
     val reduced = com.stuassistant.app.glass.LocalLiquidGlassReducedMotion.current
     val blockShape = remember { RoundedRectangle(12.dp) }
-    val edgeShape = remember { RoundedRectangle(0.dp) }
     val scrollTick = nSelectionFeedback()
     var windowStart by remember { mutableFloatStateOf(8f*60) }
     var windowMinutes by remember { mutableFloatStateOf(360f) }
@@ -180,7 +179,7 @@ internal fun CalendarTimeline(day: String, onDay: (String) -> Unit, drafts: List
                         }
                     }
                 }
-                BoxWithConstraints(Modifier.weight(1f).fillMaxWidth().clipToBounds().semantics {
+                BoxWithConstraints(Modifier.weight(1f).fillMaxWidth().clipToBounds().calendarViewportFeather().semantics {
                     contentDescription="日历时间线"; stateDescription="可见分钟:${windowMinutes.roundToInt()}"
                 }) {
                     val track = rememberLayerBackdrop()
@@ -269,18 +268,8 @@ internal fun CalendarTimeline(day: String, onDay: (String) -> Unit, drafts: List
                             }
                         }
                     }
-                    // The edge material samples only this calendar, never the page behind it.
-                    listOf(true,false).forEach { top ->
-                        val mask=Brush.verticalGradient(if(top)listOf(Color.Black,Color.Black.copy(alpha=.65f),Color.Transparent)
-                            else listOf(Color.Transparent,Color.Black.copy(alpha=.65f),Color.Black))
-                        Box(Modifier.align(if(top)Alignment.TopCenter else Alignment.BottomCenter).fillMaxWidth().height((maxHeight*.16f).coerceIn(36.dp,64.dp))
-                            .graphicsLayer{compositingStrategy=CompositingStrategy.Offscreen}
-                            .drawWithContent{drawContent();drawRect(mask,blendMode=BlendMode.DstIn)}
-                            .drawPlainBackdrop(backdrop=track,shape={edgeShape},effects={
-                                blur(7.dp.toPx())
-                                if(!reduced)lens(6.dp.toPx(),12.dp.toPx(),chromaticAberration=true)
-                            }).background(colors.bg.copy(alpha=.72f)))
-                    }
+                    CalendarEdgeMaterial(track, (maxHeight*.28f).coerceIn(56.dp,96.dp))
+
                 }
             }
         }
