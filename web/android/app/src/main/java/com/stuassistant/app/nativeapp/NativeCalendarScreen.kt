@@ -203,7 +203,10 @@ internal fun CalendarTimeline(day: String, onDay: (String) -> Unit, drafts: List
                     val targetWidth = if (point) 48.dp else with(density) { (right-left).coerceAtLeast(48.dp.toPx()).toDp() }
                     val offset = if (point) left - with(density) { 24.dp.toPx() } else left
                     val modifier = Modifier.offset { IntOffset(offset.roundToInt(), 66.dp.roundToPx()) }.width(targetWidth).height(144.dp)
-                        .semantics { contentDescription = "${mark.title} ${if (mark.field == "deadline") "截止" else "安排"} ${CalendarDrafts.iso(mark.start)}${if (editable) " 可拖动" else " 只读"}" }
+                        .semantics(mergeDescendants = true) {
+                            contentDescription = "${mark.title} ${if (mark.field == "deadline") "截止" else "安排"} ${CalendarDrafts.iso(mark.start)}${if (editable) " 可拖动" else " 只读"}"
+                            if (editable) onClick(label = "修改时间") { onSelect(mark.item); precise = mark; true }
+                        }
                     Box(modifier.then(if (editable) Modifier.pointerInput(mark.key, windowMinutes, date) {
                         var original = currentMark
                         detectDragGestures(onDragStart = { pos ->

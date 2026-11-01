@@ -21,6 +21,7 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.text
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import com.stuassistant.app.glass.LocalLiquidGlassReducedMotion
 
 private data class CounterSegment(val text: String, val order: Long)
@@ -44,7 +45,11 @@ private val CounterParts = Regex("\\d+|\\D+")
                         (slideOutVertically(tween(duration, easing = FastOutSlowInEasing)) { -direction * it } + fadeOut(tween(duration / 2))))
                         .using(SizeTransform(clip = true, sizeAnimationSpec = { _, _ -> tween(duration) }))
                 }, label = "calendar-counter-segment") { value ->
-                BasicText(value.text, style = numberStyle, maxLines = 1)
+                BasicText(value.text, style = when {
+                    value.text.all(Char::isDigit) -> numberStyle
+                    value.text.contains(':') -> style.copy(fontFamily = FontFamily.Default)
+                    else -> style
+                }, maxLines = 1)
             }
         }
     }
