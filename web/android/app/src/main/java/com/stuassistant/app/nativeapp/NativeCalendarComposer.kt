@@ -203,7 +203,7 @@ fun NativeCalendarComposer(store: NativeStore, s: NativeState, inputBackdrop: Ba
                                     val time = CalendarDrafts.start(draft) ?: CalendarDrafts.deadline(draft)
                                         ?: CalendarDrafts.date(draft)?.let(AcademicClock::dayStart) ?: 0L
                                     CalendarCounter(CalendarDrafts.label(draft), time + (CalendarDrafts.end(draft) ?: time),
-                                        TextStyle(color = c.ink, fontSize = 23.sp, fontFamily = NativeFontFamily, fontWeight = FontWeight.SemiBold), duration = 180)
+                                        TextStyle(color = c.ink, fontSize = 23.sp, fontFamily = NativeFontFamily, fontWeight = FontWeight.SemiBold))
                                 }
                             }
                             if (currentDraft == null) Box(Modifier.height(28.dp))

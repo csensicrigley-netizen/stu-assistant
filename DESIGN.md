@@ -57,7 +57,7 @@ Android 新增或改版的界面默认使用 [Kyant0/Shapes](https://github.com/
 
 ## 时间与日期动效（2026-11-01）
 
-参考 [skydoves/compose-animations 的 Animated Counter](https://github.com/skydoves/compose-animations/blob/eb51389891c303a0ad79c73525bd97acfdf96547/app/src/main/kotlin/com/skydoves/hotreloadanimations/animations/AnimationExample5.kt)：时间、日期变化使用按增减方向滚动并淡入淡出的 `AnimatedContent`，不用直接替换文本。原生实现集中在 `NativeCalendarCounter.kt`；时间约 180ms、日期 280ms，数字等宽并分段保留稳定标点，跨小时/月/年依据实际时间方向判断。连续拖动和快速切日直接追踪最新目标，不排队播放历史值。日期数字滚动与整条时间线横向滑动同时进行；无障碍读取完整的新时间，系统减少动画设置仍优先。
+最初参考 [skydoves/compose-animations 的 Animated Counter](https://github.com/skydoves/compose-animations/blob/eb51389891c303a0ad79c73525bd97acfdf96547/app/src/main/kotlin/com/skydoves/hotreloadanimations/animations/AnimationExample5.kt)。按用户随后提供的 Transitions.dev Number pop-in 代码，原生 `NativeCalendarCounter.kt` 改为逐字符常驻：单次变化约 500ms、8dp 位移、2dp 柔化、最多两级 70ms 错峰，采用 `(0.34, 1.45, 0.64, 1)` 曲线；旧字退出与新字进入重叠，标点与未变化数字不动。快速更新优先保持新字完全可见、带轻微模糊，停下后约 240ms 清晰落定，禁止反复从透明状态重启，也不排队播放旧值。数字等宽，方向依据实际时间，日期与整条时间线的滑动同时进行；无障碍读取完整的新值，减少动画设置优先。Android 12 以下保留位移与淡入淡出，系统不支持的模糊效果自动略过。
 
 ## Android Compose 触感（2026-10-30）
 
