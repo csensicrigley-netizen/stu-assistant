@@ -256,14 +256,17 @@ internal fun CalendarTimeline(day: String, onDay: (String) -> Unit, drafts: List
     var start by remember(mark.key) { mutableStateOf(AcademicClock.clockAt(mark.start)) }
     var end by remember(mark.key) { mutableStateOf(mark.end?.let(AcademicClock::clockAt).orEmpty()) }
     var error by remember { mutableStateOf<String?>(null) }
-    var field by remember { mutableStateOf("start") }
-    Column(Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        NChips(listOf("date" to "日期", "start" to if (mark.field == "deadline") "截止" else "开始") +
-            (if (mark.field == "schedule") listOf("end" to "结束") else emptyList()), field, { field = it })
-        Box(Modifier.semantics { contentDescription = "精确时间编辑" }) {
-            NField("", when(field) { "date" -> date; "end" -> end; else -> start }, {
-                when(field) { "date" -> date = it; "end" -> end = it; else -> start = it }; error = null
-            }, placeholder = if(field == "date") "2026-11-02" else if(field == "end") "可空" else "14:00")
+    Column(Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Box(Modifier.semantics(mergeDescendants = true) { contentDescription = "精确日期" }) {
+            NField("日期", date, { date = it; error = null }, placeholder = "2026-11-02")
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Box(Modifier.weight(1f).semantics(mergeDescendants = true) { contentDescription = "精确开始时间" }) {
+                NField(if (mark.field == "deadline") "截止" else "开始", start, { start = it; error = null }, placeholder = "14:00")
+            }
+            if (mark.field == "schedule") Box(Modifier.weight(1f).semantics(mergeDescendants = true) { contentDescription = "精确结束时间" }) {
+                NField("结束", end, { end = it; error = null }, placeholder = "可空")
+            }
         }
         NError(error)
         Spacer(Modifier.weight(1f))
