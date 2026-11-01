@@ -29,6 +29,7 @@ import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Test
+import org.junit.Before
 import org.junit.runner.RunWith
 import java.io.File
 import java.util.UUID
@@ -47,6 +48,25 @@ internal fun calendarDeviceScreenshot(inst: android.app.Instrumentation): androi
 @SdkSuppress(minSdkVersion = 33)
 class NativeCalendarOnlineTest {
     private val inst = InstrumentationRegistry.getInstrumentation()
+    @Before fun cleanInterruptedTestAccounts() = runBlocking {
+        // A process-level crash cannot execute finally. Recover only our isolated
+        // test directories and synthetic accounts, never normal app preferences.
+        val prefixPattern=Regex("native-calendar-test-[0-9a-f-]{36}-")
+        inst.targetContext.noBackupFilesDir.listFiles().orEmpty()
+            .filter { it.isDirectory && prefixPattern.matches(it.name) }.forEach { directory ->
+                val isolated=IsolatedContext(inst.targetContext,directory.name)
+                val old=NativeStore(isolated)
+                try {
+                    val state=old.state.value
+                    val email=state.user?.optString("email").orEmpty()
+                    if(state.token!=null && email.startsWith("android-calendar-") && email.endsWith("@example.invalid")) {
+                        val api=NativeApi()
+                        try { api.request(NativeSession(state.server,state.token,0),"/v1/account","DELETE") }
+                        finally { api.close() }
+                    }
+                } finally { old.close();isolated.cleanup() }
+            }
+    }
     private fun find(text: String): AccessibilityNodeInfo? {
         // UIAutomation may retain the outgoing AnimatedContent tree after a day slide.
         // Read the current window, not stale virtual nodes from the preceding day/test.
@@ -397,8 +417,7 @@ class NativeCalendarOnlineTest {
             } finally { context.cleanup(); AcademicClock.setPreviewTime(null) }
         }
     }
-    private class IsolatedContext(base: Context): ContextWrapper(base) {
-        private val prefix = "native-calendar-test-${UUID.randomUUID()}-"
+    private class IsolatedContext(base: Context, private val prefix: String = "native-calendar-test-${UUID.randomUUID()}-"): ContextWrapper(base) {
         private val names = mutableSetOf<String>()
         private val directory = File(base.noBackupFilesDir, prefix)
         override fun getApplicationContext(): Context = this
