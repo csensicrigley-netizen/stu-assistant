@@ -128,9 +128,15 @@ internal fun CalendarTimeline(day: String, onDay: (String) -> Unit, drafts: List
     var windowMinutes by remember { mutableFloatStateOf(6f * 60) }
     val displayedStart by animateFloatAsState(windowStart, tween(180, easing = FastOutSlowInEasing), label = "time-window")
     var precise by remember { mutableStateOf<CalendarMark?>(null) }
+    var keepWindowForSelection by remember { mutableStateOf<Int?>(null) }
+    val currentSelected by rememberUpdatedState(selected)
     BackHandler(precise != null) { precise = null }
     val currentMarks = calendarMarks(drafts)
     LaunchedEffect(selected) {
+        if (keepWindowForSelection == selected) {
+            keepWindowForSelection = null
+            return@LaunchedEffect
+        }
         val mark = currentMarks.firstOrNull { it.item == selected }
         if (mark != null) {
             val duration = ((mark.end ?: mark.start) - mark.start) / 60000f
@@ -210,7 +216,10 @@ internal fun CalendarTimeline(day: String, onDay: (String) -> Unit, drafts: List
                     Box(modifier.then(if (editable) Modifier.pointerInput(mark.key, windowMinutes, date) {
                         var original = currentMark
                         detectDragGestures(onDragStart = { pos ->
-                            original = currentMark; delta = 0f; onSelect(original.item)
+                            original = currentMark; delta = 0f
+                            // Selecting by dragging must not pan/zoom the axis underneath the finger.
+                            keepWindowForSelection = original.item.takeIf { it != currentSelected }
+                            onSelect(original.item)
                             edge = if (original.end == null) 0 else when {
                                 pos.x < 18.dp.toPx() -> -1
                                 pos.x > size.width - 18.dp.toPx() -> 1
