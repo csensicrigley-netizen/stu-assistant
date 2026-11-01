@@ -49,6 +49,16 @@ class NativeCalendarOnlineTest {
     private fun waitFor(text: String, timeout: Long = 15000): AccessibilityNodeInfo {
         val until = SystemClock.uptimeMillis() + timeout
         while (SystemClock.uptimeMillis() < until) { find(text)?.let { return it }; Thread.sleep(100) }
+        val root = inst.uiAutomation.rootInActiveWindow
+        val nodes = ArrayDeque<AccessibilityNodeInfo>()
+        if (root != null) nodes.add(root)
+        val report = StringBuilder()
+        while (nodes.isNotEmpty()) {
+            val n = nodes.removeFirst(); val r = Rect(); n.getBoundsInScreen(r)
+            report.appendLine("visible=${n.isVisibleToUser} $r text=${n.text} desc=${n.contentDescription}")
+            repeat(n.childCount) { n.getChild(it)?.let(nodes::add) }
+        }
+        File(inst.targetContext.getExternalFilesDir(null), "calendar-missing-ui.txt").writeText(report.toString())
         error("UI missing: $text")
     }
     private fun focusedInput(): AccessibilityNodeInfo? {
