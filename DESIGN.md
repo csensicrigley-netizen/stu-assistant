@@ -55,6 +55,10 @@ Android 新增或改版的界面默认使用 [Kyant0/Shapes](https://github.com/
 - 时间线贯穿屏幕；圆角用于可移动的事件对象，不重新加外层卡片。形状改变与展开、收起、切日一起连续过渡。
 - 验收必须覆盖浅深主题、窄屏、长中文、字体放大、按下和展开中间帧，检查边缘厚度、裁剪和可点击范围；不把库的 G2 描述当作 Apple 原始算法或自动视觉验收。
 
+## 时间与日期动效（2026-11-01）
+
+参考 [skydoves/compose-animations 的 Animated Counter](https://github.com/skydoves/compose-animations/blob/eb51389891c303a0ad79c73525bd97acfdf96547/app/src/main/kotlin/com/skydoves/hotreloadanimations/animations/AnimationExample5.kt)：时间、日期变化使用按增减方向滚动并淡入淡出的 `AnimatedContent`，不用直接替换文本。原生实现集中在 `NativeCalendarCounter.kt`；时间约 180ms、日期 280ms，数字等宽并分段保留稳定标点，跨小时/月/年依据实际时间方向判断。连续拖动和快速切日直接追踪最新目标，不排队播放历史值。日期数字滚动与整条时间线横向滑动同时进行；无障碍读取完整的新时间，系统减少动画设置仍优先。
+
 ## Android Compose 触感（2026-10-30）
 
 1.0.51 补充：首页可点卡片使用 Navigation 两段触感及轻按压缩放／高亮；静态卡片保持静默。抽屉滑入滑出、蒙层渐变，退出完成后再释放背景输入和焦点，减少动态时即时切换。正式后台内置，登录注册不显示服务器配置；实现与交付规则见[原生登录与卡片抽屉修复](docs/原生登录与卡片抽屉修复.md)。
