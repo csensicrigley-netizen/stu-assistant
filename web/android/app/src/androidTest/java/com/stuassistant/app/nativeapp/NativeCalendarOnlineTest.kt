@@ -68,6 +68,7 @@ class NativeCalendarOnlineTest {
         error("UI missing: $text")
     }
     private fun focusedInput(): AccessibilityNodeInfo? {
+        inst.uiAutomation.clearCache()
         val root = inst.uiAutomation.rootInActiveWindow ?: return null
         val queue = ArrayDeque<AccessibilityNodeInfo>(); queue.add(root)
         while (queue.isNotEmpty()) {
@@ -87,6 +88,22 @@ class NativeCalendarOnlineTest {
         val r = bounds(text); val t = SystemClock.uptimeMillis()
         event(MotionEvent.ACTION_DOWN, t, r.exactCenterX(), r.exactCenterY())
         event(MotionEvent.ACTION_UP, t, r.exactCenterX(), r.exactCenterY())
+    }
+    private fun tapField(description: String) {
+        val queue = ArrayDeque<AccessibilityNodeInfo>()
+        queue.add(waitFor(description))
+        while (queue.isNotEmpty()) {
+            val node = queue.removeFirst()
+            if (node.isEditable) {
+                val r = Rect(); node.getBoundsInScreen(r)
+                val t = SystemClock.uptimeMillis()
+                event(MotionEvent.ACTION_DOWN, t, r.exactCenterX(), r.exactCenterY())
+                event(MotionEvent.ACTION_UP, t, r.exactCenterX(), r.exactCenterY())
+                return
+            }
+            repeat(node.childCount) { node.getChild(it)?.let(queue::add) }
+        }
+        error("Editable input missing: $description")
     }
     private fun moveEvent(text: String) {
         val drag = bounds(text)
@@ -218,7 +235,8 @@ class NativeCalendarOnlineTest {
             waitFor("精确开始时间")
             if (!deadlineOnly) waitFor("精确结束时间")
             assertNull("Time editor must replace Confirm, not overlap it", find("确认"))
-            tap("精确开始时间"); Thread.sleep(700)
+            tapField("精确开始时间"); Thread.sleep(700)
+            screenshot("calendar-precise-keyboard.png")
             assertNotNull("Time field must receive keyboard focus", focusedInput())
             waitFor("精确日期")
             if (!deadlineOnly) waitFor("精确结束时间")

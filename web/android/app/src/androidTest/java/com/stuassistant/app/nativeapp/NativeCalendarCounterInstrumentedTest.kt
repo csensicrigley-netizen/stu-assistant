@@ -41,6 +41,7 @@ class NativeCalendarCounterInstrumentedTest {
             scenario.onActivity { activity -> activity.setContent {
                 LaunchedEffect(running.value) {
                     if (running.value) repeat(1200) { index ->
+                        if (!running.value) return@LaunchedEffect
                         // All cells change, in both directions, faster than one transition.
                         value.value = (100000 + ((index * 111119L) % 900000)).toString()
                         delay(16)
@@ -81,8 +82,13 @@ class NativeCalendarCounterInstrumentedTest {
                 assertTrue("Fast update frame $index became blank", ink(bmp) > baseline * .3)
                 bmp.recycle()
             }
-            scenario.onActivity { running.value = false; value.value = "1000000" }
+            scenario.onActivity { running.value = false }
+            inst.waitForIdleSync()
+            scenario.onActivity { value.value = "1000000" }
             Thread.sleep(900)
+            inst.uiAutomation.clearCache()
+            assertTrue("Latest rollover value must be displayed",
+                inst.uiAutomation.rootInActiveWindow.findAccessibilityNodeInfosByText("1000000").isNotEmpty())
             val settled = shot("calendar-counter-settled.png")
             assertTrue("Rollover must settle into readable digits", ink(settled) > baseline * .7)
             settled.recycle()
