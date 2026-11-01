@@ -226,7 +226,8 @@ class NativeCalendarOnlineTest {
             scenario.onActivity { activity -> activity.setContent {
                 var draft by remember { mutableStateOf(initial) }
                 val backdrop = rememberLayerBackdrop()
-                Box(Modifier.fillMaxSize().background(Color.White).layerBackdrop(backdrop)) {
+                Box(Modifier.fillMaxSize().background(Color.White)) {
+                    Box(Modifier.fillMaxSize().layerBackdrop(backdrop).background(Color.White))
                     CompositionLocalProvider(LocalNativeBackdrop provides backdrop) {
                         Box(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
                             CalendarTimeline("2026-11-02",{},listOf(draft),0,emptyList(),null,
