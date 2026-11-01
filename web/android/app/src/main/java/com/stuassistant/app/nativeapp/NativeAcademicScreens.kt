@@ -876,7 +876,7 @@ private fun AcademicTaskRow(task: AcademicTask, now: Long, done: Boolean, toggle
 }
 
 @Composable
-private fun AcademicExams(exams: List<AcademicExam>, now: Long) {
+internal fun AcademicExams(exams: List<AcademicExam>, now: Long) {
     val c = LocalNativeColors.current; val tones = academicTones()
     val inverse = if (c.bg.luminance() < .2f) c.bg else c.surface
     val sorted = exams.sortedBy { it.startMs ?: Long.MAX_VALUE }
@@ -916,7 +916,7 @@ private fun AcademicExams(exams: List<AcademicExam>, now: Long) {
 }
 
 @Composable
-private fun AcademicGrades(grades: List<AcademicGrade>) {
+internal fun AcademicGrades(grades: List<AcademicGrade>) {
     var semester by rememberSaveable { mutableStateOf("all") }
     val semesters = grades.map { it.semester }.filter { it.isNotEmpty() }.distinct().sortedDescending()
     val rows = if (semester == "all") grades else grades.filter { it.semester == semester }

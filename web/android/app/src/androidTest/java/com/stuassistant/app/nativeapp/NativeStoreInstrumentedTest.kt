@@ -137,6 +137,33 @@ class NativeStoreInstrumentedTest {
     }
 
     @Test
+    fun calendarConfirmationIsLocalAtomicAndAccountScoped() = runBlocking {
+        val first = server()
+        val store = signedIn(first, "alice")
+        val alice = store.calendarAccount()
+        val draft = JSONObject().put("title", "Local-only calendar content").put("timezone", "Asia/Shanghai")
+            .put("reminders", JSONArray())
+        store.saveCalendar("batch-one", listOf(draft), alice)
+        store.saveCalendar("batch-one", listOf(draft), alice)
+        assertEquals(1, store.calendarItems().size)
+        val id = store.calendarItems().single().getString("id")
+        store.toggleCalendar(id, alice)
+        assertTrue(store.calendarItems().single().getBoolean("done"))
+        store.login("bob@example.test", "test-passphrase")
+        awaitReady(store, "bob")
+        assertTrue(store.calendarItems().isEmpty())
+        expectApiError("account_changed") { store.saveCalendar("stale", listOf(draft), alice) }
+        store.login("alice@example.test", "test-passphrase")
+        awaitReady(store, "alice")
+        assertEquals(id, store.calendarItems().single().getString("id"))
+        val second = server()
+        store.setServer(second.base)
+        store.login("alice@example.test", "test-passphrase")
+        awaitReady(store, "alice")
+        assertTrue(store.calendarItems().isEmpty())
+    }
+
+    @Test
     fun partialServiceFailureKeepsOnlyItsOldDataAndDoesNotAdvanceSyncedAt() = runBlocking {
         val server = server()
         val store = signedIn(server, "alice")
