@@ -132,8 +132,8 @@ class NativeActivity:ComponentActivity() {
             if(ready) NativeUpdatePrompt(store,combined,Modifier.align(Alignment.BottomCenter).padding(start=12.dp,end=12.dp,bottom=(104+bottom).dp))
             NativeSheetHost(sheets,combined)
             AnimatedVisibility(calendarOpen&&s.token!=null&&!s.preview, enter=slideInVertically(tween(420)){ -it/12 }+fadeIn(tween(220)), exit=slideOutVertically(tween(260)){ -it/12 }+fadeOut(tween(220))) {
-                CompositionLocalProvider(LocalNativeBackdrop provides combined) {
-                    NativeCalendarComposer(store,s) {calendarOpen=false}
+                CompositionLocalProvider(LocalNativeBackdrop provides base) {
+                    NativeCalendarComposer(store,s,inputBackdrop=combined) {calendarOpen=false}
                 }
             }
         }

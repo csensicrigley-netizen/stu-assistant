@@ -12,12 +12,14 @@ import android.view.MotionEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.filters.SdkSuppress
 import androidx.test.platform.app.InstrumentationRegistry
 import com.kyant.backdrop.backdrops.*
 import com.stuassistant.app.NativeActivity
@@ -34,6 +36,7 @@ import java.util.concurrent.CopyOnWriteArrayList
 
 /** Opt-in real Internet/Jev test. Isolated app data and a disposable STU account. */
 @RunWith(AndroidJUnit4::class)
+@SdkSuppress(minSdkVersion = 33)
 class NativeCalendarOnlineTest {
     private val inst = InstrumentationRegistry.getInstrumentation()
     private fun find(text: String): AccessibilityNodeInfo? {
@@ -101,6 +104,21 @@ class NativeCalendarOnlineTest {
         val file = File(inst.targetContext.getExternalFilesDir(null), name)
         file.outputStream().use { inst.uiAutomation.takeScreenshot().compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
     }
+    private fun pinch(centerX: Float, y: Float, from: Float, to: Float) {
+        val time = SystemClock.uptimeMillis()
+        fun send(action: Int, count: Int, half: Float) {
+            val props = Array(count) { i -> MotionEvent.PointerProperties().apply { id = i; toolType = MotionEvent.TOOL_TYPE_FINGER } }
+            val coords = Array(count) { i -> MotionEvent.PointerCoords().apply { x = centerX + if (i == 0) -half else half; this.y = y; pressure = 1f; size = 1f } }
+            val e = MotionEvent.obtain(time, SystemClock.uptimeMillis(), action, count, props, coords, 0, 0, 1f, 1f, 0, 0, InputDevice.SOURCE_TOUCHSCREEN, 0)
+            try { assertTrue(inst.uiAutomation.injectInputEvent(e, true)) } finally { e.recycle() }
+        }
+        send(MotionEvent.ACTION_DOWN, 1, from)
+        send(MotionEvent.ACTION_POINTER_DOWN or (1 shl MotionEvent.ACTION_POINTER_INDEX_SHIFT), 2, from)
+        repeat(16) { i -> send(MotionEvent.ACTION_MOVE, 2, from + (to-from)*(i+1)/16); Thread.sleep(16) }
+        send(MotionEvent.ACTION_POINTER_UP or (1 shl MotionEvent.ACTION_POINTER_INDEX_SHIFT), 2, to)
+        send(MotionEvent.ACTION_UP, 1, to)
+        Thread.sleep(250)
+    }
     @Test fun realJevKeyboardDragAndEncryptedPersistence() = runBlocking {
         runFlow("明天下午两点到三点和导师开会，明天下午五点前交报告", false)
     }
@@ -129,11 +147,17 @@ class NativeCalendarOnlineTest {
             scenario = ActivityScenario.launch(Intent(inst.targetContext, NativeActivity::class.java).putExtra("preview", true))
             scenario.onActivity { activity -> activity.setContent {
                 val backdrop = rememberLayerBackdrop()
+                val ambient = rememberLayerBackdrop()
                 val state by store.state.collectAsState()
                 Box(Modifier.fillMaxSize()) {
                     Box(Modifier.fillMaxSize().layerBackdrop(backdrop).background(Color.White))
+                    Canvas(Modifier.fillMaxSize().layerBackdrop(ambient)) {
+                        drawRect(Color.White)
+                        drawRect(Color.Black, topLeft = androidx.compose.ui.geometry.Offset(size.width*.76f, size.height*.04f),
+                            size = androidx.compose.ui.geometry.Size(size.width*.2f, size.height*.1f))
+                    }
                     CompositionLocalProvider(LocalNativeBackdrop provides backdrop, LocalNativeFeedback provides feedback, LocalNativeStrength provides 72) {
-                        NativeCalendarComposer(store, state) { closed.set(true) }
+                        NativeCalendarComposer(store, state, inputBackdrop = ambient) { closed.set(true) }
                     }
                 }
             } }
@@ -169,6 +193,19 @@ class NativeCalendarOnlineTest {
             screenshot(if (deadlineOnly) "calendar-deadline.png" else "calendar-online.png")
             tap("后一天"); Thread.sleep(600); screenshot("calendar-next-day.png")
             tap("前一天"); Thread.sleep(600); screenshot("calendar-return-day.png")
+            if (!deadlineOnly) {
+                val block = bounds("安排")
+                val original = waitFor("安排").contentDescription.toString()
+                val half = block.width() * .2f
+                val minutes = waitFor("日历时间线").stateDescription.toString().substringAfter(':').toInt()
+                pinch(block.exactCenterX(), block.top + block.height()*.45f, half, half*2)
+                val zoomed = waitFor("日历时间线").stateDescription.toString().substringAfter(':').toInt()
+                assertTrue("Pinching on an event must zoom the axis", zoomed < minutes*.7)
+                assertEquals("Pinch must not edit the event", original, waitFor("安排").contentDescription.toString())
+                screenshot("calendar-pinch.png")
+                pinch(block.exactCenterX(), block.top + block.height()*.45f, half*2, half)
+                assertTrue("Pinch inward must zoom out", waitFor("日历时间线").stateDescription.toString().substringAfter(':').toInt() >= minutes-2)
+            }
             moveEvent(if (deadlineOnly) "可拖动" else "安排")
             if (!deadlineOnly) {
                 val tick = bounds("12:00")
@@ -176,6 +213,13 @@ class NativeCalendarOnlineTest {
                 assertEquals("Selecting by dragging must not shift the time axis", tick.left, bounds("12:00").left)
             }
             screenshot("calendar-dragged.png")
+            tap(if (deadlineOnly) "可拖动" else "安排"); Thread.sleep(500)
+            waitFor("精确时间编辑")
+            assertNull("Time editor must replace Confirm, not overlap it", find("确认"))
+            tap("精确时间编辑"); Thread.sleep(700)
+            waitFor("完成")
+            screenshot("calendar-precise-keyboard.png")
+            tap("完成"); Thread.sleep(500)
             tap("事件选项"); Thread.sleep(400)
             waitFor("优先级")
             screenshot("calendar-options.png")
