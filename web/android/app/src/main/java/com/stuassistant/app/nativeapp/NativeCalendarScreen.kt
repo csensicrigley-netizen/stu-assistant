@@ -69,7 +69,10 @@ fun NativeCalendarItemsScreen(store: NativeStore, s: NativeState, onConnect: () 
                         NButton("＋ 记一件事", { if (s.preview || s.token == null) onConnect() else open() }, primary = true, modifier = Modifier.fillMaxWidth())
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                             NButton("‹", { day = AcademicClock.addDays(day, -1) })
-                            Box(Modifier.weight(1f), contentAlignment = Alignment.Center) { NText("${AcademicClock.monthDay(day)} · ${AcademicClock.weekdayText(AcademicClock.weekday(day))}", 18, true) }
+                            Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                                CalendarCounter("${AcademicClock.monthDay(day)} · ${AcademicClock.weekdayText(AcademicClock.weekday(day))}", AcademicClock.dayStart(day),
+                                    TextStyle(color = LocalNativeColors.current.ink, fontSize = 18.sp, fontFamily = NativeFontFamily, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold), duration = 280)
+                            }
                             NButton("›", { day = AcademicClock.addDays(day, 1) })
                         }
                         NError(error)
@@ -140,11 +143,8 @@ internal fun CalendarTimeline(day: String, onDay: (String) -> Unit, drafts: List
     Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp), verticalAlignment = Alignment.CenterVertically) {
         NButton("‹", { onDay(AcademicClock.addDays(day, -1)) }, modifier = Modifier.size(48.dp).semantics { contentDescription = "前一天" })
         Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-            Crossfade(day, Modifier.fillMaxWidth(), animationSpec = tween(180), label = "date-label") { label ->
-                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    NText("${AcademicClock.monthDay(label)} · ${AcademicClock.weekdayText(AcademicClock.weekday(label))}", 18, true)
-                }
-            }
+            CalendarCounter("${AcademicClock.monthDay(day)} · ${AcademicClock.weekdayText(AcademicClock.weekday(day))}", AcademicClock.dayStart(day),
+                TextStyle(color = colors.ink, fontSize = 18.sp, fontFamily = NativeFontFamily, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold), duration = 280)
         }
         NButton("›", { onDay(AcademicClock.addDays(day, 1)) }, modifier = Modifier.size(48.dp).semantics { contentDescription = "后一天" })
     }

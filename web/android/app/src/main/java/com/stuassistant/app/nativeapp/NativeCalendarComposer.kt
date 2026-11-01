@@ -194,11 +194,16 @@ fun NativeCalendarComposer(store: NativeStore, s: NativeState, close: () -> Unit
                                     }
                                 }
                             }
-                            AnimatedContent(drafts.getOrNull(selected)?.let(CalendarDrafts::label).orEmpty(),
-                                transitionSpec = { fadeIn(tween(240)) togetherWith fadeOut(tween(160)) }, label = "suggested-time") { label ->
-                                if (label.isEmpty()) Box(Modifier.height(28.dp))
-                                else BasicText(label, style = TextStyle(color = c.ink, fontSize = 23.sp, fontFamily = NativeFontFamily, fontWeight = FontWeight.SemiBold))
+                            val currentDraft = drafts.getOrNull(selected)
+                            AnimatedVisibility(currentDraft != null, enter = fadeIn(tween(240)), exit = fadeOut(tween(160))) {
+                                currentDraft?.let { draft ->
+                                    val time = CalendarDrafts.start(draft) ?: CalendarDrafts.deadline(draft)
+                                        ?: CalendarDrafts.date(draft)?.let(AcademicClock::dayStart) ?: 0L
+                                    CalendarCounter(CalendarDrafts.label(draft), time + (CalendarDrafts.end(draft) ?: time),
+                                        TextStyle(color = c.ink, fontSize = 23.sp, fontFamily = NativeFontFamily, fontWeight = FontWeight.SemiBold), duration = 180)
+                                }
                             }
+                            if (currentDraft == null) Box(Modifier.height(28.dp))
                         }
                         AnimatedContent(phase == "loading", transitionSpec = { fadeIn(tween(300)) togetherWith fadeOut(tween(240)) }, label = "inference-to-timeline") { loading ->
                             if (loading) CalendarPendingTimeline()
@@ -217,7 +222,11 @@ fun NativeCalendarComposer(store: NativeStore, s: NativeState, close: () -> Unit
                         AnimatedVisibility(phase == "review" && drafts.isNotEmpty(), enter = fadeIn(tween(280)) + expandVertically()) {
                             Column(Modifier.padding(horizontal = 24.dp, vertical = 14.dp)) {
                                 NDivider()
-                                NRow("事件选项", trailing = if (options) "⌃" else "⌄", onClick = { options = !options })
+                                val angle by animateFloatAsState(if (options) 180f else 0f, tween(240), label = "options-chevron")
+                                Row(Modifier.fillMaxWidth().height(56.dp).clickable { options = !options }, verticalAlignment = Alignment.CenterVertically) {
+                                    Box(Modifier.weight(1f)) { NText("事件选项", 17, true) }
+                                    Box(Modifier.graphicsLayer { rotationZ = angle }) { NText("⌄", 18, muted = true) }
+                                }
                                 AnimatedVisibility(options, enter = expandVertically(tween(280)) + fadeIn(), exit = shrinkVertically(tween(240)) + fadeOut()) {
                                     if (drafts.isNotEmpty()) CalendarItemOptions(drafts[selected], reviewNeeded) { change(selected, it) }
                                 }
