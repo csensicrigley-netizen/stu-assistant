@@ -31,6 +31,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.*
+import com.kyant.backdrop.Backdrop
 import com.kyant.backdrop.drawPlainBackdrop
 import com.kyant.backdrop.effects.blur
 import kotlinx.coroutines.CancellationException
@@ -43,7 +44,7 @@ import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.sin
 
-private val CalendarRevealEase = CubicBezierEasing(.12f, .82f, .18f, 1f)
+private val CalendarRevealEase = CubicBezierEasing(.18f, .48f, .22f, 1f)
 
 /** Feathered circular reveal in this layer's coordinate system, seeded at Submit. */
 private fun Modifier.calendarReveal(progress: Float, origin: Offset) = graphicsLayer {
@@ -61,9 +62,8 @@ private fun Modifier.calendarReveal(progress: Float, origin: Offset) = graphicsL
 
 /** Only an explicit submission calls Jev. Keyboard, header and review share one stable anchor. */
 @Composable
-fun NativeCalendarComposer(store: NativeStore, s: NativeState, close: () -> Unit) {
+fun NativeCalendarComposer(store: NativeStore, s: NativeState, inputBackdrop: Backdrop = LocalNativeBackdrop.current, close: () -> Unit) {
     val c = LocalNativeColors.current
-    val backdrop = LocalNativeBackdrop.current
     val scope = rememberCoroutineScope()
     val keyboard = LocalSoftwareKeyboardController.current
     val focus = remember { FocusRequester() }
@@ -79,6 +79,7 @@ fun NativeCalendarComposer(store: NativeStore, s: NativeState, close: () -> Unit
     var saving by remember { mutableStateOf(false) }
     var manualMenu by remember { mutableStateOf(false) }
     var options by rememberSaveable { mutableStateOf(false) }
+    var precise by remember { mutableStateOf<CalendarMark?>(null) }
     var origin by remember { mutableStateOf(Offset.Zero) }
     var bodyPosition by remember { mutableStateOf(Offset.Zero) }
     val account = remember { runCatching { store.calendarAccount() }.getOrNull() }
@@ -86,7 +87,7 @@ fun NativeCalendarComposer(store: NativeStore, s: NativeState, close: () -> Unit
     val batch = rememberSaveable { UUID.randomUUID().toString() }
     val drafts = remember(packed) { academicObjects(JSONArray(packed)) }
     val reveal by animateFloatAsState(if (phase == "input") 0f else 1f,
-        tween(if (phase == "input") 360 else 900, easing = CalendarRevealEase), label = "calendar-radial-reveal")
+        tween(if (phase == "input") 420 else 1250, easing = CalendarRevealEase), label = "calendar-radial-reveal")
     LaunchedEffect(phase) {
         if (phase == "input") { withFrameNanos { }; focus.requestFocus(); keyboard?.show() }
     }
@@ -100,7 +101,8 @@ fun NativeCalendarComposer(store: NativeStore, s: NativeState, close: () -> Unit
     DisposableEffect(Unit) { onDispose { job?.cancel() } }
     fun back() {
         if (saving) return
-        when { options -> { options = false; keyboard?.hide() }
+        when { precise != null -> { precise = null; keyboard?.hide() }
+            options -> { options = false; keyboard?.hide() }
             phase != "input" -> { job?.cancel(); phase = "input"; error = null }
             else -> { keyboard?.hide(); close() } }
     }
@@ -141,15 +143,15 @@ fun NativeCalendarComposer(store: NativeStore, s: NativeState, close: () -> Unit
         Box(Modifier.fillMaxSize().calendarReveal(reveal, origin).background(c.bg))
         // Broad blur with vertical feathering; there is no filled input card or hard outline.
         Box(Modifier.statusBarsPadding().fillMaxWidth().height(132.dp)
-            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen; alpha = 1f - reveal }
             .drawWithContent {
                 drawContent()
                 drawRect(Brush.verticalGradient(0f to Color.Transparent, .18f to Color.Black,
                     .72f to Color.Black, 1f to Color.Transparent), blendMode = BlendMode.DstIn)
             }
-            .drawPlainBackdrop(backdrop, { RectangleShape }, { blur(28.dp.toPx()) },
-                onDrawSurface = { drawRect(c.bg.copy(alpha = .18f + reveal * .75f)) }))
-        Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
+            .drawPlainBackdrop(inputBackdrop, { RectangleShape }, { blur(28.dp.toPx()) },
+                onDrawSurface = { drawRect(c.bg.copy(alpha = .18f)) }))
+        Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding()) {
             Row(Modifier.padding(horizontal = 24.dp, vertical = 12.dp).fillMaxWidth().height(72.dp)
                 .semantics { contentDescription = "日历输入栏" }.padding(start = 8.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 BasicTextField(text, { if (phase == "input") text = it.take(200) },
@@ -179,8 +181,9 @@ fun NativeCalendarComposer(store: NativeStore, s: NativeState, close: () -> Unit
             AnimatedVisibility(phase != "input", modifier = Modifier.weight(1f), enter = fadeIn(tween(80)), exit = fadeOut(tween(360))) {
                 Column(Modifier.fillMaxSize().onGloballyPositioned { bodyPosition = it.boundsInRoot().topLeft }
                     .calendarReveal(reveal, origin - bodyPosition)) {
-                    Column(Modifier.weight(1f).fillMaxWidth().imePadding().verticalScroll(rememberScrollState())) {
-                        Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 22.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Column(Modifier.weight(1f).fillMaxWidth()) {
+                        AnimatedVisibility(!options && precise == null, enter = fadeIn(tween(240)) + expandVertically(), exit = fadeOut(tween(160)) + shrinkVertically()) {
+                        Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                                 Box(Modifier.weight(1f)) { NTitle("建议", 30) }
                                 if (drafts.size > 1) Row(Modifier.widthIn(max = 176.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -205,36 +208,45 @@ fun NativeCalendarComposer(store: NativeStore, s: NativeState, close: () -> Unit
                             }
                             if (currentDraft == null) Box(Modifier.height(28.dp))
                         }
-                        AnimatedContent(phase == "loading", transitionSpec = { fadeIn(tween(300)) togetherWith fadeOut(tween(240)) }, label = "inference-to-timeline") { loading ->
-                            if (loading) CalendarPendingTimeline()
-                            else if (drafts.isNotEmpty()) {
-                                val existing = calendarMarks(records.filter { !it.optBoolean("done") }.map { it.getJSONObject("draft") }, "local") +
-                                    s.plans.filter { !s.sample && !it.optBoolean("done") }.mapNotNull { plan ->
-                                        val a = AcademicClock.parseTime("${plan.optString("date")}T${plan.optString("start")}:00")
-                                        val b = AcademicClock.parseTime("${plan.optString("date")}T${plan.optString("end")}:00")
-                                        a?.let { CalendarMark("legacy-${plan.optString("id")}", plan.optString("title"), it, b) }
-                                    }
-                                CalendarTimeline(day, { day = it }, drafts, selected, existing,
-                                    AcademicTimetable.normalize(if (s.sample) null else s.timetable),
-                                    { i, field, start, end -> change(i, CalendarDrafts.edit(drafts[i], field, start, end)) }, { selected = it })
-                            }
                         }
-                        AnimatedVisibility(phase == "review" && drafts.isNotEmpty(), enter = fadeIn(tween(280)) + expandVertically()) {
-                            Column(Modifier.padding(horizontal = 24.dp, vertical = 14.dp)) {
-                                NDivider()
-                                val angle by animateFloatAsState(if (options) 180f else 0f, tween(240), label = "options-chevron")
-                                Row(Modifier.fillMaxWidth().height(56.dp).clickable { options = !options }, verticalAlignment = Alignment.CenterVertically) {
-                                    Box(Modifier.weight(1f)) { NText("事件选项", 17, true) }
-                                    Box(Modifier.graphicsLayer { rotationZ = angle }) { NText("⌄", 18, muted = true) }
+                        AnimatedContent(when { precise != null -> "time"; options -> "options"; phase == "loading" -> "loading"; else -> "timeline" },
+                            modifier = Modifier.weight(1f).fillMaxWidth(),
+                            transitionSpec = { (fadeIn(tween(280)) + slideInHorizontally(tween(280)) { it / 12 }) togetherWith
+                                (fadeOut(tween(180)) + slideOutHorizontally(tween(240)) { -it / 12 }) }, label = "calendar-content-mode") { mode ->
+                            when (mode) {
+                                "loading" -> CalendarPendingTimeline()
+                                "time" -> precise?.let { mark -> CalendarPrecise(mark, { start, end ->
+                                    change(mark.item, CalendarDrafts.edit(drafts[mark.item], mark.field, start, end))
+                                    keyboard?.hide(); precise = null
+                                }) }
+                                "options" -> drafts.getOrNull(selected)?.let { draft ->
+                                    CalendarItemOptions(draft, reviewNeeded, { change(selected, it) }, { options = false; keyboard?.hide() })
                                 }
-                                AnimatedVisibility(options, enter = expandVertically(tween(280)) + fadeIn(), exit = shrinkVertically(tween(240)) + fadeOut()) {
-                                    if (drafts.isNotEmpty()) CalendarItemOptions(drafts[selected], reviewNeeded) { change(selected, it) }
+                                else -> if (drafts.isNotEmpty()) {
+                                    val existing = calendarMarks(records.filter { !it.optBoolean("done") }.map { it.getJSONObject("draft") }, "local") +
+                                        s.plans.filter { !s.sample && !it.optBoolean("done") }.mapNotNull { plan ->
+                                            val a = AcademicClock.parseTime("${plan.optString("date")}T${plan.optString("start")}:00")
+                                            val b = AcademicClock.parseTime("${plan.optString("date")}T${plan.optString("end")}:00")
+                                            a?.let { CalendarMark("legacy-${plan.optString("id")}", plan.optString("title"), it, b) }
+                                        }
+                                    Column(Modifier.fillMaxSize()) {
+                                        Box(Modifier.weight(1f)) {
+                                            CalendarTimeline(day, { day = it }, drafts, selected, existing,
+                                                AcademicTimetable.normalize(if (s.sample) null else s.timetable),
+                                                { i, field, start, end -> change(i, CalendarDrafts.edit(drafts[i], field, start, end)) },
+                                                { selected = it }, { precise = it })
+                                        }
+                                        Row(Modifier.fillMaxWidth().height(48.dp).padding(horizontal = 24.dp).clickable { options = true }, verticalAlignment = Alignment.CenterVertically) {
+                                            Box(Modifier.weight(1f)) { NText("事件选项", 16, true) }
+                                            NText("›", 20, muted = true)
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
-                    AnimatedVisibility(phase == "review", enter = fadeIn(tween(280)) + expandVertically(), exit = fadeOut()) {
-                        Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    AnimatedVisibility(phase == "review" && !options && precise == null, enter = fadeIn(tween(280)) + expandVertically(), exit = fadeOut(tween(180)) + shrinkVertically()) {
+                        Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             NError(error)
                             NButton(if (saving) "保存中…" else "确认", {
                                 if (!saving) { saving = true; scope.launch {
@@ -276,29 +288,73 @@ fun NativeCalendarComposer(store: NativeStore, s: NativeState, close: () -> Unit
     }
 }
 
-@Composable private fun CalendarItemOptions(draft: JSONObject, review: Boolean, change: (JSONObject) -> Unit) {
-    fun update(key: String, value: Any) { change(JSONObject(draft.toString()).put(key, value)) }
+/** Each editor replaces the middle region; no form grows underneath a fixed footer. */
+@Composable private fun CalendarItemOptions(draft: JSONObject, review: Boolean, change: (JSONObject) -> Unit, close: () -> Unit) {
+    val keyboard = LocalSoftwareKeyboardController.current
+    var field by rememberSaveable { mutableStateOf("") }
+    var value by rememberSaveable { mutableStateOf("") }
     val details = draft.optJSONObject("details") ?: JSONObject()
     val reminders = academicObjects(draft.optJSONArray("reminders"))
-    val reminderChoice = when { reminders.isEmpty() -> "none"
-        reminders.size == 1 && reminders[0].optString("kind") == "relative" && reminders[0].optInt("offset_minutes") == -15 -> "15"
-        reminders.size == 1 && reminders[0].optString("kind") == "relative" && reminders[0].optInt("offset_minutes") == 0 -> "0"
-        else -> "custom" }
-    Column(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        NField("事项", draft.optString("title"), { update("title", it.take(200)) })
-        if (review) NRow("识别状态", trailing = "有待确认字段")
-        NField("备注", details.optString("note"), { update("details", JSONObject(details.toString()).put("note", it.take(10000))) }, multiline = true)
-        NText("优先级", 14, true)
-        NChips(listOf("0" to "普通", "1" to "重要", "2" to "很重要"), details.optInt("priority", 0).toString(), {
-            update("details", JSONObject(details.toString()).put("priority", it.toInt()))
-        })
-        NRow("提醒", trailing = if (reminders.isEmpty()) "未设置" else "仅记录 · 通知未启用")
-        val hasAnchor = CalendarDrafts.start(draft) != null || CalendarDrafts.deadline(draft) != null
-        if (hasAnchor) NChips((if (reminderChoice == "custom") listOf("custom" to "已识别") else emptyList()) + listOf("none" to "无", "0" to "准时", "15" to "提前15分"), reminderChoice, { choice ->
-            if (choice == "custom") return@NChips
-            val anchor = if (draft.optJSONObject("schedule") != null) "start" else "deadline"
-            update("reminders", if (choice == "none") JSONArray() else JSONArray().put(JSONObject()
-                .put("kind", "relative").put("anchor", anchor).put("offset_minutes", -choice.toInt())))
-        })
+    fun update(key: String, value: Any) { change(JSONObject(draft.toString()).put(key, value)) }
+    BackHandler(field.isNotEmpty()) { field = ""; keyboard?.hide() }
+    Column(Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Box(Modifier.fillMaxWidth().height(40.dp).clickable { if (field.isEmpty()) close() else { field = ""; keyboard?.hide() } }, contentAlignment = Alignment.CenterStart) {
+            NTitle(if (field.isEmpty()) "事件选项" else field, 22)
+        }
+        AnimatedContent(field, modifier = Modifier.weight(1f).fillMaxWidth(), transitionSpec = {
+            (fadeIn(tween(240)) + slideInHorizontally(tween(240)) { it / 14 }) togetherWith fadeOut(tween(160))
+        }, label = "calendar-field") { target ->
+            Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                when (target) {
+                    "" -> {
+                        CalendarOptionRow("事项", draft.optString("title")) { value = draft.optString("title"); field = "事项" }
+                        CalendarOptionRow("备注", details.optString("note").ifEmpty { "未填写" }) { value = details.optString("note"); field = "备注" }
+                        CalendarOptionRow("优先级", listOf("普通", "重要", "很重要")[details.optInt("priority", 0).coerceIn(0,2)]) { field = "优先级" }
+                        CalendarOptionRow("提醒", if (reminders.isEmpty()) "未设置" else "已记录") { field = "提醒" }
+                        if (review) NText("有待确认字段", 14, muted = true)
+                    }
+                    "事项", "备注" -> BasicTextField(value, { value = it.take(if (target == "事项") 200 else 10000) },
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp, max = 112.dp).semantics { contentDescription = target },
+                        textStyle = TextStyle(color = LocalNativeColors.current.ink, fontSize = 18.sp, lineHeight = 27.sp, fontFamily = NativeFontFamily),
+                        cursorBrush = SolidColor(LocalNativeColors.current.brand), maxLines = if (target == "事项") 2 else 4)
+                    "优先级" -> NChips(listOf("0" to "普通", "1" to "重要", "2" to "很重要"), details.optInt("priority", 0).toString(), {
+                        update("details", JSONObject(details.toString()).put("priority", it.toInt()))
+                    })
+                    "提醒" -> {
+                        NText("仅记录配置 · 系统通知未启用", 14, muted = true)
+                        if (CalendarDrafts.start(draft) != null || CalendarDrafts.deadline(draft) != null) {
+                            val choice = when {
+                                reminders.isEmpty() -> "none"
+                                reminders.size == 1 && reminders[0].optString("kind") == "relative" && reminders[0].optInt("offset_minutes") == -15 -> "15"
+                                reminders.size == 1 && reminders[0].optString("kind") == "relative" && reminders[0].optInt("offset_minutes") == 0 -> "0"
+                                else -> "custom"
+                            }
+                            NChips((if (choice == "custom") listOf("custom" to "已识别") else emptyList()) + listOf("none" to "无", "0" to "准时", "15" to "提前15分"), choice, {
+                                if (it != "custom") update("reminders", if (it == "none") JSONArray() else JSONArray().put(JSONObject().put("kind", "relative")
+                                    .put("anchor", if (CalendarDrafts.start(draft) != null) "start" else "deadline").put("offset_minutes", -it.toInt())))
+                            })
+                        }
+                    }
+                }
+            }
+        }
+        NButton("完成", {
+            when (field) {
+                "事项" -> if (value.isNotBlank()) update("title", value.trim())
+                "备注" -> update("details", JSONObject(details.toString()).put("note", value))
+            }
+            keyboard?.hide()
+            if (field.isEmpty()) close() else field = ""
+        }, primary = true, enabled = field != "事项" || value.isNotBlank(), modifier = Modifier.fillMaxWidth())
+    }
+}
+
+@Composable private fun CalendarOptionRow(label: String, value: String, click: () -> Unit) {
+    Row(Modifier.fillMaxWidth().height(48.dp).clickable(onClick = click), verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        NText(label, 16, true)
+        BasicText(value, Modifier.weight(1f), style = TextStyle(color = LocalNativeColors.current.muted, fontSize = 15.sp, fontFamily = NativeFontFamily),
+            maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+        NText("›", 20, muted = true)
     }
 }
