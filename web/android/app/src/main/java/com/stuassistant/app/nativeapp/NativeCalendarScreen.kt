@@ -11,9 +11,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -21,10 +18,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.BlendMode
@@ -35,21 +30,13 @@ import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.drawPlainBackdrop
 import com.kyant.backdrop.effects.blur
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.*
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
-import org.json.JSONArray
 import org.json.JSONObject
-import java.util.UUID
-import kotlin.math.abs
 import kotlin.math.roundToInt
 
 val LocalCalendarComposer = staticCompositionLocalOf<() -> Unit> { {} }
@@ -128,164 +115,8 @@ fun NativeCalendarItemsScreen(store: NativeStore, s: NativeState, onConnect: () 
     }
 }
 
-/** Root sibling above the navigation: input anchor never moves when the surface grows. */
 @Composable
-fun NativeCalendarComposer(store: NativeStore, s: NativeState, close: () -> Unit) {
-    val colors = LocalNativeColors.current
-    val scope = rememberCoroutineScope()
-    val keyboard = LocalSoftwareKeyboardController.current
-    val focus = remember { FocusRequester() }
-    var text by rememberSaveable { mutableStateOf("") }
-    var phase by rememberSaveable { mutableStateOf("input") }
-    var packed by rememberSaveable { mutableStateOf("[]") }
-    var selected by rememberSaveable { mutableIntStateOf(0) }
-    var day by rememberSaveable { mutableStateOf(AcademicClock.moment().date) }
-    var issueText by rememberSaveable { mutableStateOf("") }
-    var error by remember { mutableStateOf<String?>(null) }
-    var records by remember { mutableStateOf<List<JSONObject>>(emptyList()) }
-    var job by remember { mutableStateOf<Job?>(null) }
-    var saving by remember { mutableStateOf(false) }
-    var manualMenu by remember { mutableStateOf(false) }
-    val account = remember { store.calendarAccount() }
-    val batch = rememberSaveable { UUID.randomUUID().toString() }
-    val drafts = remember(packed) { academicObjects(JSONArray(packed)) }
-    val expanded by animateFloatAsState(if (phase == "input") 0f else 1f, tween(520, easing = FastOutSlowInEasing), label = "surface-expansion")
-    LaunchedEffect(Unit) { focus.requestFocus(); keyboard?.show(); records = store.calendarItems() }
-    LaunchedEffect(s.server, s.user?.optString("id")) { if (runCatching { store.calendarAccount() }.getOrNull() != account) close() }
-    // A killed in-flight request is never silently reissued (it may already have cost quota).
-    LaunchedEffect(Unit) { if (phase == "loading" && job == null) { phase = "input"; error = "上次识别已中断，可手动重试" } }
-    DisposableEffect(Unit) { onDispose { job?.cancel() } }
-    BackHandler { job?.cancel(); keyboard?.hide(); close() }
-    fun change(index: Int, draft: JSONObject) { packed = JSONArray(drafts.mapIndexed { i, old -> if (i == index) draft else old }).toString() }
-    fun submit(manual: Boolean) {
-        if (text.isBlank() || saving || phase == "loading") return
-        keyboard?.hide(); manualMenu = false; error = null; issueText = ""; packed = "[]"; phase = "loading"
-        job = scope.launch {
-            try {
-                val result = if (manual) listOf(JSONObject().put("title", text.trim()).put("timezone", "Asia/Shanghai").put("reminders", JSONArray()))
-                else {
-                    val response = store.inferCalendar(text.trim())
-                    val items = academicObjects(response.optJSONArray("items"))
-                    require(items.isNotEmpty()) { "服务未返回可用事项" }
-                    if (items.any { (it.optJSONArray("issues")?.length() ?: 0) > 0 } || (response.optJSONArray("issues")?.length() ?: 0) > 0)
-                        issueText = "有时间或含义待确认，请检查后再保存"
-                    items.map { it.getJSONObject("draft") }
-                }
-                packed = JSONArray(result).toString(); selected = 0
-                day = CalendarDrafts.date(result.first()) ?: day
-                phase = "review"
-            } catch (e: CancellationException) { throw e }
-            catch (e: Exception) { phase = "input"; error = if (e is NativeApiError) when (e.code) {
-                "timeout" -> "识别超时，结果未知；请自行决定是否重试"
-                "network" -> "网络连接失败，可重试或手动记录"
-                else -> when (e.status) {
-                    401 -> "登录已过期，请重新登录"
-                    429 -> "请求过于频繁或今日用量已达上限，请稍后再试"
-                    503 -> "在线识别暂不可用，可稍后重试或手动记录"
-                    504 -> "识别超时，结果未知；请自行决定是否重试"
-                    else -> "在线识别未完成，请重试或手动记录"
-                }
-            } else e.message ?: "识别未完成" }
-        }
-    }
-    BoxWithConstraints(Modifier.fillMaxSize().background(colors.bg.copy(alpha = .25f + expanded * .75f)).pointerInput(phase) {
-        detectTapGestures { if (phase == "input") { keyboard?.hide(); close() } }
-    }) {
-        val screenHeight = maxHeight
-        Box(Modifier.fillMaxWidth().height(140.dp + (screenHeight - 140.dp) * expanded)
-            .clip(RoundedCornerShape(bottomStart = (32 * (1 - expanded)).dp, bottomEnd = (32 * (1 - expanded)).dp))
-            .background(colors.bg))
-        Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
-            Row(Modifier.padding(horizontal = 16.dp, vertical = 16.dp).fillMaxWidth().semantics { contentDescription = "日历输入栏" }
-                .clip(RoundedCornerShape(28.dp)).background(colors.surface).padding(start = 20.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
-                verticalAlignment = Alignment.CenterVertically) {
-                BasicTextField(text, { if (phase == "input") text = it.take(200) },
-                    Modifier.weight(1f).height(56.dp).wrapContentHeight(Alignment.CenterVertically).focusRequester(focus)
-                        .semantics { contentDescription = "记一件事输入框" },
-                    enabled = phase == "input", maxLines = 2,
-                    textStyle = TextStyle(color = colors.ink, fontSize = 17.sp, lineHeight = 24.sp),
-                    cursorBrush = androidx.compose.ui.graphics.SolidColor(colors.brand),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                    keyboardActions = KeyboardActions(onSend = { submit(false) }),
-                    decorationBox = { inner -> Box { if (text.isEmpty()) NText("想做什么，写下来…", 17, muted = true); inner() } })
-                if (phase == "input") Box(Modifier.size(36.dp).semantics { contentDescription = "记录方式" }
-                    .clickable { manualMenu = !manualMenu }, contentAlignment = Alignment.Center) { NText("⋯", 21, muted = true) }
-                else Spacer(Modifier.width(36.dp))
-                NButton(if (phase == "input") "↑" else "×", {
-                    if (phase == "input") submit(false) else { job?.cancel(); keyboard?.hide(); close() }
-                }, enabled = phase != "input" || text.isNotBlank(), primary = phase == "input")
-            }
-            AnimatedVisibility(phase == "input" && (manualMenu || error != null), enter = fadeIn(tween(180)) + expandVertically(), exit = fadeOut(tween(120)) + shrinkVertically()) {
-                Column(Modifier.padding(horizontal = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    NError(error)
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                        NButton("手动记录", { submit(true) }, enabled = text.isNotBlank())
-                    }
-                }
-            }
-            AnimatedVisibility(phase != "input", modifier = Modifier.weight(1f), enter = fadeIn(tween(350, 100)) + expandVertically(tween(440)), exit = fadeOut(tween(160))) {
-                Column(Modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(bottom = 24.dp)) {
-                    Column(Modifier.padding(horizontal = 24.dp, vertical = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        NTitle("建议", 32)
-                        if (drafts.isNotEmpty()) {
-                            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                drafts.forEachIndexed { index, draft ->
-                                    if (drafts.size > 1) NButton(draft.optString("title"), { selected = index; day = CalendarDrafts.date(draft) ?: day }, primary = selected == index)
-                                }
-                            }
-                            NText(CalendarDrafts.label(drafts[selected.coerceIn(drafts.indices)]), 23, true)
-                        }
-                    }
-                    AnimatedContent(phase == "loading", transitionSpec = { fadeIn(tween(260)) togetherWith fadeOut(tween(180)) }, label = "result-reveal") { loading ->
-                        if (loading) CalendarSkeleton()
-                        else if (drafts.isNotEmpty()) {
-                            val doc = AcademicTimetable.normalize(if (s.sample) null else s.timetable)
-                            val existing = calendarMarks(records.filter { !it.optBoolean("done") }.map { it.getJSONObject("draft") }, "local") +
-                                s.plans.filter { !s.sample && !it.optBoolean("done") }.mapNotNull { plan ->
-                                    val a = AcademicClock.parseTime("${plan.optString("date")}T${plan.optString("start")}:00")
-                                    val b = AcademicClock.parseTime("${plan.optString("date")}T${plan.optString("end")}:00")
-                                    a?.let { CalendarMark("legacy-${plan.optString("id")}", plan.optString("title"), it, b) }
-                                }
-                            CalendarTimeline(day, { day = it }, drafts, selected, existing, doc, { i, field, start, end ->
-                                change(i, CalendarDrafts.edit(drafts[i], field, start, end))
-                            }, { index -> selected = index })
-                        }
-                    }
-                    AnimatedVisibility(phase == "review") {
-                        Column(Modifier.padding(horizontal = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                            if (issueText.isNotEmpty()) NText(issueText, 14, muted = true)
-                            if (drafts.any { (it.optJSONArray("reminders")?.length() ?: 0) > 0 }) NText("提醒意图会保留，此版本暂不发送通知", 14, muted = true)
-                            NError(error)
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                                NButton("返回修改", { phase = "input"; scope.launch { focus.requestFocus(); keyboard?.show() } }, enabled = !saving)
-                                NButton(if (saving) "保存中…" else "确认", {
-                                    if (!saving) { saving = true; scope.launch {
-                                        try { store.saveCalendar(batch, drafts, account); close() }
-                                        catch (e: Exception) { error = e.message }
-                                        finally { saving = false }
-                                    } }
-                                }, enabled = !saving, primary = true, modifier = Modifier.widthIn(min = 124.dp))
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable private fun CalendarSkeleton() {
-    val pulse = rememberInfiniteTransition(label = "inference")
-    val alpha by pulse.animateFloat(.18f, .45f, infiniteRepeatable(tween(800), RepeatMode.Reverse), label = "skeleton")
-    val colors = LocalNativeColors.current
-    Box(Modifier.fillMaxWidth().height(270.dp).semantics { contentDescription = "正在在线识别" }) {
-        Box(Modifier.align(Alignment.Center).fillMaxWidth().height(82.dp).background(colors.muted.copy(alpha = alpha / 3)))
-        Box(Modifier.align(Alignment.Center).width(110.dp).height(82.dp).clip(RoundedCornerShape(20.dp)).background(colors.brand.copy(alpha = alpha)))
-    }
-}
-
-@Composable
-private fun CalendarTimeline(day: String, onDay: (String) -> Unit, drafts: List<JSONObject>, selected: Int,
+internal fun CalendarTimeline(day: String, onDay: (String) -> Unit, drafts: List<JSONObject>, selected: Int,
     existing: List<CalendarMark>, doc: AcademicTimetableDoc?, onEdit: (Int, String, Long, Long?) -> Unit, onSelect: (Int) -> Unit) {
     val colors = LocalNativeColors.current
     val density = LocalDensity.current
@@ -293,6 +124,7 @@ private fun CalendarTimeline(day: String, onDay: (String) -> Unit, drafts: List<
     var windowMinutes by remember { mutableFloatStateOf(6f * 60) }
     val displayedStart by animateFloatAsState(windowStart, tween(180, easing = FastOutSlowInEasing), label = "time-window")
     var precise by remember { mutableStateOf<CalendarMark?>(null) }
+    BackHandler(precise != null) { precise = null }
     val currentMarks = calendarMarks(drafts)
     LaunchedEffect(selected) {
         val mark = currentMarks.firstOrNull { it.item == selected }
@@ -304,8 +136,8 @@ private fun CalendarTimeline(day: String, onDay: (String) -> Unit, drafts: List<
         }
     }
     Column(Modifier.fillMaxWidth()) {
-    Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-        NButton("‹", { onDay(AcademicClock.addDays(day, -1)) }, modifier = Modifier.semantics { contentDescription = "前一天" })
+    Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp), verticalAlignment = Alignment.CenterVertically) {
+        NButton("‹", { onDay(AcademicClock.addDays(day, -1)) }, modifier = Modifier.size(48.dp).semantics { contentDescription = "前一天" })
         Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
             Crossfade(day, Modifier.fillMaxWidth(), animationSpec = tween(180), label = "date-label") { label ->
                 Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -313,7 +145,7 @@ private fun CalendarTimeline(day: String, onDay: (String) -> Unit, drafts: List<
                 }
             }
         }
-        NButton("›", { onDay(AcademicClock.addDays(day, 1)) }, modifier = Modifier.semantics { contentDescription = "后一天" })
+        NButton("›", { onDay(AcademicClock.addDays(day, 1)) }, modifier = Modifier.size(48.dp).semantics { contentDescription = "后一天" })
     }
     AnimatedContent(day, Modifier.fillMaxWidth().clipToBounds(), transitionSpec = {
         val sign = if (targetState > initialState) 1 else -1
@@ -325,7 +157,7 @@ private fun CalendarTimeline(day: String, onDay: (String) -> Unit, drafts: List<
             midnight + it.startMin * 60000L, midnight + it.endMin * 60000L, source = "course") }
         val marks = (courses + existing + currentMarks).filter { it.start < midnight + 86400000 && (it.end ?: it.start) >= midnight }
             .sortedBy { if (it.item == selected) 2 else if (it.item >= 0) 1 else 0 }
-        BoxWithConstraints(Modifier.fillMaxWidth().height(270.dp).clipToBounds()) {
+        BoxWithConstraints(Modifier.fillMaxWidth().height(220.dp).clipToBounds()) {
             val track = rememberLayerBackdrop()
             val width = constraints.maxWidth.toFloat()
             fun x(ms: Long) = ((ms - midnight) / 60000f - displayedStart) / windowMinutes * width
@@ -347,20 +179,21 @@ private fun CalendarTimeline(day: String, onDay: (String) -> Unit, drafts: List<
                 for (minute in 0..1440 step step) {
                     val px = (minute - displayedStart) / windowMinutes * width
                     if (px in -30f..(width + 30)) {
-                        Box(Modifier.offset { IntOffset(px.roundToInt(), 54.dp.roundToPx()) }.width(1.dp).height(140.dp).background(colors.border.copy(alpha = .55f)))
+                        Box(Modifier.offset { IntOffset(px.roundToInt(), 54.dp.roundToPx()) }.width(1.dp).height(140.dp).background(colors.ink.copy(alpha = .14f)))
                         Box(Modifier.offset { IntOffset((px - 24.dp.toPx()).roundToInt(), 20.dp.roundToPx()) }.width(48.dp), contentAlignment = Alignment.Center) {
-                            NText(AcademicClock.clock(minute), 12, muted = true)
+                            BasicText(AcademicClock.clock(minute), style = TextStyle(color = colors.ink.copy(alpha = .72f), fontSize = 12.sp, fontFamily = NativeFontFamily))
                         }
                     }
                 }
-                Box(Modifier.fillMaxWidth().padding(top = 90.dp).height(72.dp).background(colors.surface.copy(alpha = .32f)))
+                Box(Modifier.fillMaxWidth().padding(top = 90.dp).height(72.dp).background(colors.brand.copy(alpha = .055f)))
+                Box(Modifier.fillMaxWidth().padding(top = 126.dp).height(1.dp).background(colors.brand.copy(alpha = .16f)))
             }
             marks.forEach { mark -> key(mark.key) {
                 val left = x(mark.start)
                 val right = mark.end?.let(::x) ?: left
                 if (right >= -48 && left <= width + 48) {
                     val editable = mark.item >= 0
-                    val tint = when { mark.field == "deadline" -> Color(0xFFFF8FA4); editable -> colors.brand; mark.source == "course" -> colors.muted; else -> Color(0xFF75B6A8) }
+                    val tint = when { mark.field == "deadline" -> if (colors.bg.luminance() > .5f) Color(0xFFD63760) else Color(0xFFFF809D); editable -> colors.brand; mark.source == "course" -> colors.muted; else -> Color(0xFF398A79) }
                     var delta by remember { mutableFloatStateOf(0f) }
                     var edge by remember { mutableIntStateOf(0) }
                     val currentEdit by rememberUpdatedState(onEdit)
@@ -392,21 +225,22 @@ private fun CalendarTimeline(day: String, onDay: (String) -> Unit, drafts: List<
                         }, onDragCancel = { currentEdit(original.item, original.field, original.start, original.end) })
                     }.pointerInput(mark.key) { detectTapGestures { onSelect(currentMark.item); precise = currentMark } } else Modifier)) {
                         if (point) {
-                            Box(Modifier.align(Alignment.TopCenter).padding(top = 8.dp).width(2.dp).height(94.dp).background(tint))
-                            Box(Modifier.align(Alignment.TopCenter).padding(top = 86.dp).size(28.dp).clip(CircleShape).background(tint.copy(alpha = .18f)), contentAlignment = Alignment.Center) { Box(Modifier.size(14.dp).clip(CircleShape).background(tint)) }
+                            Box(Modifier.align(Alignment.TopCenter).padding(top = 8.dp).width(9.dp).height(94.dp).background(tint.copy(alpha = .12f)))
+                            Box(Modifier.align(Alignment.TopCenter).padding(top = 8.dp).width(3.dp).height(94.dp).background(tint))
+                            Box(Modifier.align(Alignment.TopCenter).padding(top = 82.dp).size(36.dp).clip(CircleShape).background(tint.copy(alpha = .17f)), contentAlignment = Alignment.Center) {
+                                Box(Modifier.size(20.dp).clip(CircleShape).background(tint).border(2.dp, colors.bg, CircleShape))
+                            }
                         } else {
                             Box(Modifier.fillMaxWidth().padding(top = 26.dp).height(72.dp).clip(RoundedCornerShape(15.dp))
-                                .background(tint.copy(alpha = if (editable) .30f else .16f))
-                                .border(if (editable) 1.dp else 0.dp, if (editable) tint.copy(alpha = .7f) else Color.Transparent, RoundedCornerShape(15.dp)), contentAlignment = Alignment.Center) {
-                                BasicText(mark.title, Modifier.padding(horizontal = 8.dp), style = TextStyle(color = tint, fontSize = 13.sp), maxLines = 1, overflow = TextOverflow.Clip)
+                                .background(tint.copy(alpha = if (editable) .94f else .20f))
+                                .border(if (editable) 1.5.dp else 1.dp, tint.copy(alpha = if (editable) 1f else .32f), RoundedCornerShape(15.dp)), contentAlignment = Alignment.Center) {
+                                BasicText(mark.title, Modifier.padding(horizontal = 12.dp), style = TextStyle(color = if (editable) colors.onBrand else colors.ink, fontSize = 13.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 if (editable) {
-                                    Box(Modifier.align(Alignment.CenterStart).padding(start = 5.dp).width(2.dp).height(18.dp).background(tint.copy(alpha = .75f)))
-                                    Box(Modifier.align(Alignment.CenterEnd).padding(end = 5.dp).width(2.dp).height(18.dp).background(tint.copy(alpha = .75f)))
+                                    Box(Modifier.align(Alignment.CenterStart).padding(start = 5.dp).width(2.dp).height(20.dp).background(colors.onBrand.copy(alpha = .75f)))
+                                    Box(Modifier.align(Alignment.CenterEnd).padding(end = 5.dp).width(2.dp).height(20.dp).background(colors.onBrand.copy(alpha = .75f)))
                                 }
                             }
                         }
-                        if (point && editable) BasicText(if (mark.field == "deadline") "截止" else mark.title,
-                            Modifier.align(Alignment.BottomCenter), style = TextStyle(color = tint, fontSize = 12.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                     // A point's separate hollow tail grows a range; the main round grip always moves the point.
                     if (point && editable && mark.field == "schedule") {
@@ -440,17 +274,10 @@ private fun CalendarTimeline(day: String, onDay: (String) -> Unit, drafts: List<
             }
         }
     }
-    Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 6.dp), horizontalArrangement = Arrangement.End) {
-        if (currentMarks.none { it.item == selected }) NButton("安排时间", {
+    if (currentMarks.none { it.item == selected }) Box(Modifier.padding(horizontal = 24.dp)) {
+        NRow("时间", trailing = "未安排  ＋", onClick = {
             precise = CalendarMark("new-$selected", drafts[selected].optString("title"),
                 AcademicClock.dayStart(day) + 14 * 3600000L, null, item = selected)
-        })
-        NButton("回到事项", {
-            val mark = currentMarks.firstOrNull { it.item == selected }
-            if (mark != null) {
-                onDay(AcademicClock.moment(mark.start).date)
-                windowStart = (AcademicClock.moment(mark.start).minutes - windowMinutes / 2).coerceIn(0f, 1440f - windowMinutes)
-            }
         })
     }
     AnimatedVisibility(precise != null, enter = expandVertically(tween(240)) + fadeIn(), exit = shrinkVertically(tween(200)) + fadeOut()) {
