@@ -28,6 +28,9 @@ data class NativeState(
     val schoolId: String = "",
     val rememberSchool: Boolean = false,
     val syncedAt: Long? = null,
+    val calendarRevision: Long = 0,
+    val calendarLastBatch: String? = null,
+    val calendarFocusDate: String? = null,
 )
 
 class NativeApiError(

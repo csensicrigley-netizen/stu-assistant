@@ -201,6 +201,10 @@ internal class NativeApi {
 
     private fun httpError(response: Response): NativeApiError {
         val payload = try { parseObject(response.text) } catch (_: Exception) { null }
+        payload?.optJSONObject("error")?.let { error ->
+            return NativeApiError(error.optString("code", "http_${response.status}"), response.status,
+                error.optString("message", "请求未完成"))
+        }
         val rawDetail = payload?.opt("detail")?.takeUnless { it === JSONObject.NULL }
         val code = when (rawDetail) {
             is String -> rawDetail.takeIf { it.isNotBlank() } ?: "http_${response.status}"
@@ -231,8 +235,9 @@ internal class NativeApi {
         try {
             val uri = URI(path)
             val decoded = uri.path ?: throw NativeApiError("invalid_path")
-            if (!path.startsWith("/v1/") || uri.isAbsolute || uri.rawAuthority != null ||
-                uri.rawFragment != null || !decoded.startsWith("/v1/") ||
+            val calendar = path == "/api/calendar/v2/mobile/parse"
+            if ((!calendar && !path.startsWith("/v1/")) || uri.isAbsolute || uri.rawAuthority != null ||
+                uri.rawFragment != null || (!calendar && !decoded.startsWith("/v1/")) ||
                 path.any { it <= '\u0020' || it == '\u007f' || it == '\\' } ||
                 decoded.any { it <= '\u001f' || it == '\u007f' || it == '\\' } ||
                 decoded.split('/').any { it == "." || it == ".." }
@@ -246,6 +251,7 @@ internal class NativeApi {
     }
 
     private fun timeoutFor(path: String): Long = when {
+        path == "/api/calendar/v2/mobile/parse" -> 90_000L
         path.startsWith("/v1/auth/") -> 45_000L
         path == "/v1/relogin" -> 60_000L
         path.startsWith("/v1/timetable") -> 40_000L
