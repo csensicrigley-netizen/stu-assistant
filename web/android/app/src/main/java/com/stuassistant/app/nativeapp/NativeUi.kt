@@ -75,8 +75,10 @@ val NativeFontFamily=FontFamily(Font(R.font.stu_regular,FontWeight.Normal),Font(
 }
 
 @Composable fun NPage(title:String,eyebrow:String="",actions:(@Composable RowScope.()->Unit)?=null,content:@Composable ColumnScope.()->Unit) {
+    val scroll = rememberScrollState()
+    val topEdgeDepth = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 44.dp
     Box(Modifier.fillMaxSize().imePadding(),contentAlignment=Alignment.TopCenter) {
-        Column(Modifier.widthIn(max=600.dp).fillMaxWidth().verticalScroll(rememberScrollState()).statusBarsPadding().padding(start=20.dp,end=20.dp,top=24.dp,bottom=120.dp).navigationBarsPadding(),verticalArrangement=Arrangement.spacedBy(20.dp)) {
+        Column(Modifier.widthIn(max=600.dp).fillMaxWidth().nativeTopSoftEdge(scroll,topEdgeDepth).verticalScroll(scroll).statusBarsPadding().padding(start=20.dp,end=20.dp,top=24.dp,bottom=120.dp).navigationBarsPadding(),verticalArrangement=Arrangement.spacedBy(20.dp)) {
             if(title.isNotBlank()||eyebrow.isNotBlank()||actions!=null)Column(verticalArrangement=Arrangement.spacedBy(6.dp)) {
                 if(eyebrow.isNotEmpty()) NText(eyebrow,14,muted=true)
                 Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween) {
