@@ -96,7 +96,7 @@ import kotlin.math.floor
                                     val originalDay = AcademicClock.dayStart(AcademicClock.moment(hit.start).date)
                                     val dayDelta = if (edge == 0 && !grow) {
                                         val targetColumn = floor((down.position.x+delta.x-gutter)/dayWidth).toInt().coerceIn(0,2)
-                                        (centerDay+(targetColumn-1)*86400000L) - box!!.slot.midnight
+                                        (centerDay+(targetColumn-1)*86400000L) - box.slot.midnight
                                     } else 0L
                                     val targetDay = originalDay + dayDelta
                                     a = when {
