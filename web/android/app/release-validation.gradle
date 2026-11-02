@@ -16,6 +16,16 @@ tasks.register('validateNativeConfiguration') {
                 server.port > 65535 || value != value.trim() || value.endsWith('/')) {
             throw new GradleException('Configure a nonempty HTTPS backend base URL in assets/native-config.json (no credentials, query, fragment, or trailing slash).')
         }
+        // Public origins are deployment configuration, not secrets. Check direct
+        // Gradle/CI builds as well as the delivery script for accidental redaction.
+        ['server', 'legacyServer'].each { key ->
+            def host = config[key] instanceof String ? new URI(config[key]).host?.toLowerCase(Locale.ROOT) : null
+            if (host && ['example.com', 'example.org', 'example.net', 'example', 'invalid'].any {
+                host == it || host.endsWith('.' + it)
+            }) {
+                throw new GradleException("Configure a real deployment domain for $key; template domains cannot be packaged.")
+            }
+        }
         def web = webVersionFile.getText('UTF-8')
         def webName = web =~ /APP_VERSION_NAME\s*=\s*"([^"]+)"/
         def webCode = web =~ /APP_VERSION_CODE\s*=\s*(\d+)/
