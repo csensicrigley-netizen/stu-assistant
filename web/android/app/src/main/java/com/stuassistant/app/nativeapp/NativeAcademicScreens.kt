@@ -1,7 +1,6 @@
 package com.stuassistant.app.nativeapp
 
 import android.animation.ValueAnimator
-import android.app.TimePickerDialog
 import android.os.Build
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
@@ -11,13 +10,10 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -37,7 +33,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
@@ -78,7 +73,6 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import org.json.JSONObject
 import java.util.Locale
 import kotlin.math.PI
 import kotlin.math.cos
@@ -139,22 +133,6 @@ private fun AcademicText(text: String, color: Color, fontSize: Int = 16, bold: B
         textAlign = if (centered) TextAlign.Center else TextAlign.Start,
         fontWeight = if (bold) FontWeight.SemiBold else FontWeight.Normal,
         textDecoration = if (crossed) TextDecoration.LineThrough else TextDecoration.None), maxLines = maxLines, overflow = TextOverflow.Ellipsis)
-}
-
-@Composable
-private fun AcademicCheck(checked: Boolean, label: String, enabled: Boolean = true, onToggle: () -> Unit) {
-    val colors = LocalNativeColors.current
-    val leaf = academicLeafColor()
-    val tick = nHapticFeedback("toggle")
-    Box(Modifier.size(44.dp).toggleable(checked, enabled = enabled, role = Role.Checkbox, onValueChange = { tick(); onToggle() })
-        .semantics { contentDescription = label }, contentAlignment = Alignment.Center) {
-        Canvas(Modifier.size(22.dp)) {
-            val ink = (if (checked) leaf else colors.muted).copy(alpha = if (enabled) 1f else .45f)
-            drawRoundRect(if (checked) ink else Color.Transparent, cornerRadius = CornerRadius(6.dp.toPx()))
-            if (!checked) drawRoundRect(ink, cornerRadius = CornerRadius(6.dp.toPx()), style = Stroke(1.5.dp.toPx()))
-            else drawPath(Path().apply { moveTo(size.width * .23f, size.height * .50f); lineTo(size.width * .43f, size.height * .70f); lineTo(size.width * .78f, size.height * .30f) }, colors.surface, style = Stroke(2.dp.toPx()))
-        }
-    }
 }
 
 @Composable
@@ -623,256 +601,6 @@ private fun AcademicCourseSheet(block: AcademicBlock, week: Int, weekday: Int, m
         } }
         NText("时刻按教务处《课堂作息时间表》换算。${if (slots.any { slot -> slot.periods.any { it >= 10 } }) "第 0、A–C 节的编号对应尚未用真实课表核对，" else ""}实际以任课教师通知为准。", 12, muted = true)
     }
-}
-
-@Composable
-fun NativeItemsScreen(store: NativeStore, s: NativeState, onNavigate: (String) -> Unit, onConnect: () -> Unit, initialSource: String = "all") {
-    val now = academicNow(60_000)
-    var view by rememberSaveable { mutableStateOf("tasks") }
-    var source by rememberSaveable(initialSource) { mutableStateOf(initialSource) }
-    var day by rememberSaveable { mutableStateOf<String?>(null) }
-    var formOpen by rememberSaveable { mutableStateOf(false) }
-    var title by rememberSaveable { mutableStateOf("") }
-    var note by rememberSaveable { mutableStateOf("") }
-    var start by rememberSaveable { mutableStateOf("") }
-    var end by rememberSaveable { mutableStateOf("") }
-    var priority by rememberSaveable { mutableStateOf("0") }
-    var busy by remember { mutableStateOf(false) }
-    var loadingPlans by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
-    var formError by remember { mutableStateOf<String?>(null) }
-    var deletePlan by remember { mutableStateOf<JSONObject?>(null) }
-    var doneOverrides by remember { mutableStateOf<Map<String, Boolean>>(emptyMap()) }
-    var sortOverrides by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
-    var removed by remember { mutableStateOf<Set<String>>(emptySet()) }
-    var pending by remember { mutableStateOf<Set<String>>(emptySet()) }
-    val selected = day ?: now.date
-    val scope = rememberCoroutineScope()
-    val tasks = s.tasks.map(AcademicRecords::task)
-    val exams = s.exams.map(AcademicRecords::exam)
-    val openTasks = tasks.filter { it.id !in s.done && AcademicRecords.bucket(it, now.ms) != "expired" }
-    val urgent = openTasks.count { AcademicRecords.bucket(it, now.ms) in listOf("overdue", "today") }
-    val nextExam = exams.filter { it.startMs != null && it.startMs > now.ms }.minByOrNull { it.startMs!! }
-    val plans = s.plans.filter { it.optString("date") == selected && it.optString("id") !in removed }.sortedWith(compareBy<JSONObject> { academicString(it.opt("start")).ifEmpty { "99:99" } }.thenBy { sortOverrides[it.optString("id")] ?: it.optInt("sort") }.thenBy { it.optLong("created_at") })
-    suspend fun load(silent: Boolean = false) {
-        if (!silent) loadingPlans = true
-        error = null
-        try { store.loadPlans() } catch (e: Exception) { error = academicError(e) } finally { loadingPlans = false }
-    }
-    LaunchedEffect(s.token, s.preview) { if (!s.preview) load() }
-    NPage("事项", "计划 · 作业 · 考试 · 成绩", actions = { AcademicMode(store, s, onConnect) }) {
-        NText("${openTasks.size} 项作业待完成${nextExam?.date?.let { " · 最近考试 ${AcademicClock.monthDay(it)}" }.orEmpty()}", 13, muted = true)
-        NChips(listOf("tasks" to "待办${if (urgent > 0) " $urgent" else ""}", "exams" to "考试", "grades" to "成绩"), view, { view = it })
-        when (view) {
-            "exams" -> AcademicExams(exams, now.ms)
-            "grades" -> AcademicGrades(s.grades.map(AcademicRecords::grade))
-            else -> {
-                NChips(listOf("all" to "全部", "personal" to "个人", "school" to "作业"), source, { source = it })
-                if (source != "school") {
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            (-3..3).forEach { offset ->
-                                val date = AcademicClock.addDays(now.date, offset)
-                                AcademicDateChoice(date, now.date, selected) { day = date }
-                            }
-                        }
-                        NButton("今天", { day = null }, enabled = selected != now.date, haptic = NativeButtonHaptic.Utility)
-                    }
-                    if (s.preview) AcademicEmpty("登录后就能写计划", "计划只属于你自己的账号，换设备也还在。上面的日期条可以先看看。") { NButton("登录 / 注册", onConnect, primary = true, haptic = NativeButtonHaptic.Navigation) }
-                    else {
-                        val sum = s.planSummary
-                        AcademicScoreboard(listOf("今天" to "today_total", "已完成" to "today_done", "还剩" to "today_open").map { (label, key) -> label to sum.optInt(key).toString() })
-                        val upcoming = academicObjects(sum.optJSONArray("upcoming")).take(3)
-                        if (sum.optInt("overdue") > 0 || upcoming.isNotEmpty()) NCard {
-                            if (sum.optInt("overdue") > 0) NText("还有 ${sum.optInt("overdue")} 项是之前几天没做完的，翻回去补一下。", 14)
-                            if (upcoming.isNotEmpty()) NText("接下来：" + upcoming.joinToString(" · ") { "${AcademicClock.monthDay(it.optString("date"))} ${it.optInt("count")} 项" }, 14, muted = true)
-                        }
-                        NError(error, { scope.launch { load() } })
-                        AcademicSection(if (selected == now.date) "今天的安排" else "${AcademicClock.monthDay(selected)} ${AcademicClock.weekdayText(AcademicClock.weekday(selected))}", if (!loadingPlans) "${plans.size} 项" else "") {
-                            when {
-                                loadingPlans -> NLoading()
-                                plans.isEmpty() -> AcademicEmpty(if (selected == now.date) "今天还空着" else "这一天还空着", if (selected == now.date) "把想做的事写下来，完成一件勾一件。" else "想给这天加点什么？") { NButton("加一条", { formOpen = true }, haptic = NativeButtonHaptic.Utility) }
-                                else -> plans.forEachIndexed { index, plan ->
-                                    val id = plan.optString("id")
-                                    val done = doneOverrides[id] ?: plan.optBoolean("done")
-                                    AcademicPlanRow(plan, done, id in pending, index > 0, index < plans.lastIndex,
-                                        onToggle = {
-                                            val next = !done
-                                            doneOverrides = doneOverrides + (id to next); pending = pending + id
-                                            scope.launch {
-                                                try { store.togglePlan(id, next); load(true) } catch (e: Exception) { error = academicError(e) }
-                                                finally { doneOverrides = doneOverrides - id; pending = pending - id }
-                                            }
-                                        },
-                                        onDelete = { deletePlan = plan },
-                                        onMove = { delta ->
-                                            val ids = plans.map { it.optString("id") }.toMutableList()
-                                            val target = index + delta
-                                            if (target in ids.indices) {
-                                                java.util.Collections.swap(ids, index, target)
-                                                sortOverrides = sortOverrides + ids.withIndex().associate { it.value to it.index }
-                                                scope.launch {
-                                                    try { store.reorderPlans(selected, ids); load(true) } catch (e: Exception) { error = academicError(e) }
-                                                    finally { sortOverrides = sortOverrides - ids.toSet() }
-                                                }
-                                            }
-                                        })
-                                }
-                            }
-                        }
-                        if (formOpen) NCard {
-                            NField("要做什么", title, { title = it.take(200) }, placeholder = "例如：复习细胞生物学", autoFocus = true)
-                            NText("1–200 个字，写清楚一点，回头一眼能认出来。", 12, muted = true)
-                            NField("备注（可不填）", note, { note = it.take(1000) }, multiline = true, placeholder = "第几章、要带什么、在哪做…", minHeight = 96)
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                Box(Modifier.weight(1f)) { AcademicTimeField("开始", start, { start = it }) }
-                                Box(Modifier.weight(1f)) { AcademicTimeField("结束", end, { end = it }) }
-                            }
-                            NText("不写时间就只是一条待办；写了就要晚于开始时间。", 12, muted = true)
-                            NText("优先级", 14, true)
-                            NChips(listOf("0" to "普通", "1" to "重要", "2" to "紧急"), priority, { priority = it })
-                            NError(formError)
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                Box(Modifier.weight(1f), propagateMinConstraints = true) {
-                                NButton(if (busy) "保存中…" else "保存", {
-                                    if (busy) return@NButton
-                                    formError = when { title.isBlank() -> "标题不能为空。"; start.isEmpty() != end.isEmpty() -> "开始和结束时间要么都填，要么都空。"; start.isNotEmpty() && end <= start -> "结束时间要晚于开始时间。"; else -> null }
-                                    if (formError == null) {
-                                        busy = true
-                                        scope.launch {
-                                            try {
-                                                store.createPlan(JSONObject().put("date", selected).put("title", title).put("note", note).put("start", start).put("end", end).put("priority", priority.toInt()))
-                                                title = ""; note = ""; start = ""; end = ""; priority = "0"; formOpen = false
-                                                // The write succeeded; a later read failure is not a rejected save.
-                                                try { load(true) } catch (e: CancellationException) { throw e } catch (_: Exception) { }
-                                            } catch (e: CancellationException) { throw e }
-                                            catch (e: Exception) { formError = academicError(e) }
-                                            finally { busy = false }
-                                        }
-                                    }
-                                }, enabled = !busy, primary = true, haptic = NativeButtonHaptic.Submit)
-                                }
-                                Box(Modifier.weight(1f), propagateMinConstraints = true) { NButton("取消", { formOpen = false; formError = null }, enabled = !busy, haptic = NativeButtonHaptic.Utility) }
-                            }
-                        }
-                        if (!formOpen) AcademicBlockButton("＋ 加一条", { formOpen = true })
-                        NText("计划是你自己写的，和 MySTU 的作业分开存，同步学校数据不会动它。日期按北京时间算。" + if (selected != now.date) "现在看的是 ${AcademicClock.monthDay(selected)}，距今天 ${AcademicClock.daysUntil(selected, now.ms)} 天。" else "", 12, muted = true)
-                    }
-                }
-                if (source != "personal") AcademicTasks(store, s, tasks, now.ms)
-            }
-        }
-    }
-    deletePlan?.let { plan -> NSheet("删除计划", { deletePlan = null }) {
-        NText("删掉「${plan.optString("title")}」？删了就找不回来了。", 16)
-        NError(error)
-        NButton(if (busy) "删除中…" else "确认删除", {
-            if (!busy) {
-                busy = true; val id = plan.optString("id"); removed = removed + id
-                scope.launch {
-                    try { store.removePlan(id); deletePlan = null; load(true) } catch (e: Exception) { error = academicError(e) }
-                    finally { removed = removed - id; busy = false }
-                }
-            }
-        }, enabled = !busy, primary = true, haptic = NativeButtonHaptic.Destructive)
-        NButton("取消", { deletePlan = null }, enabled = !busy, haptic = NativeButtonHaptic.Utility)
-    } }
-}
-
-@Composable
-private fun AcademicTimeField(label: String, value: String, onValue: (String) -> Unit) {
-    val context = LocalContext.current
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        NText(label, 14, true)
-        NButton(value.ifEmpty { "选择时间" }, {
-            val parts = value.split(':')
-            TimePickerDialog(context, { _, hour, minute -> onValue(AcademicClock.clock(hour * 60 + minute)) }, parts.getOrNull(0)?.toIntOrNull() ?: 12, parts.getOrNull(1)?.toIntOrNull() ?: 0, true).show()
-        }, haptic = NativeButtonHaptic.Utility)
-        if (value.isNotEmpty()) NButton("清除", { onValue("") }, haptic = NativeButtonHaptic.Utility)
-    }
-}
-
-@Composable
-private fun AcademicDateChoice(date: String, today: String, selected: String, onSelect: () -> Unit) {
-    val colors = LocalNativeColors.current
-    val on = date == selected
-    Column(Modifier.width(44.dp).heightIn(min = 56.dp).clip(RoundedCornerShape(18.dp))
-        .background(if (on) colors.brand.copy(alpha = .13f) else colors.surface)
-        .selectable(on, role = Role.RadioButton, onClick = { if (!on) { onSelect() } })
-        .semantics { contentDescription = "${AcademicClock.monthDay(date)} ${AcademicClock.weekdayText(AcademicClock.weekday(date))}${if (date == today) "，今天" else ""}" }
-        .padding(vertical = 6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        NText(if (date == today) "今天" else AcademicClock.weekdayText(AcademicClock.weekday(date)).removePrefix("周"), 12, muted = !on)
-        NText(date.takeLast(2).toInt().toString(), 18, true)
-    }
-}
-
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun AcademicPlanRow(plan: JSONObject, done: Boolean, busy: Boolean, canUp: Boolean, canDown: Boolean, onToggle: () -> Unit, onDelete: () -> Unit, onMove: (Int) -> Unit) {
-    var armed by rememberSaveable(plan.optString("id")) { mutableStateOf(false) }
-    val c = LocalNativeColors.current
-    val longPressFeedback = nHapticFeedback("toggle")
-    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(c.surface).border(1.dp, c.border, RoundedCornerShape(14.dp)).padding(start = 2.dp, end = 12.dp, top = 4.dp, bottom = 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            AcademicCheck(done, "${if (done) "取消完成" else "标记完成"}：${plan.optString("title")}", !busy, onToggle)
-            Column(Modifier.weight(1f).combinedClickable(enabled = !busy, hapticFeedbackEnabled = false, onClick = {}, onLongClick = { if (!armed) { armed = true; longPressFeedback() } }), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                AcademicText(plan.optString("title"), if (done) c.muted else c.ink, bold = true, crossed = done, maxLines = 2)
-                if (plan.optString("note").isNotEmpty()) NText(plan.optString("note"), 12, muted = true)
-            }
-            Column(horizontalAlignment = Alignment.End) {
-                val start = academicString(plan.opt("start")); val end = academicString(plan.opt("end"))
-                if (start.isNotEmpty()) NText(start + if (end.isNotEmpty()) "–$end" else "", 12, true)
-                if (plan.optInt("priority") > 0) AcademicText("●", if (plan.optInt("priority") == 2) c.danger else Color(0xff9b750b), 12, modifier = Modifier.semantics { contentDescription = if (plan.optInt("priority") == 2) "紧急" else "重要" })
-            }
-            if (!armed) NButton("⋯", { armed = true }, enabled = !busy, haptic = NativeButtonHaptic.Utility)
-        }
-        if (armed) Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            NButton("上移", { onMove(-1) }, enabled = canUp && !busy, haptic = NativeButtonHaptic.Utility)
-            NButton("下移", { onMove(1) }, enabled = canDown && !busy, haptic = NativeButtonHaptic.Utility)
-            NButton("删除", onDelete, enabled = !busy, haptic = NativeButtonHaptic.Utility)
-            NButton("收起", { armed = false }, haptic = NativeButtonHaptic.Utility)
-        }
-    }
-}
-
-@Composable
-private fun AcademicTasks(store: NativeStore, s: NativeState, tasks: List<AcademicTask>, now: Long) {
-    var showDone by rememberSaveable { mutableStateOf(false) }
-    val buckets = listOf("overdue" to "已过截止", "today" to "今天截止", "soon" to "4 天内", "later" to "更晚", "none" to "没写截止时间")
-    val groups = buckets.map { (key, label) -> Triple(key, label, tasks.filter { it.id !in s.done && AcademicRecords.bucket(it, now) == key }.sortedBy { it.dueMs ?: Long.MAX_VALUE }) }.filter { it.third.isNotEmpty() }
-    val finished = tasks.filter { it.id in s.done && AcademicRecords.bucket(it, now) != "expired" }
-    val expired = tasks.count { it.id !in s.done && AcademicRecords.bucket(it, now) == "expired" }
-    if (tasks.isEmpty() || (groups.isEmpty() && finished.isEmpty())) {
-        AcademicEmpty(if (s.syncing) "正在读取 MySTU 作业…" else "还没有作业记录", "同步 MySTU 后会出现在这里。没有记录不代表学校没有布置，雨课堂作业暂时不在其中。")
-        return
-    }
-    groups.forEach { (_, label, rows) -> AcademicSection(label, "${rows.size} 项") { rows.forEach { AcademicTaskRow(it, now, false) { store.toggleTask(it.id) } } } }
-    if (finished.isNotEmpty()) {
-        AcademicBlockButton("已完成 ${finished.size} 项 ${if (showDone) "⌃" else "⌄"}", { showDone = !showDone })
-        if (showDone) finished.forEach { AcademicTaskRow(it, now, true) { store.toggleTask(it.id) } }
-    }
-    if (expired > 0) NText("另有 $expired 项两周前就已截止的作业没有列出。", 14, muted = true)
-    NText("勾选只记在这台设备上，不会向 MySTU 提交任何内容。", 12, muted = true)
-}
-
-@Composable
-private fun AcademicTaskRow(task: AcademicTask, now: Long, done: Boolean, toggle: () -> Unit) {
-    val c = LocalNativeColors.current
-    val context = LocalContext.current
-    val interaction = remember { MutableInteractionSource() }
-    Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).clip(RoundedCornerShape(14.dp)).background(c.surface).border(1.dp, c.border, RoundedCornerShape(14.dp)).padding(start = 2.dp, end = if (task.url != null) 2.dp else 12.dp, top = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            AcademicCheck(done, "${if (done) "取消完成" else "标记完成"}：${task.title}", onToggle = toggle)
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                AcademicText(task.title, if (done) c.muted else c.ink, bold = true, crossed = done, maxLines = 2)
-                NText(listOf(task.course, AcademicRecords.source(task.source), task.schoolStatus.takeIf { it.isNotEmpty() }?.let { "学校状态：$it" }.orEmpty()).filter { it.isNotEmpty() }.joinToString(" · "), 12, muted = true)
-            }
-            Column(Modifier.width(78.dp), horizontalAlignment = Alignment.End) {
-                AcademicText(AcademicRecords.dueLine(task, now), if (AcademicRecords.bucket(task, now) in listOf("today", "overdue")) c.danger else c.muted, 12)
-                if (!done) AcademicRecords.leftText(task, now)?.let { NText(it, 11, muted = true) }
-            }
-            task.url?.let { url -> Box(Modifier.size(44.dp).clip(RoundedCornerShape(22.dp)).clickable(role = Role.Button, interactionSource = interaction, indication = null) { nativeOpenLink(context, url) }
-                .semantics { contentDescription = "在 ${AcademicRecords.source(task.source)} 打开" }, contentAlignment = Alignment.Center) { AcademicIcon("external", c.muted, 16) } }
-        }
 }
 
 @Composable

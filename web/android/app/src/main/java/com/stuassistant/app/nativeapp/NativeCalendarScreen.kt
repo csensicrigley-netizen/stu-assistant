@@ -8,36 +8,29 @@ import androidx.compose.foundation.shape.CircleShape
 import com.kyant.shapes.RoundedRectangle
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.CompositingStrategy
-import androidx.compose.ui.graphics.RectangleShape
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.kyant.backdrop.backdrops.layerBackdrop
-import com.kyant.backdrop.drawPlainBackdrop
-import com.kyant.backdrop.effects.blur
-import com.kyant.backdrop.effects.lens
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.*
-import kotlinx.coroutines.launch
 import org.json.JSONObject
 import kotlin.math.roundToInt
 
 val LocalCalendarComposer = staticCompositionLocalOf<() -> Unit> { {} }
 
+/** Read-only context and editable drafts share one three-day viewport.
+ * Drawing and gesture hit testing use the same [calendarBoxes] geometry.
+ */
 @Composable
 internal fun CalendarTimeline(day: String, onDay: (String) -> Unit, drafts: List<JSONObject>, selected: Int,
     existing: List<CalendarMark>, doc: AcademicTimetableDoc?, onEdit: (Int, String, Long, Long?) -> Unit, onSelect: (Int) -> Unit, onPrecise: (CalendarMark) -> Unit) {
@@ -202,6 +195,7 @@ internal fun CalendarTimeline(day: String, onDay: (String) -> Unit, drafts: List
     }
 }
 
+/** Compact exact-time editor; an empty end keeps a scheduled event as a point. */
 @Composable internal fun CalendarPrecise(mark: CalendarMark, save: (Long, Long?) -> Unit) {
     var date by remember(mark.key) { mutableStateOf(AcademicClock.moment(mark.start).date) }
     var start by remember(mark.key) { mutableStateOf(AcademicClock.clockAt(mark.start)) }
