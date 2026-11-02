@@ -113,7 +113,7 @@ Android 开发验证及交付见[事项 V1 验收与交付](docs/事项V1验收�
 - 直接 Gradle 构建用于开发检查；完整 App 本机交付使用 `deploy/make-native-release.ps1 -Variant Haptics`，要求已提交的干净源码和高于已交付下限的 versionCode。
 - 当前本机已交付包为 `1.1.3-native.1 / 59`，源码和哈希见[首版记录](docs/事项升级V1.md#9-已交付包与验收证据)。本轮整理不重新生成同版本交付包。
 - APK、签名和含源码 SHA/版本/哈希的构建回执保留本机 `release/`，不上传 GitHub。正式 `.app` 签名、网站下载和生产部署另行验收；提交版本常量不等于已经发布。
-- 内置后台由 `web/android/app/src/main/assets/native-config.json` 提供；空地址会阻止构建，学生不填写服务器。Jev Key 不进入 App。
+- 内置后台由 `web/android/app/src/main/assets/native-config.json` 提供，默认 `https://stu.oyishi.asia`；空地址和保留示例域名会阻止构建，学生不填写服务器。Jev Key 不进入 App。
 
 历史完整 App、机型探针和网页源码变化见[版本与验证构建](docs/版本与验证构建.md)。
 

@@ -271,6 +271,37 @@ class NativeCalendarOnlineTest {
     @Test fun realDeadlinePointDrag() = runBlocking {
         runFlow("明天下午五点前交报告", true)
     }
+    @Test fun realProductionIdentityAndCalendarRoute() = runBlocking {
+        org.junit.Assume.assumeTrue("Enable explicitly; this test uses live Jev quota",
+            InstrumentationRegistry.getArguments().getString("calendarOnline") == "true")
+        val context = IsolatedContext(inst.targetContext)
+        val store = NativeStore(context)
+        var cleanupSession: NativeSession? = null
+        try {
+            assertEquals("https://stu.oyishi.asia", store.state.value.server)
+            store.login("android-calendar-${UUID.randomUUID()}@example.invalid", UUID.randomUUID().toString(), true)
+            cleanupSession = NativeSession(store.state.value.server, store.state.value.token, 0)
+            val response = store.inferCalendar("明天下午两点到三点和导师开会")
+            val items = response.getJSONArray("items")
+            assertTrue("Live inference must return at least one item", items.length() > 0)
+            val draft = items.getJSONObject(0).getJSONObject("draft")
+            assertTrue(draft.getString("title").isNotBlank())
+            val start = CalendarDrafts.start(draft)
+            val end = CalendarDrafts.end(draft)
+            assertNotNull("Live inference must recognize the exact scheduled start", start)
+            assertNotNull("Live inference must recognize the exact scheduled end", end)
+            assertEquals(3600000L, end!! - start!!)
+            println("NATIVE_CALENDAR_ROUTE_OK source=real-online-Jev stuIdentity=true")
+        } finally {
+            store.close()
+            try {
+                cleanupSession?.let { session ->
+                    val api = NativeApi()
+                    try { api.request(session, "/v1/account", "DELETE") } finally { api.close() }
+                }
+            } finally { context.cleanup() }
+        }
+    }
     private suspend fun runFlow(inputText: String, deadlineOnly: Boolean) {
         org.junit.Assume.assumeTrue("Enable explicitly; this test uses live Jev quota",
             InstrumentationRegistry.getArguments().getString("calendarOnline") == "true")
@@ -286,7 +317,7 @@ class NativeCalendarOnlineTest {
             override fun cancel() = Unit
         }
         try {
-            assertEquals("Packaged service must be the production STU origin", "https://your-domain.example.com", store.state.value.server)
+            assertEquals("Packaged service must be the production STU origin", "https://stu.oyishi.asia", store.state.value.server)
             store.login("android-calendar-${UUID.randomUUID()}@example.invalid", UUID.randomUUID().toString(), true)
             registered = true
             cleanupSession = NativeSession(store.state.value.server, store.state.value.token, 0)

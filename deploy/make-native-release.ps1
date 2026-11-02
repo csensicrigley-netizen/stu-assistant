@@ -69,7 +69,7 @@ if (-not $effectiveServer -or -not [Uri]::TryCreate($effectiveServer, [UriKind]:
     $effectiveServer -match '[?#]' -or $effectiveServer -ne $effectiveServer.Trim() -or $effectiveServer.EndsWith('/')) {
     throw 'Configure an HTTPS backend base URL before packaging; users cannot supply one in the app.'
 }
-# 公开模板里 native-config.json 是占位符；不带 -Server 直接打包会做出指向 example.com 的包。
+# Forks may use placeholder origins; never let a template URL enter a delivery APK.
 if ($effectiveServer -match '(?i)your-domain\.example\.com|//example\.(com|org|net)|\.example\.(com|org|net)(/|$)') {
     throw 'The backend URL is still the template placeholder. Pass -Server https://your.real.host'
 }

@@ -75,7 +75,8 @@ class NativeStore internal constructor(
     suspend fun inferCalendar(text: String): JSONObject {
         val owner = session()
         requireSignedIn(owner)
-        if (owner.server.trimEnd('/') != "https://your-domain.example.com")
+        // Public deployment origin: keep the allowlist exact before forwarding its session.
+        if (owner.server.trimEnd('/') != "https://stu.oyishi.asia")
             throw NativeApiError("calendar_server", 0, "此服务器尚未接入智能日历，可使用手动记录")
         val body = JSONObject().put("text", text).put("context", JSONObject()
             .put("reference_at", java.time.OffsetDateTime.now(AcademicClock.zone).toString())

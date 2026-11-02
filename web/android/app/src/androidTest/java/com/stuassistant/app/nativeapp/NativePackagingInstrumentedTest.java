@@ -27,6 +27,9 @@ public class NativePackagingInstrumentedTest {
         assertTrue(Arrays.asList(app.getAssets().list("")).contains("native-config.json"));
         try (InputStream input = app.getAssets().open("native-config.json")) {
             JSONObject config = new JSONObject(new String(input.readAllBytes(), StandardCharsets.UTF_8));
+            assertEquals("https://stu.oyishi.asia", config.getString("server"));
+            assertEquals("Legacy sessions must retain their original server scope",
+                "https://stu.oyishi.asia", config.getString("legacyServer"));
             URI service = URI.create(config.getString("server"));
             assertEquals("https", service.getScheme());
             assertNotNull(service.getHost());
