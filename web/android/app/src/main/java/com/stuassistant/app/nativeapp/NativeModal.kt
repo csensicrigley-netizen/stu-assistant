@@ -411,9 +411,10 @@ private fun NativeSheetLayer(entry: NativeSheetEntry, active: Boolean, backdrop:
                     Box(Modifier.weight(1f).semantics { heading() }) { NText(entry.title.value, 24, true) }
                     NButton("关闭", onDismiss, haptic = NativeButtonHaptic.Utility)
                 }
+                val contentScroll = rememberScrollState()
                 Column(
                     Modifier.fillMaxWidth().weight(1f, fill = false)
-                        .verticalScroll(rememberScrollState()).navigationBarsPadding()
+                        .nativeTopSoftEdge(contentScroll).verticalScroll(contentScroll).navigationBarsPadding()
                         .padding(start = 20.dp, end = 20.dp, bottom = 32.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
