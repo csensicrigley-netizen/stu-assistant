@@ -1,13 +1,13 @@
 {
   "channel": "product",
-  "versionName": "1.0.54",
-  "versionCode": 55,
+  "versionName": "1.1.3",
+  "versionCode": 59,
   "apk": "/download/stu-assistant.apk",
   "notes": [
-    "底部抽屉玻璃背景连续铺到屏幕底边，仅保留顶部圆角，消除悬浮弹窗式空挡",
-    "系统手势安全距离移到内容内部，底栏仍在下层保留原位置和状态"
+    "事项交互：完成与详情展开分离，完成后原位保留、可撤销",
+    "考试与成绩使用独立学业层级，恢复全局顶部柔性模糊"
   ],
   "mandatory": false,
-  "releasedAt": "2026-10-31T05:17:29Z",
+  "releasedAt": "2026-11-01T14:45:00Z",
   "minSupported": "1.0.0"
 }

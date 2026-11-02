@@ -1,20 +1,32 @@
 # STU 事项助手
 
-汕头大学校园信息的个人助手：把**教务课表、MySTU 作业、学校 OA 通知**收在一处，
-网页版和安卓 App 同源，按教务处官方作息算准每一节课。
+汕头大学校园信息的个人助手：把**教务课表、MySTU 课程动态、个人事项和学校通知**收在一处。Android 使用原生 Jetpack Compose，网页使用 React PWA；校园账号与同步服务共用，新增智能日历事项在设备本地加密保存。
 
 > 本项目是**学生自用**的只读工具，与学校官方无关。
 > 只读你本人账号本来就能看到的内容，**不代签到、不交作业、不缴费、不提交任何东西**。
 
 ---
 
+## 事项升级 V1
+
+[GitHub 里程碑：事项升级 V1](https://github.com/csensicrigley-netizen/stu-assistant/milestone/1)
+
+本轮完整范围是 **1.0.54 / code55 → 1.1.3 / code59**，涵盖 PR #23–#26：顶部自然语言输入、真实 Jev + Duckling、原生竖向三天日历、直接拖动、设备加密保存，以及事项详情/完成、学业导航和柔化材质修复。
+
+- [首版说明：前后变化、使用流程、边界与版本记录](docs/事项升级V1.md)
+- [架构与接口：模块职责、字段、数据流和持久化](docs/事项V1架构与接口.md)
+- [验收与交付：构建命令、测试范围、升级与回退](docs/事项V1验收与交付.md)
+- [完整代码比较](https://github.com/csensicrigley-netizen/stu-assistant/compare/62e5a2a03af0a04918965175b7225b8ab46b7e88...cc59496d1ec01f33b81d90a2f5e30524db316e5e)
+
+当前是完整 App 的本机验证版本；源码合入、本机 APK 和正式渠道部署分别登记。课程动态 Jev 分类、保存后事项完整编辑/删除及设备提醒调度尚未接入，不能把字段保留或配置入口当作能力已经执行。
+
 ## 功能
 
 | 模块 | 内容 |
 |---|---|
 | 今天 | 现在/下一节课、还剩多久、教室怎么走；今天的课与空档排成一条时间轴 |
-| 课表 | 整学期课表、周次、调课与停课、考试安排 |
-| 学业 | 作业按截止时间排序、成绩与学分加权、考试倒数 |
+| 课表 | 整学期课表、周次、调课与停课、课程详情 |
+| 事项 | 自然语言/手动新建、三天日历调整、个人事项与未分类课程动态；学业子页查看考试和成绩 |
 | 校园 | 充电桩实时空闲口、图书馆开放时间、到校交通、常用入口 |
 | 我的 | 连接校园账号、通知偏好、实时活动开关、清除数据 |
 
@@ -24,26 +36,27 @@
 
 ## 架构
 
-```
-浏览器 / 安卓 App（React PWA + Capacitor）
-        │  HTTPS
-        ▼
-  FastAPI 后端（多租户，每个用户一份独立加密空间）
-        │
-        ├── stu-mcp：学校统一认证 / 教务 / MySTU / WebVPN 的登录与解析层
-        └── 第三方充电平台：公开只读接口
+```mermaid
+flowchart LR
+    Web[React PWA] --> STU[STU FastAPI：账号与校园同步]
+    App[Android Compose] --> STU
+    STU --> School[stu-mcp：学校只读接入]
+    App --> Local[设备 Keystore / AtomicFile：新事项]
+    App --> Inference[独立 smart-calendar：Jev + Duckling 推理]
 ```
 
-- **前端**：React + TypeScript + Vite，PWA 可装到桌面；安卓包用 Capacitor 打包同一份前端。
-- **后端**：FastAPI + SQLite（零外部依赖），多租户隔离，每个用户一个租户目录。
-- **学校对接**：全部交给 [`stu-mcp`](https://github.com/0error0warning/stu-mcp)（MIT），
-  本项目只做编排、缓存、限流与呈现。
+- **Android**：原生 Compose 页面与 AndroidLiquidGlass / Kyant Shapes。历史 Capacitor 模块作为构建和迁移依赖保留，原生交付包不夹带网页业务 bundle。
+- **网页**：React + TypeScript + Vite PWA，继续现有校园信息功能；本轮没有实现与原生日历等价的网页交互。
+- **STU 后端**：FastAPI + SQLite，负责既有账号、学校授权、同步、校园缓存和旧计划；使用 [`stu-mcp`](https://github.com/0error0warning/stu-mcp) 对接学校。
+- **智能日历**：只有推理模块独立建仓于 [`smart-calendar`](https://github.com/0error0warning/smart-calendar)，App 主动提交时调用。Jev Key 留在服务端，新事项在本地保存。
+
+数据本地要求针对新增智能日历业务，不代表既有 STU 校园采集系统已整体改成本地。详细接口及边界见[事项 V1 架构](docs/事项V1架构与接口.md)。
 
 ---
 
 ## 快速开始（本地）
 
-需要 **Python 3.12** 与 **Node 20+**。
+网页/后端开发需要 **Python 3.12** 与 **Node 22**（CI 版本）。Android 另需 JDK 21 和 Android SDK，见[原生构建步骤](docs/事项V1验收与交付.md)。
 
 ```bash
 # 后端
@@ -94,20 +107,15 @@ sudo bash deploy/install.sh <你的域名>
 它会建系统用户、装 venv、写 systemd 服务、配 Caddy 反代与证书，并跑一次 `app.doctor` 自检。
 **安装脚本不包含任何真实域名、IP、密钥**；这些都要你自己填。
 
-安卓包：
+Android 开发验证及交付见[事项 V1 验收与交付](docs/事项V1验收与交付.md)：
 
-```powershell
-powershell -ExecutionPolicy Bypass -File deploy\make-release.ps1 -Server https://你的域名 -Online
-```
+- 产品版本源是 `web/android/app/build.gradle`，`python deploy/sync-version.py --write` 同步网页和后台数字；机型探针使用独立登记。
+- 直接 Gradle 构建用于开发检查；完整 App 本机交付使用 `deploy/make-native-release.ps1 -Variant Haptics`，要求已提交的干净源码和高于已交付下限的 versionCode。
+- 当前本机已交付包为 `1.1.3-native.1 / 59`，源码和哈希见[首版记录](docs/事项升级V1.md#9-已交付包与验收证据)。本轮整理不重新生成同版本交付包。
+- APK、签名和含源码 SHA/版本/哈希的构建回执保留本机 `release/`，不上传 GitHub。正式 `.app` 签名、网站下载和生产部署另行验收；提交版本常量不等于已经发布。
+- 内置后台由 `web/android/app/src/main/assets/native-config.json` 提供；空地址会阻止构建，学生不填写服务器。Jev Key 不进入 App。
 
-- 需要你自己准备签名密钥（`android-signing/keystore.properties`），**仓库里不含任何签名材料**
-- 产品版本以 `android/app/build.gradle` 的 `defaultConfig` 为源，运行 `python deploy/sync-version.py --write` 同步网页与后台；机型探针使用独立的 `deploy/probe-versions.json`，不能推动产品版本或更新提示
-- 正式后台内置于 `web/android/app/src/main/assets/native-config.json`；空地址会阻止构建，登录页不要求学生填写服务器
-- 产物在 `release/`，同时把版本写进服务端 `latest_version.json`，旧客户端就能收到更新提示
-
-原生本机测试包使用 `deploy/make-native-release.ps1 -Variant Haptics`。交付前先提交源码；APK 及其源码 SHA／版本／哈希记录只保留本机。参见[分支、升级与交付流程](docs/原生登录与卡片抽屉修复.md)。
-
-当前产品功能基线为 `1.0.54` / code55；`1.0.55–1.0.60` 是已交付的独立通知实验编号，不代表正式功能升级。完整 App 的本机验证、机型探针、网页源码变化与实际生产发布分别登记，见[版本与验证构建](docs/版本与验证构建.md)。
+历史完整 App、机型探针和网页源码变化见[版本与验证构建](docs/版本与验证构建.md)。
 
 ---
 
@@ -120,7 +128,7 @@ STU_APP_DEMO=true STU_APP_HOME=./tmp python tests/check_stu_mcp.py
 STU_APP_DEMO=true STU_APP_HOME=./tmp python tests/check_sync.py
 
 cd ../web
-npm run typecheck
+npm test
 npm run build
 ```
 
@@ -160,7 +168,7 @@ backend/
 web/
   src/            React 源码（screens/ 页面、components/ 组件、lib/ 逻辑）
   scripts/        打包与截图脚本
-  android/        Capacitor 安卓工程
+  android/        原生 Compose App；保留既有 Capacitor 构建/迁移依赖
 deploy/           安装与发布脚本
 docs/             数据契约、官方来源、能力地图、授权边界、接口手册
 ```
@@ -170,7 +178,9 @@ docs/             数据契约、官方来源、能力地图、授权边界、�
 ## 致谢
 
 - [`stu-mcp`](https://github.com/0error0warning/stu-mcp)（MIT）：学校登录与解析层，没有它这个项目无从谈起
-- 图标与配色为自制；字体使用系统字体
+- [AndroidLiquidGlass](https://github.com/Kyant0/AndroidLiquidGlass) / [Shapes](https://github.com/Kyant0/Shapes)：原生材质和连续形状
+- [compose-animations](https://github.com/skydoves/compose-animations)：数字动画参考，Apache-2.0 声明保留在原生 assets/licenses
+- 日历布局和手势参考项目、固定源码版本及设计取舍见 [`DESIGN.md`](DESIGN.md)；React Native 不是 App 运行时依赖
 
 ## 许可
 

@@ -7,6 +7,8 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
+import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
@@ -64,6 +66,7 @@ class NativeActivity:ComponentActivity() {
     SideEffect {WindowCompat.getInsetsController(activity.window,activity.window.decorView).apply {isAppearanceLightStatusBars=!dark;isAppearanceLightNavigationBars=!dark}}
     val reduced=remember(resumeEpoch) {Settings.Global.getFloat(context.contentResolver,Settings.Global.ANIMATOR_DURATION_SCALE,1f)==0f}
     var route by rememberSaveable {mutableStateOf("today")}
+    var calendarOpen by rememberSaveable {mutableStateOf(false)}
     var campusView by rememberSaveable {mutableStateOf("notices")}
     var connect by rememberSaveable {mutableStateOf(false)}
     var gateStart by rememberSaveable {mutableStateOf("hello")}
@@ -83,22 +86,23 @@ class NativeActivity:ComponentActivity() {
     val density=LocalDensity.current
     val bottom=with(density){WindowInsets.navigationBars.getBottom(this).toDp().value}
     val ime=WindowInsets.ime.getBottom(density)>0
-    val showBottomNavigation=ready&&!needsWelcome&&!connect&&!ime
+    val showBottomNavigation=ready&&!needsWelcome&&!connect&&(!ime||calendarOpen)
     val scope=rememberCoroutineScope()
     LaunchedEffect(s.hapticStrength) {if(s.hapticStrength==0)feedback.cancel()}
     BackHandler {activity.moveTaskToBack(true)}
     BackHandler(enabled=!needsWelcome&&!connect&&route!="today"&&sheets.entries.isEmpty()) {route=if(route=="import"||route=="medical")"week"else"today"}
-    CompositionLocalProvider(LocalNativeColors provides colors,LocalNativePalette provides s.palette,LocalNativeForegroundEpoch provides resumeEpoch,LocalNativeBackdrop provides base,LocalNativeFeedback provides feedback,LocalNativeStrength provides s.hapticStrength,LocalNativeConnect provides onConnect,LocalNativeSheets provides sheets,LocalLiquidGlassDarkTheme provides dark,LocalLiquidGlassAccentColor provides colors.brand,LocalLiquidGlassReducedMotion provides reduced) {
+    CompositionLocalProvider(LocalCalendarComposer provides {calendarOpen=true},LocalNativeColors provides colors,LocalNativePalette provides s.palette,LocalNativeForegroundEpoch provides resumeEpoch,LocalNativeBackdrop provides base,LocalNativeFeedback provides feedback,LocalNativeStrength provides s.hapticStrength,LocalNativeConnect provides onConnect,LocalNativeSheets provides sheets,LocalLiquidGlassDarkTheme provides dark,LocalLiquidGlassAccentColor provides colors.brand,LocalLiquidGlassReducedMotion provides reduced) {
         Box(Modifier.fillMaxSize().background(colors.bg)) {
             Box(Modifier.fillMaxSize().layerBackdrop(base).background(colors.bg))
-            Box(Modifier.fillMaxSize().layerBackdrop(page).nativeSheetBackground(sheets)) {
+            Box(Modifier.fillMaxSize().layerBackdrop(page).nativeSheetBackground(sheets)
+                .then(if(calendarOpen) Modifier.clearAndSetSemantics {} else Modifier)) {
                 if(!ready) NPage("STU 事项助手"){NLoading()}
                 else if(needsWelcome||connect) NativeWelcomeScreen(store,s,start=gateStart,onDone={connect=false;store.reloadAfterMutation()},onCancel=if(gateCancelable){{connect=false}}else null)
                 else NativePageTransition(NativePageRoute(route,campusView),reduced) { snapshot ->
                     when {
                         snapshot.route=="today"->NativeTodayScreen(store,s,navigate,onConnect)
                         snapshot.route=="week"->NativeWeekScreen(store,s,navigate,onConnect)
-                        snapshot.route.startsWith("items")->NativeItemsScreen(store,s,navigate,onConnect,snapshot.route.substringAfter(':',"all"))
+                        snapshot.route.startsWith("items")->NativeCalendarItemsScreen(store,s,onConnect)
                         snapshot.route.startsWith("campus")->NativeCampusScreen(store,s,snapshot.campusView,onConnect,{campusView=it})
                         snapshot.route=="me"->NativeMeScreen(store,s,onConnect,{connect=false;route="today"})
                         snapshot.route=="medical"->NativeMedicalScreen(store,s,navigate)
@@ -114,10 +118,11 @@ class NativeActivity:ComponentActivity() {
                 val urgent=s.tasks.map(AcademicRecords::task).count {it.id !in s.done&&AcademicRecords.bucket(it) in listOf("today","overdue")}
                 val reconnect=s.sources.count {it.optString("state")=="need_login"&&it.optString("source") in academicStrings(s.user?.optJSONArray("bound"))}
                 val tabs=listOf(GlassNavigationTab("today","今天"),GlassNavigationTab("week","课表"),GlassNavigationTab("items","事项",urgent),GlassNavigationTab("campus","校园"),GlassNavigationTab("me","我的",reconnect))
-                Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height((104+bottom).dp).nativeSheetBackground(sheets)) {
+                Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height((104+bottom).dp).nativeSheetBackground(sheets)
+                    .then(if(calendarOpen) Modifier.clearAndSetSemantics {} else Modifier)) {
                     LiquidGlassBottomBar(GlassNavigationState(current,tabs,dark,s.palette,s.hapticStrength,bottom,reduced),combined) {next->
                         // Also reject a selection queued before the sheet opened.
-                        if(sheets.entries.isEmpty()) {
+                        if(sheets.entries.isEmpty()&&!calendarOpen) {
                             if(next!=current){feedback.play("navigation",s.hapticStrength);route=next}
                             else if(route=="import"||route=="medical"){route="week"}
                         }
@@ -126,6 +131,11 @@ class NativeActivity:ComponentActivity() {
             }
             if(ready) NativeUpdatePrompt(store,combined,Modifier.align(Alignment.BottomCenter).padding(start=12.dp,end=12.dp,bottom=(104+bottom).dp))
             NativeSheetHost(sheets,combined)
+            AnimatedVisibility(calendarOpen&&s.token!=null&&!s.preview, enter=slideInVertically(tween(420)){ -it/12 }+fadeIn(tween(220)), exit=slideOutVertically(tween(260)){ -it/12 }+fadeOut(tween(220))) {
+                CompositionLocalProvider(LocalNativeBackdrop provides base) {
+                    NativeCalendarComposer(store,s,inputBackdrop=combined) {calendarOpen=false}
+                }
+            }
         }
     }
 }

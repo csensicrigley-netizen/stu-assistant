@@ -89,7 +89,7 @@ class VersionPolicyTest(unittest.TestCase):
         POLICY.validate_upgrade([self.resolve("Release")], recorded)
         future = self.resolve("Vivoidentity") | {"versionCode": 62}
         POLICY.validate_upgrade([future], recorded)
-        with self.assertRaisesRegex(ValueError, "must exceed 55"):
+        with self.assertRaisesRegex(ValueError, f"must exceed {self.catalog['lastDeliveredVersionCodes']['com.stuassistant.app.haptics']}"):
             POLICY.validate_upgrade([self.resolve("Haptics")], recorded)
 
     def test_malformed_recorded_floor_fails_closed(self):

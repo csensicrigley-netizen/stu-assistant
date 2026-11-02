@@ -110,7 +110,9 @@ try {
             try { $packagedServer = ($configReader.ReadToEnd() | ConvertFrom-Json).server } finally { $configReader.Dispose() }
             if ($packagedServer -cne $effectiveServer) { throw 'Packaged backend differs from the intended deployment configuration.' }
         } finally { $archive.Dispose() }
-        $badging = & $aaptPath dump badging $builtApk 2>&1
+        # aapt cannot reliably open non-ASCII Windows paths; use the live build mapping.
+        $asciiApk = "$($driveLetter):\web\android\app\build\outputs\apk\$variantLower\app-$variantLower.apk"
+        $badging = & $aaptPath dump badging $asciiApk 2>&1
         $aaptExitCode = $LASTEXITCODE
         $heading = ($badging | Select-String -Pattern '^package:' | Select-Object -First 1).Line
         if ($aaptExitCode -ne 0 -or $heading -notmatch "name='([^']+)' versionCode='([^']+)' versionName='([^']+)'") { throw 'APK identity metadata could not be read.' }

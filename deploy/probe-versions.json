@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "lastDeliveredVersionCodes": {
-    "com.stuassistant.app.haptics": 55,
+    "com.stuassistant.app.haptics": 59,
     "com.stuassistant.app.liveprobe": 56,
     "com.stuassistant.app.huaweiprobe": 58,
     "com.stuassistant.app.vivoprobe": 61,
