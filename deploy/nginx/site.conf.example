@@ -9,11 +9,11 @@ upstream stu_api {
     keepalive_requests 1000;
 }
 
-# your-domain.example.com — 汕头大学事项助手
+# 示例域名 — 汕头大学事项助手
 # 静态网页放在这台（只做转发，不做计算）；/v1 反代到数据中心的 8100
 # 数据中心通过 SSH 隧道映射到本机 127.0.0.1:8100（stu-tunnel.service）
 server {
-    server_name your-domain.example.com your-domain.example.com your-domain.example.com;
+    server_name your-domain.example.com;
 
     root /opt/stu-web;
     index index.html;
@@ -140,7 +140,7 @@ server {
 
     listen 80;
     listen [::]:80;
-    server_name your-domain.example.com your-domain.example.com your-domain.example.com;
+    server_name your-domain.example.com;
     return 404; # managed by Certbot
 
 

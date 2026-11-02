@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import time
+import threading
 from typing import Any
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, Response
@@ -99,12 +100,19 @@ async def _security_headers(request, call_next):
 def current_user(authorization: str = Header(default="")) -> str:
     if not authorization.startswith("Bearer "):
         raise HTTPException(401, "missing_bearer")
-    uid = authlib.verify_token(authorization[7:].strip())
+    token = authorization[7:].strip()
+    uid = authlib.verify_token(token)
     if not uid:
         raise HTTPException(401, "invalid_token")
     db = DB(settings.db_path)
-    if not db.user_by_id(uid):
+    row = db.user_by_id(uid)
+    if not row:
         raise HTTPException(401, "user_gone")
+    # 2026-11-02: 登出会 +1 users.token_version，旧 token 立刻作废。
+    # 老 token 里没有 ver（按 0 算），老用户默认也是 0，升级不会把已登录的人踢下线。
+    claims = authlib.token_claims(token)
+    if int(claims.get("ver", 0) or 0) != int(row.get("token_version", 0) or 0):
+        raise HTTPException(401, "token_revoked")
     return uid
 
 
@@ -367,6 +375,34 @@ class DeviceIn(BaseModel):
 # auth endpoints
 # --------------------------------------------------------------------------
 
+# 2026-11-02: 一个账号一天只能试少数几个不同学号。
+# 正常学生只会绑自己那一个；把任意学号往服务端喂是撞库的手会有的动作。
+_BIND_SID_WINDOW: dict[str, dict[str, float]] = {}
+_BIND_SID_GUARD = threading.Lock()
+_BIND_SID_MAX = 3
+_BIND_SID_TTL = 86400.0
+
+
+def _bind_sid_allowed(uid: str, sid: str) -> bool:
+    import time as _time
+
+    sid = (sid or "").strip()
+    if not sid:
+        return False
+    now_ts = _time.time()
+    with _BIND_SID_GUARD:
+        seen = _BIND_SID_WINDOW.setdefault(uid, {})
+        for k in [k for k, v in seen.items() if now_ts - v > _BIND_SID_TTL]:
+            seen.pop(k, None)
+        if sid in seen:
+            seen[sid] = now_ts
+            return True
+        if len(seen) >= _BIND_SID_MAX:
+            return False
+        seen[sid] = now_ts
+        return True
+
+
 def _client_ip(request: Request) -> str:
     # uvicorn runs with --proxy-headers behind Caddy, so this is the real peer
     return request.client.host if request.client else "unknown"
@@ -382,7 +418,7 @@ def register(body: RegisterIn, request: Request) -> dict:
     if db.user_by_email(body.email):
         raise HTTPException(409, "email_taken")
     user = db.create_user(body.email, authlib.hash_password(body.passphrase))
-    return {"token": authlib.issue_token(user["id"]), "user": {"id": user["id"],
+    return {"token": authlib.issue_token(user["id"], ver=0), "user": {"id": user["id"],
                                                               "email": user["email"]}}
 
 
@@ -397,7 +433,8 @@ def login(body: LoginIn, request: Request) -> dict:
         raise HTTPException(401, "bad_credentials")
     if user["status"] != "active":
         raise HTTPException(403, "account_disabled")
-    return {"token": authlib.issue_token(user["id"]), "user": {"id": user["id"],
+    return {"token": authlib.issue_token(user["id"], ver=user.get("token_version", 0) or 0),
+            "user": {"id": user["id"],
                                                               "email": user["email"]}}
 
 
@@ -411,6 +448,8 @@ def bind_start(body: BindIn, uid: str = Depends(current_user)) -> dict:
     # many failures, and a wrong password typed six times should stop here.
     if not bind_limiter.allow(uid):
         raise HTTPException(429, "login_throttled")
+    if not _bind_sid_allowed(uid, body.student_id):
+        raise HTTPException(429, "too_many_accounts")
     # 连 WebVPN 就是要去读 OA：没有本人授权，这一步不往下走。
     # 数盾动态口令仍然要由本人在下一步现输（bind.py 的 totp challenge），
     # 服务器不代输、不保存。
@@ -466,7 +505,9 @@ def relogin_now(body: BindIn, request: Request, uid: str = Depends(current_user)
     学校会话会自己过期。密码留在设备上，掉线时由设备发这一次重登请求；服务端只在
     这个请求的内存里用一次，不写库、不进日志、不回传。
     """
-    if not login_account_limiter.allow(body.student_id) or not login_ip_limiter.allow(_client_ip(request)):
+    if (not bind_limiter.allow(uid)
+            or not login_account_limiter.allow(body.student_id)
+            or not login_ip_limiter.allow(_client_ip(request))):
         raise HTTPException(429, "login_throttled")
     from .relogin import login_with
     from .tenancy import tenant_scope
@@ -737,7 +778,9 @@ def del_device(body: DeviceIn, uid: str = Depends(current_user)) -> dict:
 @app.post("/v1/account/logout")
 def logout(uid: str = Depends(current_user)) -> dict:
     # Sessions stay on disk (they belong to the campus systems); only the App
-    # token dies, because the App holds no server-side session state.
+    # token dies. Bumping token_version makes the token that was just used
+    # unusable even if it had been copied off the device.
+    DB(settings.db_path).bump_token_version(uid)
     return {"ok": True}
 
 

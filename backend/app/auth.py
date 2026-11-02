@@ -44,13 +44,14 @@ def _unb64(text: str) -> bytes:
     return base64.urlsafe_b64decode(text + "=" * (-len(text) % 4))
 
 
-def issue_token(user_id: str, ttl: int | None = None) -> str:
+def issue_token(user_id: str, ttl: int | None = None, ver: int = 0) -> str:
     header = _b64(json.dumps({"alg": "HS256", "typ": "JWT"}, separators=(",", ":")).encode())
     now_ts = int(time.time())
     payload = _b64(json.dumps({
         "sub": user_id,
         "iat": now_ts,
         "exp": now_ts + (ttl or settings.jwt_ttl_seconds),
+        "ver": int(ver or 0),
     }, separators=(",", ":")).encode())
     signing_input = f"{header}.{payload}".encode()
     sig = _b64(hmac.new(settings.jwt_secret.encode(), signing_input, hashlib.sha256).digest())
@@ -70,3 +71,11 @@ def verify_token(token: str) -> str | None:
         return str(claims.get("sub") or "") or None
     except (ValueError, TypeError, KeyError):
         return None
+
+
+def token_claims(token: str) -> dict:
+    """Payload of an already-verified token (used for the revocation counter)."""
+    try:
+        return json.loads(_unb64(token.split(".")[1]))
+    except (ValueError, TypeError, KeyError, IndexError):
+        return {}

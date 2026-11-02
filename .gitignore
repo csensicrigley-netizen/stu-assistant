@@ -47,6 +47,8 @@ logs/
 *.key
 *.p12
 secrets/
+# androidTest 的本地 mock HTTPS 自签证书（测试用，不是发布签名）
+!web/android/app/src/androidTest/assets/native-api-test.p12
 
 # ---- 编辑器与系统 ----
 .DS_Store

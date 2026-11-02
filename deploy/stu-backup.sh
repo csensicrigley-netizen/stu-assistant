@@ -1,5 +1,5 @@
 #!/bin/bash
-# 每日备份：SQLite 在线快照（WAL 安全）+ 租户目录 + 保留 14 天 + 异地到 entry-host
+# 每日备份：SQLite 在线快照（WAL 安全）+ 租户目录 + 保留 14 天 + 异地到入口机
 set -euo pipefail
 DEST=/var/backups/stu-assistant
 STAMP=$(date +%Y%m%d-%H%M%S)
@@ -35,7 +35,7 @@ chmod 600 "$DEST"/*
 find "$DEST" -name "app-*.db.gz" -mtime +14 -delete
 find "$DEST" -name "tenants-*.tar.gz" -mtime +14 -delete
 
-# 异地一份到入口机 entry-host（失败只记 syslog，不否定本地备份的成功）
+# 异地一份到入口机（失败只记 syslog，不否定本地备份的成功）
 rsync -az --delete \
   -e "ssh -i /root/.ssh/backup_stu -o StrictHostKeyChecking=accept-new -o ConnectTimeout=20" \
   /var/backups/stu-assistant/ root@entry-host.example:/var/backups/stu-offsite/ \

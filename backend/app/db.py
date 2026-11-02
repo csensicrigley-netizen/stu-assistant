@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS users (
   email         TEXT UNIQUE NOT NULL,
   pass_hash     TEXT NOT NULL,
   student_id_h  TEXT,
+  token_version INTEGER NOT NULL DEFAULT 0,
   status        TEXT NOT NULL DEFAULT 'active',
   created_at    REAL NOT NULL
 );
@@ -162,6 +163,10 @@ class DB:
         for name, ddl in (("app_version", "TEXT"), ("app_code", "INTEGER"), ("seen_at", "REAL")):
             if name not in cols:
                 c.execute(f"ALTER TABLE devices ADD COLUMN {name} {ddl}")
+        # 2026-11-02: 每个用户一个令牌版本号，登出时 +1，旧 token 立即作废。
+        ucols = {row["name"] for row in c.execute("PRAGMA table_info(users)")}
+        if "token_version" not in ucols:
+            c.execute("ALTER TABLE users ADD COLUMN token_version INTEGER NOT NULL DEFAULT 0")
         if c.execute("PRAGMA user_version").fetchone()[0] < 1:
             for table in USER_TABLES:
                 c.execute(f"DELETE FROM {table} WHERE NOT EXISTS "
@@ -207,6 +212,13 @@ class DB:
     def set_student_id_hash(self, uid: str, sid_h: str) -> None:
         with self.conn() as c:
             c.execute("UPDATE users SET student_id_h=? WHERE id=?", (sid_h, uid))
+
+    def bump_token_version(self, uid: str) -> int:
+        """Retire every token already issued for this user (logout / disable)."""
+        with self.conn() as c:
+            c.execute("UPDATE users SET token_version = COALESCE(token_version,0) + 1 WHERE id=?", (uid,))
+            row = c.execute("SELECT token_version FROM users WHERE id=?", (uid,)).fetchone()
+        return int(row["token_version"]) if row else 0
 
     def delete_user(self, uid: str) -> None:
         with self.conn() as c:

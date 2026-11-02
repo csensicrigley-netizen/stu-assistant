@@ -1,12 +1,12 @@
 # 站点加固记录（2026-11）
 
-线上 `your-domain.example.com` 已按纵深防御完成两轮加固。本文是公开摘要；凭据、隧道、密钥路径等敏感细节只在私有维护手册（`docs/网站维护与加固-交接给agent.md`，不入公开仓）。
+线上站点已按纵深防御完成多轮加固。本文是公开摘要；凭据、隧道、密钥路径等敏感细节只在私有维护手册（`docs/网站维护与加固-交接给agent.md`，不入公开仓）。
 
 配套产物：
 
 - `deploy/nginx/stu-headers.conf` —— 安全响应头 snippet
 - `deploy/nginx/stu-limits.conf` —— 限流/连接数 zone
-- `deploy/nginx/entry-host-icu.conf.example` —— 线上边缘配置模板（可直接对照部署）
+- `deploy/nginx/site.conf.example` —— 线上边缘配置模板（可直接对照部署）
 - `deploy/stu-backup.sh` —— 每日备份脚本（目标主机写成 `entry-host.example` 占位，用前替换）
 
 ## 边缘（nginx）
@@ -46,3 +46,34 @@
 - 无 CDN/WAF 缓冲层（DDoS 时无缓冲；需云账号层操作）
 - 上传通道仍为密码 SFTP（建议换密钥）
 - 单 worker 为刻意设计（SQLite + 租户锁），勿随意加
+
+## 2026-11-02 第二轮加固（对抗演练后）
+
+一次完整的外部黑盒 + 内部白盒演练暴露了下列问题，均已修复并留下验证方法。
+
+### 边缘（nginx / fail2ban）
+
+1. **fail2ban 的两个 nginx jail 实际从未生效**
+   - 现象：`fail2ban-client status nginx-limit-req` 显示 `No file is currently monitored`，`Total failed: 0`，而 `error.log` 里躺着数百条 `limiting requests`
+   - 根因：`jail.d/defaults-debian.conf` 的 `backend = systemd` 覆盖了 `logpath`；nginx 只写文件、不写 journal，jail 去 journal 里永远捞不到
+   - 修复：为 `nginx-limit-req`（logpath `error.log`）和 `nginx-444`（logpath `access.log`）显式设 `backend = auto`
+   - 验证：连发 20 次 429 → `Total failed: 13` → 攻击 IP 被 DROP（后续请求直接超时）
+2. TLS 全局 `ssl_protocols` 残留 `TLSv1 TLSv1.1`（vhost 已覆盖，但其他站点会继承）→ 收敛为 1.2/1.3
+3. `X-Forwarded-For` 原用 `$proxy_add_x_forwarded_for`（追加，保留客户端伪造值）→ 改 `$remote_addr`（丢弃伪造），限速 key 恒为真实来源
+4. 上游 `Server` 头透出 → `proxy_hide_header Server`
+
+### 应用层（FastAPI）
+
+5. **JWT 无法吊销**：新增 `users.token_version` + token 内 `ver` claim
+   - 登出 `POST /v1/account/logout` 会 +1，旧 token 立即 `401 token_revoked`
+   - 老 token 没有 `ver`（按 0 处理），与老用户默认值 0 对齐，**升级不踢已登录用户**
+6. **绑定入口可被当作撞库代理**：`/v1/bind`、`/v1/relogin` 会拿任意学号密码去打学校系统
+   - 新增单账号学号锁定：24h 内最多尝试 3 个不同学号（正常学生只绑自己那一个）
+   - `relogin` 限速从「仅学号」改为「账号 + 学号 + IP」三重
+7. 每日数据库冷备（`.backup`，WAL 安全）+ 7 天保留
+
+### 仍存在的结构性风险（设计取舍，非 bug）
+
+- 学生教务凭据集中托管：每租户独立 `master.key` + Fernet 密文，但密钥与密文同盘同用户，**主机被 root 拿下即全量泄露**。根治需密钥外置（KMS / 独立主机 / systemd credentials）
+- `/v1/charging` 匿名可读属产品设计（公开充电桩看板），未加鉴权
+- 注册无邮箱验证：受 nginx 与进程内双层限流约束，但仍是账号膨胀的入口
