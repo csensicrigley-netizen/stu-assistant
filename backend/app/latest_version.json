@@ -1,11 +1,11 @@
 {
   "channel": "product",
-  "versionName": "1.1.2",
-  "versionCode": 58,
+  "versionName": "1.1.3",
+  "versionCode": 59,
   "apk": "/download/stu-assistant.apk",
   "notes": [
-    "原生智能日历：顶部输入、真实在线 Jev 识别与可拖动时间线",
-    "新事项仅在本机加密保存；日期切换滑动过渡，支持时间点与时间段"
+    "事项交互：完成与详情展开分离，完成后原位保留、可撤销",
+    "考试与成绩使用独立学业层级，恢复全局顶部柔性模糊"
   ],
   "mandatory": false,
   "releasedAt": "2026-11-01T14:45:00Z",
