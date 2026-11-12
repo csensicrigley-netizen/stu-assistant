@@ -894,6 +894,124 @@ fun NDivider() {
     )
 }
 
+/**
+ * Unified Liquid Glass date / week step switcher shared by Items (事项) and Timetable (课表).
+ * Keeps identical 20dp glass container geometry, 48dp refractive step buttons, 17sp tabular
+ * number-pop title, and an inline brand capsule pill to jump back to Today / This Week without
+ * vertical layout shifts.
+ */
+@Composable
+internal fun NativeStepSwitcherBar(
+    title: String,
+    order: Long,
+    previousLabel: String,
+    nextLabel: String,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
+    canPrevious: Boolean = true,
+    canNext: Boolean = true,
+    idleSubtitle: String,
+    resetLabel: String? = null,
+    resetPrefix: String? = null,
+    onReset: (() -> Unit)? = null,
+) {
+    val c = LocalNativeColors.current
+    val dark = LocalLiquidGlassDarkTheme.current == true
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .nativeGlassCard(20)
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        NativeStepIconButton(previousLabel, "chevron-left", enabled = canPrevious, dark = dark, onClick = onPrevious)
+        Column(
+            Modifier.weight(1f),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            CalendarCounter(
+                title,
+                order,
+                nativeTextStyle(
+                    color = c.ink,
+                    sizeSp = 17f,
+                    lineHeightSp = 22f,
+                    weight = FontWeight.Bold,
+                    tabularNums = true,
+                ),
+                duration = 240,
+            )
+            Box(Modifier.heightIn(min = 20.dp), contentAlignment = Alignment.Center) {
+                if (resetLabel != null && onReset != null) {
+                    val backTick = nSelectionFeedback()
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        if (!resetPrefix.isNullOrBlank()) {
+                            NText(
+                                resetPrefix,
+                                11,
+                                muted = true,
+                                maxLines = 1,
+                                softWrap = false,
+                                tabularNums = true,
+                            )
+                        }
+                        Box(
+                            Modifier
+                                .clip(Capsule())
+                                .background(c.brand.copy(alpha = 0.11f))
+                                .clickable(role = Role.Button) {
+                                    backTick()
+                                    onReset()
+                                }
+                                .padding(horizontal = 10.dp, vertical = 3.dp),
+                        ) {
+                            BasicText(
+                                resetLabel,
+                                maxLines = 1,
+                                softWrap = false,
+                                style = nativeTextStyle(
+                                    color = c.brand,
+                                    sizeSp = 11.5f,
+                                    lineHeightSp = 14f,
+                                    weight = FontWeight.SemiBold,
+                                ),
+                            )
+                        }
+                    }
+                } else {
+                    NText(idleSubtitle, 11, muted = true, maxLines = 1, softWrap = false, tabularNums = true)
+                }
+            }
+        }
+        NativeStepIconButton(nextLabel, "chevron-right", enabled = canNext, dark = dark, onClick = onNext)
+    }
+}
+
+@Composable
+private fun NativeStepIconButton(
+    label: String,
+    icon: String,
+    enabled: Boolean,
+    dark: Boolean,
+    onClick: () -> Unit,
+) {
+    val c = LocalNativeColors.current
+    NativeGlassButton(
+        onClick = onClick,
+        modifier = Modifier.size(48.dp).semantics { contentDescription = label },
+        enabled = enabled,
+        haptic = NativeButtonHaptic.Navigation,
+        surfaceColor = c.surface.copy(alpha = if (enabled) (if (dark) 0.38f else 0.48f) else 0.18f),
+    ) {
+        NativeIcon(icon, c.ink.copy(alpha = if (enabled) 1f else 0.35f), size = 16.dp, strokeWidth = 2.1f)
+    }
+}
+
 fun nativeOpenLink(context: android.content.Context, url: String) {
     runCatching {
         val uri = Uri.parse(url)

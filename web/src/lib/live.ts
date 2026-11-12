@@ -60,14 +60,13 @@ export const CHARGING_DEVICES: ChargingDevice[] = [
   { code: "4GR00008497", name: "滑板场一", location: "滑板场", capacity: 20, verified: true },
   { code: "4GR00008488", name: "滑板场二", location: "滑板场", capacity: 20, verified: true },
   { code: "4GR00006723", name: "教师宿舍", location: "教师宿舍", capacity: 20, verified: true },
-  { code: "4GR00008477", name: "水电中心（名称待核）", location: "水电中心", capacity: 20, verified: false },
 ];
 
 export const CHARGING_SOURCE = {
   provider: "第三方充电平台",
   registryVerifiedOn: "2026-10-29",
   method: "按机身二维码逐台核对",
-  scope: "已核验 15 台设备，不代表全校",
+  scope: "已核验 14 台设备，不代表全校",
 };
 
 const PORT_LABELS: Record<number, string> = {

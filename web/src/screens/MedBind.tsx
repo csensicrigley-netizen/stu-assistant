@@ -165,8 +165,8 @@ export function MedBindScreen() {
         title="连接医学院教务"
         sub="连上以后，课表、成绩、考试都会自己同步过来，不用再一门一门录。"
         aside={
-          <button type="button" className="btn btn--ghost btn--sm" onClick={() => shell.go("week")}>
-            返回课表
+          <button type="button" className="btn btn--ghost btn--sm" onClick={() => shell.go("me")}>
+            ‹ 我的
           </button>
         }
       />

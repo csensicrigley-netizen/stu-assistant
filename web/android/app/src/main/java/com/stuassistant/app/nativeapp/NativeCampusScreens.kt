@@ -427,7 +427,7 @@ private fun CampusNoticeSearch(query: String, onChange: (String) -> Unit) {
     }
 }
 
-private data class CampusDevice(val code: String, val name: String, val location: String, val capacity: Int, val verified: Boolean)
+internal data class CampusDevice(val code: String, val name: String, val location: String, val capacity: Int, val verified: Boolean)
 private data class CampusPort(val num: Int, val state: Int, val label: String)
 private data class CampusCharge(
     val device: CampusDevice, val total: Int, val free: Int, val occupied: Int, val fault: Int,
@@ -527,7 +527,6 @@ private fun CampusLife(store: NativeStore, s: NativeState, now: AcademicMoment, 
     val liveCount = charging.count { it.live }
     val allLive = charging.isNotEmpty() && liveCount == charging.size
     val hasSamples = charging.any { !it.live && it.unavailable == null }
-    val newest = charging.filter { it.live }.mapNotNull { it.at }.maxOrNull()
     val context = LocalContext.current
 
     CampusSection("宿舍水电", "需校园网", icon = "bolt") {
@@ -662,7 +661,7 @@ private fun CampusLife(store: NativeStore, s: NativeState, now: AcademicMoment, 
                     if (pair.size == 1) Spacer(Modifier.weight(1f))
                 }
             }
-            if (place != null) {
+            if (place != null && places.containsKey(place)) {
                 charging.filter { it.device.location == place }.forEach { device ->
                     NCard {
                         Row(
@@ -672,7 +671,7 @@ private fun CampusLife(store: NativeStore, s: NativeState, now: AcademicMoment, 
                         ) {
                             Box(Modifier.weight(1f)) {
                                 NText(
-                                    device.device.name + if (!device.device.verified && !device.device.name.contains("名称待核")) "（名称待核）" else "",
+                                    device.device.name,
                                     15,
                                     bold = true,
                                     maxLines = 1,
@@ -701,16 +700,6 @@ private fun CampusLife(store: NativeStore, s: NativeState, now: AcademicMoment, 
                     }
                 }
             }
-        }
-        CampusFootnote(
-            "第三方充电平台，已核验 15 台设备，不代表全校。按机身二维码逐台核对（2026-10-29）。" +
-                (newest?.let { "采样于 " + AcademicClock.ago(it, now.ms) + "，每两分钟更新。" }
-                    ?: if (hasSamples) "充电平台暂时连不上，显示的是示意数据。"
-                    else if (charging.isEmpty()) ""
-                    else "平台本轮暂无设备数据，每两分钟自动重试。"),
-        )
-        if (charging.any { !it.device.verified }) {
-            CampusFootnote("标「名称待核」的设备：编号在平台上有效，但地点名还没有二维码可对，先按原清单名称显示。")
         }
     }
 
@@ -1470,7 +1459,7 @@ private fun campusPhaseColor(kind: String, tones: NativeSemanticTones): Color = 
 
 private const val campusWebVpn = "https://webvpn.stu.edu.cn/"
 
-private val campusDevices = listOf(
+internal val campusDevices = listOf(
     CampusDevice("4GR00008492", "思源书院左一", "思源书院", 20, true),
     CampusDevice("4GR00008485", "思源书院左二", "思源书院", 20, true),
     CampusDevice("4GR00008489", "思源书院左三", "思源书院", 20, true),
@@ -1485,7 +1474,6 @@ private val campusDevices = listOf(
     CampusDevice("4GR00008497", "滑板场一", "滑板场", 20, true),
     CampusDevice("4GR00008488", "滑板场二", "滑板场", 20, true),
     CampusDevice("4GR00006723", "教师宿舍", "教师宿舍", 20, true),
-    CampusDevice("4GR00008477", "水电中心（名称待核）", "水电中心", 20, false),
 )
 
 private val campusEntrances = listOf(

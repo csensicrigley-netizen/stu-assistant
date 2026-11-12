@@ -36,11 +36,11 @@ const ORDER: Record<TabKey, number> = {
   today: 0,
   plan: 1,
   week: 2,
-  import: 2.4,
-  medbind: 2.6,
   study: 3,
   campus: 4,
   me: 5,
+  import: 5.4,
+  medbind: 5.6,
 };
 
 function dirOf(from: TabKey, to: TabKey): 1 | -1 {
@@ -193,7 +193,7 @@ function Shell({ onSignOut, onConnect }: { onSignOut: () => void; onConnect: () 
     () =>
       onBack(() => {
         if (tab === "import" || tab === "medbind") {
-          go("week");
+          go("me");
           return true;
         }
         if (tab === "today") return false;

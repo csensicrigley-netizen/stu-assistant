@@ -116,4 +116,19 @@ class NativeRuntimeSafetyTest {
             }
         }
     }
+
+    @Test
+    fun medicalAndImportRoutes_belongToMeDataSourceTab() {
+        assertEquals("me", NativePageRoute("medical", "notices").tab)
+        assertEquals("me", NativePageRoute("import", "notices").tab)
+        assertEquals(4, NativePageRoute("medical", "notices").index)
+        assertEquals(4, NativePageRoute("import", "notices").index)
+    }
+
+    @Test
+    fun campusChargingDevices_excludeUtilitiesCenterAndAreAllVerified() {
+        assertEquals(14, campusDevices.size)
+        assertTrue(campusDevices.none { it.location == "水电中心" || it.code == "4GR00008477" })
+        assertTrue(campusDevices.all { it.verified })
+    }
 }

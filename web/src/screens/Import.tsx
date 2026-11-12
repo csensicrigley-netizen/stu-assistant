@@ -193,8 +193,8 @@ export function ImportScreen() {
         sub="医学院的教务系统和主校区不是一套，没法自动同步，只能自己录。录完和自动同步的课表一样显示。"
         aside={
           // 手机上没地方放「返回」，挂在标题右侧；Android 物理返回键走同一路径。
-          <button type="button" className="btn btn--ghost btn--sm" onClick={() => shell.go("week")}>
-            返回课表
+          <button type="button" className="btn btn--ghost btn--sm" onClick={() => shell.go("me")}>
+            ‹ 我的
           </button>
         }
       />

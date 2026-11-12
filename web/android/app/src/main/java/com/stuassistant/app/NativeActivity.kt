@@ -93,7 +93,7 @@ class NativeActivity:ComponentActivity() {
     val scope=rememberCoroutineScope()
     LaunchedEffect(s.hapticStrength) {if(s.hapticStrength==0)feedback.cancel()}
     BackHandler {activity.moveTaskToBack(true)}
-    BackHandler(enabled=!needsWelcome&&!connect&&route!="today"&&sheets.entries.isEmpty()) {route=if(route=="import"||route=="medical")"week"else"today"}
+    BackHandler(enabled=!needsWelcome&&!connect&&route!="today"&&sheets.entries.isEmpty()) {route=if(route=="import"||route=="medical")"me"else"today"}
     CompositionLocalProvider(LocalCalendarComposer provides {calendarOpen=true},LocalNativeColors provides colors,LocalNativePalette provides s.palette,LocalNativeForegroundEpoch provides resumeEpoch,LocalNativeBackdrop provides base,LocalNativeFeedback provides feedback,LocalNativeStrength provides s.hapticStrength,LocalNativeConnect provides onConnect,LocalNativeSheets provides sheets,LocalLiquidGlassDarkTheme provides dark,LocalLiquidGlassAccentColor provides colors.brand,LocalLiquidGlassReducedMotion provides reduced) {
         Box(Modifier.fillMaxSize().background(colors.bg)) {
             val orbPrimary = colors.brand.copy(alpha = if (dark) 0.22f else 0.15f)
@@ -134,7 +134,7 @@ class NativeActivity:ComponentActivity() {
                         snapshot.route=="week"->NativeWeekScreen(store,s,navigate,onConnect)
                         snapshot.route.startsWith("items")->NativeCalendarItemsScreen(store,s,onConnect)
                         snapshot.route.startsWith("campus")->NativeCampusScreen(store,s,snapshot.campusView,onConnect,{campusView=it})
-                        snapshot.route=="me"->NativeMeScreen(store,s,onConnect,{connect=false;route="today"})
+                        snapshot.route=="me"->NativeMeScreen(store,s,onConnect,{connect=false;route="today"},navigate)
                         snapshot.route=="medical"->NativeMedicalScreen(store,s,navigate)
                         snapshot.route=="import"->NativeImportScreen(store,s,navigate)
                         else->NativeTodayScreen(store,s,navigate,onConnect)
@@ -144,7 +144,7 @@ class NativeActivity:ComponentActivity() {
             // Keep the same bar mounted behind the full-screen modal. A sheet
             // covers it normally without owning its visibility or lifetime.
             if(showBottomNavigation) {
-                val current=if(route=="import"||route=="medical")"week"else route.substringBefore(':')
+                val current=if(route=="import"||route=="medical")"me"else route.substringBefore(':')
                 val urgent=s.tasks.map(AcademicRecords::task).count {it.id !in s.done&&AcademicRecords.bucket(it) in listOf("today","overdue")}
                 val reconnect=s.sources.count {it.optString("state")=="need_login"&&it.optString("source") in academicStrings(s.user?.optJSONArray("bound"))}
                 val tabs=listOf(GlassNavigationTab("today","今天"),GlassNavigationTab("week","课表"),GlassNavigationTab("items","事项",urgent),GlassNavigationTab("campus","校园"),GlassNavigationTab("me","我的",reconnect))
@@ -154,7 +154,7 @@ class NativeActivity:ComponentActivity() {
                         // Also reject a selection queued before the sheet opened.
                         if(sheets.entries.isEmpty()&&!calendarOpen) {
                             if(next!=current){feedback.play("navigation",s.hapticStrength);route=next}
-                            else if(route=="import"||route=="medical"){route="week"}
+                            else if(route=="import"||route=="medical"){route="me"}
                         }
                     }
                 }

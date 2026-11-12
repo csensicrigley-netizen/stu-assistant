@@ -52,8 +52,6 @@ DEVICES: list[dict[str, Any]] = [
     {"code": "4GR00008488", "name": "滑板场二", "location": "滑板场", "capacity": 20, "verified": True},
     # ---- 生活区 ----
     {"code": "4GR00006723", "name": "教师宿舍", "location": "教师宿舍", "capacity": 20, "verified": True},
-    # ---- 编号有效、地点待补 ----
-    {"code": "4GR00008477", "name": "水电中心（名称待核）", "location": "水电中心", "capacity": 20, "verified": False},
 ]
 
 STATE_LABELS = {

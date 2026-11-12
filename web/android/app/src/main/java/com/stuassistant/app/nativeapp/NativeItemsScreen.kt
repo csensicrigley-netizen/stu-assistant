@@ -285,48 +285,17 @@ private fun ColumnScope.ItemsAgenda(
             ),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .nativeGlassCard(20)
-                .padding(horizontal = 10.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            ItemsStepIconButton("事项前一天", "chevron-left") { onDay(AcademicClock.addDays(day, -1)) }
-            Column(
-                Modifier.weight(1f),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                CalendarCounter(
-                    "${AcademicClock.monthDay(day)} · ${AcademicClock.weekdayText(AcademicClock.weekday(day))}",
-                    AcademicClock.dayStart(day),
-                    nativeTextStyle(color = c.ink, sizeSp = 17f, lineHeightSp = 22f, weight = FontWeight.Bold, tabularNums = true),
-                    duration = 240,
-                )
-                if (day != today) {
-                    val backTick = nSelectionFeedback()
-                    Box(
-                        Modifier
-                            .clip(Capsule())
-                            .background(c.brand.copy(alpha = 0.11f))
-                            .clickable(role = Role.Button) { backTick(); onDay(today) }
-                            .padding(horizontal = 10.dp, vertical = 3.dp),
-                    ) {
-                        BasicText(
-                            "回到今天",
-                            maxLines = 1,
-                            softWrap = false,
-                            style = nativeTextStyle(color = c.brand, sizeSp = 11.5f, lineHeightSp = 14f, weight = FontWeight.SemiBold),
-                        )
-                    }
-                } else {
-                    NText("今天 · 左右轻滑切换日期", 11, muted = true, maxLines = 1, softWrap = false)
-                }
-            }
-            ItemsStepIconButton("事项后一天", "chevron-right") { onDay(AcademicClock.addDays(day, 1)) }
-        }
+        NativeStepSwitcherBar(
+            title = "${AcademicClock.monthDay(day)} · ${AcademicClock.weekdayText(AcademicClock.weekday(day))}",
+            order = AcademicClock.dayStart(day),
+            previousLabel = "事项前一天",
+            nextLabel = "事项后一天",
+            onPrevious = { onDay(AcademicClock.addDays(day, -1)) },
+            onNext = { onDay(AcademicClock.addDays(day, 1)) },
+            idleSubtitle = "今天 · 左右轻滑切换日期",
+            resetLabel = if (day != today) "回到今天" else null,
+            onReset = if (day != today) ({ onDay(today) }) else null,
+        )
 
         NError(error)
 
@@ -443,21 +412,6 @@ private fun ColumnScope.ItemsAgenda(
         if (s.tasks.size > limit) {
             NButton("查看更多（${s.tasks.size - limit}）", { limit += 12 }, modifier = Modifier.fillMaxWidth())
         }
-    }
-}
-
-@Composable
-private fun ItemsStepIconButton(label: String, icon: String, onClick: () -> Unit) {
-    val c = LocalNativeColors.current
-    val dark = LocalLiquidGlassDarkTheme.current == true
-    NativeGlassButton(
-        onClick = onClick,
-        modifier = Modifier.size(48.dp).semantics { contentDescription = label },
-        enabled = true,
-        haptic = NativeButtonHaptic.Navigation,
-        surfaceColor = c.surface.copy(alpha = if (dark) 0.38f else 0.48f),
-    ) {
-        NativeIcon(icon, c.ink, size = 16.dp, strokeWidth = 2.1f)
     }
 }
 

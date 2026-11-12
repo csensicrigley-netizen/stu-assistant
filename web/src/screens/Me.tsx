@@ -47,7 +47,7 @@ function hostOf(base: string): string {
 
 export function MeScreen({ onSignOut }: { onSignOut: () => void }) {
   const store = useStore();
-  const { connect } = useShell();
+  const { connect, go } = useShell();
   const { pref, choose } = useTheme();
   const { palette, choose: choosePalette } = usePalette();
   const [remembered, setRemembered] = useState(() => readSchool() !== null);
@@ -102,16 +102,21 @@ export function MeScreen({ onSignOut }: { onSignOut: () => void }) {
       <PageHead eyebrow="账号 · 外观 · 关于" title="我的" />
 
       {!signedIn ? (
-        <motion.section className="connect" {...rise(0, { y: 8 })}>
-          <div className="connect__icon" aria-hidden="true">
-            <Icon name="shield" size={24} />
-          </div>
-          <h2 className="connect__title">登录后换成你自己的课表</h2>
-          <p className="connect__text">现在看到的是一份真实课表快照和示例作业、成绩。创建账号并连接校园账号后，课表、作业、考试和成绩都会换成你的。</p>
-          <button type="button" className="btn btn--primary btn--block" onClick={connect}>
-            登录 / 注册
-          </button>
-        </motion.section>
+        <>
+          <motion.section className="connect" {...rise(0, { y: 8 })}>
+            <div className="connect__icon" aria-hidden="true">
+              <Icon name="shield" size={24} />
+            </div>
+            <h2 className="connect__title">登录后换成你自己的课表</h2>
+            <p className="connect__text">现在看到的是一份真实课表快照和示例作业、成绩。创建账号并连接校园账号后，课表、作业、考试和成绩都会换成你的。</p>
+            <button type="button" className="btn btn--primary btn--block" onClick={connect}>
+              登录 / 注册
+            </button>
+          </motion.section>
+          <Section title="数据来源">
+            <TimetableSourceActions onGo={go} />
+          </Section>
+        </>
       ) : (
         <>
           <motion.section className="account" {...rise(0, { y: 8 })}>
@@ -206,6 +211,7 @@ export function MeScreen({ onSignOut }: { onSignOut: () => void }) {
                 </button>
               </div>
             )}
+            <TimetableSourceActions onGo={go} />
           </Section>
         </>
       )}
@@ -393,6 +399,37 @@ export function MeScreen({ onSignOut }: { onSignOut: () => void }) {
  * 自动提示那一条可能被你点了「稍后」，也可能正好错过；这里手动查一次，
  * 查之前先把「稍后」记录清掉，保证结果一定弹给你看。
  */
+function TimetableSourceActions({ onGo }: { onGo: (tab: "medbind" | "import") => void }) {
+  return (
+    <div className="stack-2">
+      <Magnetic pull={0.5}>
+        <button type="button" className="cta" onClick={() => onGo("medbind")}>
+          <span className="cta__icon" aria-hidden="true">
+            <Icon name="shield" size={20} />
+          </span>
+          <span className="cta__text">
+            <b>用医学院教务账号自动同步</b>
+            <small>连一次，课表成绩考试都自己来；密码只用一次，不保存</small>
+          </span>
+          <Icon name="chevron-right" size={18} />
+        </button>
+      </Magnetic>
+      <Magnetic pull={0.5}>
+        <button type="button" className="cta" onClick={() => onGo("import")}>
+          <span className="cta__icon" aria-hidden="true">
+            <Icon name="spark" size={20} />
+          </span>
+          <span className="cta__text">
+            <b>手动导入课表</b>
+            <small>不想连账号，或者那边密码改过：粘文字、导 CSV 或一条条加</small>
+          </span>
+          <Icon name="chevron-right" size={18} />
+        </button>
+      </Magnetic>
+    </div>
+  );
+}
+
 function UpdateSection() {
   const [state, setState] = useState<"idle" | "checking" | "latest" | "found">("idle");
   const [info, setInfo] = useState<UpdateInfo | null>(null);

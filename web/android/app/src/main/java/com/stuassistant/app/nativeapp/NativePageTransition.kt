@@ -27,7 +27,7 @@ import kotlinx.coroutines.launch
 internal data class NativePageRoute(val route: String, val campusView: String) {
     val tab: String
         get() = when (route.substringBefore(':')) {
-            "import", "medical" -> "week"
+            "import", "medical" -> "me"
             "today", "week", "items", "campus", "me" -> route.substringBefore(':')
             else -> "today"
         }

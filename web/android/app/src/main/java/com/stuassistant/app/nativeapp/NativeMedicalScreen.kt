@@ -2,6 +2,7 @@ package com.stuassistant.app.nativeapp
 
 import android.graphics.BitmapFactory
 import android.util.Base64
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -31,6 +32,7 @@ private fun medError(error:Throwable):String=when((error as? NativeApiError)?.co
     "timeout"->"医学院那边太久没回话，稍等一下再试。"
     "network"->"网络断了，检查一下再试。"
     "not_linked"->"还没连过医学院账号，先把账号密码填上。"
+    "not_signed_in","preview"->"请先返回「我的」登录助手账号，再绑定医学院教务。"
     else->if(error is NativeApiError) {if(error.code.startsWith("http_"))"服务器出了点问题，稍后再试。"else error.detail}else"出了点意外，再试一次。"
 }
 
@@ -66,7 +68,8 @@ private fun medError(error:Throwable):String=when((error as? NativeApiError)?.co
         catch(e:CancellationException){throw e}catch(_:Exception){status=JSONObject().put("linked",false);refreshCaptcha()}
         finally{checking=false}
     }
-    NPage("连接医学院教务","医学院 · 自动同步",actions={NButton("返回课表",{onNavigate("week")},haptic=NativeButtonHaptic.Navigation)}) {
+    BackHandler {onNavigate("me")}
+    NPage("连接医学院教务","医学院 · 自动同步",actions={NButton("‹ 我的",{onNavigate("me")},haptic=NativeButtonHaptic.Navigation)}) {
         NText("连上以后，课表、成绩、考试都会自己同步过来，不用再一门一门录。",14,muted=true)
         if(checking)NCard {NText("正在看这个账号连过没有…",14,muted=true)}
         else if(status?.optBoolean("linked")==true)NCard {

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { useStore } from "../lib/store";
-import { agoText, monthDayCn, moment, useNow } from "../lib/clock";
+import { monthDayCn, moment, useNow } from "../lib/clock";
 import {
   CALENDAR_SOURCE,
   currentOrNextTerm,
@@ -11,7 +11,6 @@ import {
   upcomingMilestones,
 } from "../lib/calendar";
 import {
-  CHARGING_SOURCE,
   ENTRANCES,
   LIBRARY,
   TRANSIT,
@@ -226,7 +225,6 @@ function Life() {
   }, [charging]);
   const liveCount = charging.filter((c) => c.live).length;
   const allLive = charging.length > 0 && liveCount === charging.length;
-  const newest = charging.reduce<number | null>((m, c) => (c.live && c.at && (!m || c.at > m) ? c.at : m), null);
   const devices = charging.filter((c) => c.device.location === place);
 
   return (
@@ -371,20 +369,6 @@ function Life() {
             </AnimatePresence>
           </>
         )}
-        <p className="footnote">
-          <Icon name="info" size={14} />
-          <span>
-            {CHARGING_SOURCE.provider}，{CHARGING_SOURCE.scope}。
-            {CHARGING_SOURCE.method ? `${CHARGING_SOURCE.method}（${CHARGING_SOURCE.registryVerifiedOn}）。` : ""}
-            {newest ? `采样于 ${agoText(newest)}，每两分钟更新。` : "充电平台暂时连不上，显示的是示意数据。"}
-          </span>
-        </p>
-        {charging.some((c) => c.device.verified === false) ? (
-          <p className="footnote">
-            <Icon name="info" size={14} />
-            <span>标「名称待核」的设备：编号在平台上有效，但地点名还没有二维码可对，先按原清单名称显示。</span>
-          </p>
-        ) : null}
         <div className="card card--list">
           {LIBRARY.halls.map((h) => {
             const s = libraryOpenNow(h.open, h.close, now);

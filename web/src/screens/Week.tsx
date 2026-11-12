@@ -8,7 +8,6 @@ import { gapsBetween, minutesOf, periodsText, type Block } from "../lib/timetabl
 import { DayRibbon } from "../components/DayRibbon";
 import { CourseSheet } from "../components/CourseSheet";
 import { Icon } from "../components/Icon";
-import { Magnetic } from "../components/Magnetic";
 import { PILL, rise } from "../lib/motion";
 import { useHorizontalSwipe } from "../lib/useHorizontalSwipe";
 import { Empty, ModePill, PageHead, Section } from "../components/Layout";
@@ -59,14 +58,11 @@ export function WeekScreen() {
         <Empty icon={<Icon name="week" size={22} />} title={store.syncing || store.loading ? "正在读取课表…" : "还没有课表"}>
           {store.syncing || store.loading
             ? "第一次同步通常要半分钟左右。"
-            : "连接校园账号并同步后，这里会显示你每周的理论课。"}
+            : "连接校园账号，或在「我的 · 数据来源」中绑定医学院教务 / 手动导入课表后，这里会显示每周课程。"}
           {!store.syncing && !store.loading && (
             <div className="row-actions" style={{ marginTop: 12 }}>
-              <button type="button" className="btn btn--primary btn--sm" onClick={() => shell.go("medbind")}>
-                <Icon name="shield" size={16} /> 连医学院教务
-              </button>
-              <button type="button" className="btn btn--ghost btn--sm" onClick={() => shell.go("import")}>
-                <Icon name="spark" size={16} /> 手动导入课表
+              <button type="button" className="btn btn--primary btn--sm" onClick={() => shell.go("me")}>
+                <Icon name="refresh" size={16} /> 去「我的」配置数据来源
               </button>
             </div>
           )}
@@ -250,40 +246,6 @@ export function WeekScreen() {
           </div>
         </Section>
       )}
-
-      {/*
-        医学院：先给"自动同步"这条路（用教务账号连一次，之后课表自己来），
-        连不上再退回手动录入。所以这里是两块，不是一块——顺序也重要：
-        能自动的人不该被先塞一张表单。
-      */}
-      <Section title="医学院">
-        <div className="stack-2">
-          <Magnetic pull={0.5}>
-            <button type="button" className="cta" onClick={() => shell.go("medbind")}>
-              <span className="cta__icon" aria-hidden="true">
-                <Icon name="shield" size={20} />
-              </span>
-              <span className="cta__text">
-                <b>用医学院教务账号自动同步</b>
-                <small>连一次，课表成绩考试都自己来；密码只用一次，不保存</small>
-              </span>
-              <Icon name="chevron-right" size={18} />
-            </button>
-          </Magnetic>
-          <Magnetic pull={0.5}>
-            <button type="button" className="cta" onClick={() => shell.go("import")}>
-              <span className="cta__icon" aria-hidden="true">
-                <Icon name="spark" size={20} />
-              </span>
-              <span className="cta__text">
-                <b>手动导入课表</b>
-                <small>不想连账号，或者那边密码改过：粘文字、导 CSV 或一条条加</small>
-              </span>
-              <Icon name="chevron-right" size={18} />
-            </button>
-          </Magnetic>
-        </div>
-      </Section>
 
       <p className="footnote">
         <Icon name="info" size={14} />

@@ -1092,21 +1092,6 @@ private fun AcademicLesson(block: AcademicBlock, onOpen: (AcademicBlock) -> Unit
 }
 
 @Composable
-private fun WeekStepButton(label: String, icon: String, enabled: Boolean, onClick: () -> Unit) {
-    val c = LocalNativeColors.current
-    val dark = c.bg.luminance() < 0.2f
-    NativeGlassButton(
-        onClick = onClick,
-        modifier = Modifier.size(48.dp).semantics { contentDescription = label },
-        enabled = enabled,
-        haptic = NativeButtonHaptic.Utility,
-        surfaceColor = c.surface.copy(alpha = if (enabled) (if (dark) 0.38f else 0.48f) else 0.18f),
-    ) {
-        NativeIcon(icon, c.ink.copy(alpha = if (enabled) 1f else 0.35f), size = 16.dp, strokeWidth = 2.1f)
-    }
-}
-
-@Composable
 fun NativeWeekScreen(store: NativeStore, s: NativeState, onNavigate: (String) -> Unit, onConnect: () -> Unit) {
     val now = academicNow()
     val position = AcademicCalendar.position(now.date)
@@ -1121,11 +1106,11 @@ fun NativeWeekScreen(store: NativeStore, s: NativeState, onNavigate: (String) ->
         if (!s.sample && doc == null) {
             AcademicEmpty(
                 if (s.syncing || s.loading) "正在读取课表…" else "还没有课表",
-                if (s.syncing || s.loading) "第一次同步通常要半分钟左右。" else "连接校园账号并同步后，这里会显示你每周的理论课。",
+                if (s.syncing || s.loading) "第一次同步通常要半分钟左右。"
+                else "连接校园账号，或在「我的 · 数据来源」中绑定医学院教务 / 手动导入课表后，这里会显示每周课程。",
             ) {
                 if (!s.syncing && !s.loading) {
-                    NButton("连医学院教务", { onNavigate("medical") }, primary = true, haptic = NativeButtonHaptic.Navigation)
-                    NButton("手动导入课表", { onNavigate("import") }, haptic = NativeButtonHaptic.Navigation)
+                    NButton("去「我的」配置数据来源", { onNavigate("me") }, primary = true, haptic = NativeButtonHaptic.Navigation)
                 }
             }
         }
@@ -1139,7 +1124,7 @@ fun NativeWeekScreen(store: NativeStore, s: NativeState, onNavigate: (String) ->
                     onSwipePrevious = { week = (week - 1).coerceAtLeast(1) },
                     onSwipeNext = { week = (week + 1).coerceAtMost(term.totalWeeks) },
                 ),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             val headerPlans = remember(doc, term.id, week) {
                 (1..7).map { AcademicTimetable.planFor(doc, AcademicCalendar.dateOf(term, week, it)) }
@@ -1147,48 +1132,23 @@ fun NativeWeekScreen(store: NativeStore, s: NativeState, onNavigate: (String) ->
             val total = headerPlans.sumOf { AcademicTimetable.minutes(it.blocks) }
             val isCurrent = position?.week == week
             val phaseLabel = AcademicCalendar.phase(term, week)?.label
+            val rangeText = "${AcademicClock.slash(AcademicCalendar.monday(term, week))}–${AcademicClock.slash(AcademicCalendar.dateOf(term, week, 7))}"
 
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .nativeGlassCard(22)
-                    .padding(horizontal = 10.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                WeekStepButton("上一周", "chevron-left", enabled = week > 1) {
-                    week = (week - 1).coerceAtLeast(1)
-                }
-                Column(
-                    Modifier.weight(1f),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(3.dp),
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        NText("第 $week 周", 19, bold = true, maxLines = 1, softWrap = false, tabularNums = true)
-                        if (!phaseLabel.isNullOrEmpty()) NTag(phaseLabel, colors.brand)
-                    }
-                    NText(
-                        "${AcademicClock.slash(AcademicCalendar.monday(term, week))} – ${AcademicClock.slash(AcademicCalendar.dateOf(term, week, 7))}" +
-                            if (total > 0) " · ${AcademicClock.span(total)}" else "",
-                        12,
-                        muted = true,
-                        maxLines = 1,
-                        softWrap = false,
-                        tabularNums = true,
-                    )
-                }
-                WeekStepButton("下一周", "chevron-right", enabled = week < term.totalWeeks) {
-                    week = (week + 1).coerceAtMost(term.totalWeeks)
-                }
-            }
-
-            if (position != null && !isCurrent) {
-                AcademicBlockButton("回到本周（第 ${position.week} 周）", { week = position.week; day = now.weekday })
-            }
+            NativeStepSwitcherBar(
+                title = "第 $week 周" + (phaseLabel?.takeIf { it.isNotEmpty() }?.let { " · $it" } ?: ""),
+                order = week.toLong(),
+                previousLabel = "上一周",
+                nextLabel = "下一周",
+                canPrevious = week > 1,
+                canNext = week < term.totalWeeks,
+                onPrevious = { week = (week - 1).coerceAtLeast(1) },
+                onNext = { week = (week + 1).coerceAtMost(term.totalWeeks) },
+                idleSubtitle = (if (isCurrent) "本周 · $rangeText" else rangeText) +
+                    (if (total > 0) " · ${AcademicClock.span(total)}" else " · 左右轻滑切换周次"),
+                resetLabel = if (position != null && !isCurrent) "回到本周" else null,
+                resetPrefix = if (position != null && !isCurrent) rangeText else null,
+                onReset = if (position != null && !isCurrent) ({ week = position.week; day = now.weekday }) else null,
+            )
 
             NativeDirectionalContent(
                 targetState = week,
@@ -1318,10 +1278,6 @@ fun NativeWeekScreen(store: NativeStore, s: NativeState, onNavigate: (String) ->
                     doc.unarranged.forEach { NText(it.title, 14, bold = true) }
                 }
             }
-        }
-        AcademicSection("医学院") {
-            AcademicCta("用医学院教务账号自动同步", "连一次，课表成绩考试都自己来；密码只用一次，不保存", "shield", { onNavigate("medical") })
-            AcademicCta("手动导入课表", "不想连账号，或者那边密码改过：粘文字、导 CSV 或一条条加", "spark", { onNavigate("import") })
         }
         NText("只含教务系统里的理论课。节次时刻按教务处作息表：第二、四、五大节各 155 分钟，晚课 19:20 开始。", 12, muted = true)
     }

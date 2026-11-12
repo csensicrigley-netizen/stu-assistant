@@ -20,7 +20,7 @@ export const TABS: { key: TabKey; label: string; icon: IconName }[] = [
 ];
 
 export function navigationTab(current: TabKey): TabKey {
-  return current === "import" || current === "medbind" ? "week" : current;
+  return current === "import" || current === "medbind" ? "me" : current;
 }
 
 /**

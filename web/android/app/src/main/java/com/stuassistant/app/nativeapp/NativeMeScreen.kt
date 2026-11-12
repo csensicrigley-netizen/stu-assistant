@@ -47,7 +47,13 @@ import kotlin.math.roundToInt
 /** Native counterpart of Me.tsx and FeedbackSettings.tsx; preserves source section order. */
 @Composable
 @OptIn(ExperimentalLayoutApi::class)
-fun NativeMeScreen(store: NativeStore, s: NativeState, onConnect: () -> Unit, onSignOut: () -> Unit) {
+fun NativeMeScreen(
+    store: NativeStore,
+    s: NativeState,
+    onConnect: () -> Unit,
+    onSignOut: () -> Unit,
+    onNavigate: (String) -> Unit = {},
+) {
     val c = LocalNativeColors.current
     val dark = LocalLiquidGlassDarkTheme.current == true
     val palette = LocalNativePalette.current
@@ -104,6 +110,10 @@ fun NativeMeScreen(store: NativeStore, s: NativeState, onConnect: () -> Unit, on
                 }
                 NText("现在看到的是一份真实课表快照和示例作业、成绩。创建账号并连接校园账号后，课表、作业、考试和成绩都会换成你的。", 14, muted = true)
                 NButton("登录 / 注册", onConnect, primary = true, modifier = Modifier.fillMaxWidth(), haptic = NativeButtonHaptic.Navigation)
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                MeSectionHeader("数据来源", "refresh")
+                NativeMeTimetableSourceActions(onNavigate)
             }
         } else {
             NCard {
@@ -284,6 +294,7 @@ fun NativeMeScreen(store: NativeStore, s: NativeState, onConnect: () -> Unit, on
                         }
                     }
                 }
+                NativeMeTimetableSourceActions(onNavigate)
             }
         }
 
@@ -454,7 +465,28 @@ internal fun MeSectionHeader(title: String, icon: String? = null) {
 }
 
 @Composable
-private fun NativeMeConnectCard(title: String, subtitle: String, onClick: () -> Unit) {
+private fun NativeMeTimetableSourceActions(onNavigate: (String) -> Unit) {
+    NativeMeConnectCard(
+        title = "用医学院教务账号自动同步",
+        subtitle = "连一次，课表成绩考试都自己来；密码只用一次，不保存",
+        icon = "shield",
+        onClick = { onNavigate("medical") },
+    )
+    NativeMeConnectCard(
+        title = "手动导入课表",
+        subtitle = "不想连账号，或者那边密码改过：粘文字、导 CSV 或一条条加",
+        icon = "spark",
+        onClick = { onNavigate("import") },
+    )
+}
+
+@Composable
+private fun NativeMeConnectCard(
+    title: String,
+    subtitle: String,
+    onClick: () -> Unit,
+    icon: String = "shield",
+) {
     val c = LocalNativeColors.current
     val shape = RoundedRectangle(20.dp)
     Row(
@@ -470,7 +502,7 @@ private fun NativeMeConnectCard(title: String, subtitle: String, onClick: () -> 
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        NIconBadge("shield", tint = c.brand)
+        NIconBadge(icon, tint = c.brand)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
             NText(title, 15, bold = true, maxLines = 1, softWrap = false)
             NText(subtitle, 13, muted = true)

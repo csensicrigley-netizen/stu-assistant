@@ -61,7 +61,7 @@ internal fun nativeImportDocument(doc:AcademicTimetableDoc):JSONObject = JSONObj
             raw=result
             doc=AcademicTimetable.normalize(JSONObject().put("semester",result.optString("semester").ifBlank{semester}).put("status","ok").put("courses",result.optJSONArray("courses")?:JSONArray()).put("unarranged",result.optJSONArray("unarranged")?:JSONArray()).put("pending",JSONArray()).put("coverage",JSONObject().put("complete",true)))
             go(2)
-        }catch(e:CancellationException){throw e}catch(_:Exception){problem="服务器没有回应，检查一下网络再试一次。"}finally{busy=null}
+        }catch(e:CancellationException){throw e}catch(e:NativeApiError){problem=if(e.code in listOf("not_signed_in","preview"))"请先返回「我的」登录助手账号，再导入保存课表。"else"服务器没有回应，检查一下网络再试一次。"}catch(_:Exception){problem="服务器没有回应，检查一下网络再试一次。"}finally{busy=null}
     }
     val file=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) {uri->if(uri!=null)scope.launch {
         try {val body=withContext(Dispatchers.IO){context.contentResolver.openInputStream(uri)?.bufferedReader(Charsets.UTF_8)?.use{it.readText()}?:error("file")};text=body;method="csv";parse("csv",body)}
@@ -72,8 +72,8 @@ internal fun nativeImportDocument(doc:AcademicTimetableDoc):JSONObject = JSONObj
         catch(e:CancellationException){throw e}catch(_:Exception){problem="模板没下载下来，检查一下网络再试一次。"}
     }}
     LaunchedEffect(store,semester) {try {val result=store.request("/v1/timetable/manual?semester=$semester");if(result.optJSONObject("doc")!=null)existing=result.optString("school")}catch(e:CancellationException){throw e}catch(_:Exception){}}
-    BackHandler {onNavigate("week")}
-    NPage("导入课表","手动录入 · $semester",actions={NButton("返回课表",{onNavigate("week")},haptic=NativeButtonHaptic.Navigation)}) {
+    BackHandler {onNavigate("me")}
+    NPage("导入课表","手动录入 · $semester",actions={NButton("‹ 我的",{onNavigate("me")},haptic=NativeButtonHaptic.Navigation)}) {
         NText("医学院的教务系统和主校区不是一套，没法自动同步，只能自己录。录完和自动同步的课表一样显示。",14,muted=true)
         Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {listOf("选校区","录入","核对","完成").forEachIndexed {i,label->NText("${if(i<step)"✓"else i+1} $label",13,bold=i==step,muted=i!=step,maxLines=1,softWrap=false,tabularNums=true)}}
         when(step) {
