@@ -196,10 +196,6 @@ export const api = {
 
   notices: (limit = 10) => request<{ items: FeedItem[]; count: number }>(`/v1/notices?limit=${limit}`),
 
-  /** 今天 5 条冷知识：同一天固定，隔天换一批。 */
-  facts: () =>
-    request<{ day: string; count: number; items: { id: string; text: string; index: number }[] }>("/v1/facts"),
-
   /** 到桑浦山校区的公交到站（实时优先，没有上游则按班次推算） */
   bus: () => request<BusSnapshot>("/v1/bus"),
 

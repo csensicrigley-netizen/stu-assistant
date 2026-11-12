@@ -390,8 +390,8 @@ function Bind({ onDone, onCancel }: { onDone: () => void; onCancel?: () => void 
       }
       pendingCreds.current = remember ? { account: sid.trim(), password: pw } : null;
       await api.consentGrant();
-      // 只绑教务与 MySTU：官网消息是公开页面，冷知识本地生成，
-      // 都不再需要那道登录输入（2026-10-29 起登录通道整体下线）
+      // 只绑教务与 MySTU：官网消息是公开页面，
+      // 不再需要那道登录输入（2026-10-29 起登录通道整体下线）
       const started = await api.bind(["jw", "mystu"], sid.trim(), pw);
       setPw(""); // drop it from memory the moment it is sent
       settle(started);

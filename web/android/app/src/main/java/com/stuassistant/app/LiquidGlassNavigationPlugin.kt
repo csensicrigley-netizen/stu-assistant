@@ -19,6 +19,7 @@ import com.getcapacitor.Plugin
 import com.getcapacitor.PluginCall
 import com.getcapacitor.PluginMethod
 import com.getcapacitor.annotation.CapacitorPlugin
+import com.stuassistant.app.nativeapp.normalizeNativePalette
 
 /** Reuses the existing Capacitor WebView in the same GPU layer tree as Kyant's tabs. */
 @CapacitorPlugin(name = "LiquidGlassNavigation")
@@ -61,7 +62,7 @@ class LiquidGlassNavigationPlugin : Plugin() {
                 state = GlassNavigationState(
                     current = current, tabs = tabs,
                     dark = call.getString("theme", "light") == "dark",
-                    palette = if (call.getString("palette", "sweet") == "classic") "classic" else "sweet",
+                    palette = normalizeNativePalette(call.getString("palette", "sweet")),
                     strength = (call.getInt("strength", 100) ?: 100).coerceIn(0, 100),
                     bottomInset = bottomInsetPx / activity.resources.displayMetrics.density,
                     reducedMotion = call.getBoolean("reducedMotion", false) ?: false,

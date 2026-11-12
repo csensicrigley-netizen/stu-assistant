@@ -132,6 +132,17 @@ class NativeStore internal constructor(
         }
     }
 
+    suspend fun removeCalendar(id: String, expectedAccount: String) = withContext(Dispatchers.IO) {
+        synchronized(lock) {
+            val key = calendarKey()
+            if (key != expectedAccount) throw NativeApiError("account_changed", 0, "账号已切换，请重新打开")
+            val document = secure.readCache(key) ?: return@synchronized
+            if (!removeCalendarRecordFromDocument(document, id)) return@synchronized
+            secure.writeCache(key, document)
+            mutableState.value = state.value.copy(calendarRevision = state.value.calendarRevision + 1)
+        }
+    }
+
     suspend fun login(email: String, passphrase: String, register: Boolean = false) {
         withContext(Dispatchers.IO) {
         val owner = session()
@@ -206,7 +217,7 @@ class NativeStore internal constructor(
         synchronized(lock) {
             if (closed) return
             val nextTheme = theme?.takeIf { it in setOf("system", "light", "dark") } ?: state.value.theme
-            val nextPalette = palette?.takeIf { it in setOf("sweet", "classic") } ?: state.value.palette
+            val nextPalette = palette?.takeIf { it in NATIVE_PALETTE_KEYS } ?: state.value.palette
             val nextStrength = strength?.coerceIn(0, 100) ?: state.value.hapticStrength
             if (nextTheme == state.value.theme && nextPalette == state.value.palette && nextStrength == state.value.hapticStrength) return
             prefs.edit().putString("theme", nextTheme).putString("palette", nextPalette)
@@ -376,7 +387,7 @@ class NativeStore internal constructor(
             if (legacyMigrationDone() || closed) return
             val editor = prefs.edit()
             legacyValue(values, "stu.theme").takeIf { it in setOf("system", "light", "dark") }?.let { editor.putString("theme", it) }
-            legacyValue(values, "stu.palette").takeIf { it in setOf("sweet", "classic") }?.let { editor.putString("palette", it) }
+            legacyValue(values, "stu.palette").takeIf { it in NATIVE_PALETTE_KEYS }?.let { editor.putString("palette", it) }
             val strength = legacyValue(values, "stu.haptics.strength").toIntOrNull()
                 ?: if (legacyValue(values, "stu.haptics") == "off") 0 else null
             strength?.let { editor.putInt("strength", it.coerceIn(0, 100)) }
@@ -650,7 +661,7 @@ class NativeStore internal constructor(
 
     private fun appearanceState(server: String) = NativeState(server = server,
         theme = prefs.getString("theme", "system")?.takeIf { it in setOf("system", "light", "dark") } ?: "system",
-        palette = prefs.getString("palette", "sweet")?.takeIf { it in setOf("sweet", "classic") } ?: "sweet",
+        palette = normalizeNativePalette(prefs.getString("palette", "sweet")),
         hapticStrength = prefs.getInt("strength", 100).coerceIn(0, 100))
 
     private fun withSchool(base: NativeState): NativeState {

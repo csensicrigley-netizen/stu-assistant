@@ -1,6 +1,5 @@
 package com.stuassistant.app.nativeapp
 
-import android.os.Build
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.spring
@@ -17,8 +16,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.graphics.BlurEffect
-import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
@@ -43,7 +40,7 @@ internal data class NativePageRoute(val route: String, val campusView: String) {
     }
 }
 
-private data class PageVisual(val alpha: Float, val x: Float, val scale: Float, val blur: Float)
+private data class PageVisual(val alpha: Float, val x: Float, val scale: Float)
 private data class DepartingPage(val slot: Int, val visual: PageVisual)
 private data class PageFrame(
     val page: NativePageRoute,
@@ -56,13 +53,13 @@ private data class PageFrame(
 
 private fun enteringVisual(progress: Float, direction: Int): PageVisual {
     val p = progress.coerceIn(0f, 1f)
-    return PageVisual(p, direction * 20f * (1f - progress), .994f + .006f * progress, 6f * (1f - p))
+    return PageVisual(p, direction * 22f * (1f - progress), .988f + .012f * progress)
 }
 
 private fun departingVisual(from: PageVisual, progress: Float, direction: Int): PageVisual {
     val p = progress.coerceIn(0f, 1f)
-    return PageVisual(from.alpha * (1f - p), from.x + (-direction * 14f - from.x) * p,
-        from.scale + (.996f - from.scale) * p, from.blur * (1f - p))
+    return PageVisual(from.alpha * (1f - p), from.x + (-direction * 16f - from.x) * p,
+        from.scale + (.992f - from.scale) * p)
 }
 
 /**
@@ -98,10 +95,16 @@ internal fun NativePageTransition(
     LaunchedEffect(target, reducedMotion) {
         val previous = frame
         if (target == previous.page && !reducedMotion) return@LaunchedEffect
-        if (!reducedMotion && target.tab == previous.page.tab) {
+        if (target.tab == previous.page.tab) {
             // Filters, campus sections, Import and Medical are ordinary same-tab changes.
             // Preserve any already-running primary transition rather than restarting it.
-            frame = previous.copy(page = target)
+            if (reducedMotion) {
+                entering.snapTo(1f)
+                exiting.snapTo(1f)
+                frame = PageFrame(target, previous.slot, generation = previous.generation)
+            } else {
+                frame = previous.copy(page = target)
+            }
         } else {
             val live = if (recorded[previous.slot]) DepartingPage(previous.slot,
                 enteringVisual(if (previous.animated) entering.value else 1f, previous.direction)) else null
@@ -134,11 +137,11 @@ internal fun NativePageTransition(
         val generation = frame.generation
         coroutineScope {
             launch {
-                entering.animateTo(1f, spring(dampingRatio = .8902638f,
-                    stiffness = 447.05882f, visibilityThreshold = .001f))
+                entering.animateTo(1f, spring(dampingRatio = .86f,
+                    stiffness = 460f, visibilityThreshold = .001f))
             }
             launch {
-                exiting.animateTo(1f, tween(100, easing = CubicBezierEasing(.4f, 0f, 1f, 1f)))
+                exiting.animateTo(1f, tween(120, easing = CubicBezierEasing(.32f, 0f, .67f, 1f)))
                 if (frame.generation == generation) frame = frame.copy(departing = null)
             }
         }
@@ -154,9 +157,6 @@ internal fun NativePageTransition(
                 translationX = visual.x * pxPerDp
                 scaleX = visual.scale
                 scaleY = scaleX
-                val radius = visual.blur * pxPerDp
-                renderEffect = if (Build.VERSION.SDK_INT >= 31 && radius > .05f)
-                    BlurEffect(radius, radius, TileMode.Decal) else null
             }.drawWithContent { drawLayer(layers[departing.slot]) })
         }
         key(current.page.tab) {
@@ -166,9 +166,6 @@ internal fun NativePageTransition(
                 translationX = visual.x * pxPerDp
                 scaleX = visual.scale
                 scaleY = visual.scale
-                val radius = visual.blur * pxPerDp
-                renderEffect = if (Build.VERSION.SDK_INT >= 31 && radius > .05f)
-                    BlurEffect(radius, radius, TileMode.Decal) else null
             }.drawWithContent {
                 val layer = layers[current.slot]
                 layer.record { this@drawWithContent.drawContent() }

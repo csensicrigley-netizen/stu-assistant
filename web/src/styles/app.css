@@ -7152,58 +7152,23 @@ html {
     transparent 62%
   );
   transform: translateX(-130%);
-  animation: sheen 5s linear infinite;
+  /* 只在首屏进场扫过一次，静止后释放 GPU 合成压力，杜绝手机端常驻重绘掉帧 */
+  animation: sheen 1.35s var(--ease-out) 0.14s 1 both;
 }
 
 @keyframes sheen {
   0% {
     transform: translateX(-130%);
   }
-  26% {
-    transform: translateX(130%);
-  }
   100% {
     transform: translateX(130%);
   }
 }
 
-/* ------------------------------------------------------- 课表待机动画 */
-
-.spectrum--idle .spectrum__day {
-  animation: idle-breathe 7s ease-in-out infinite;
-  will-change: transform;
-}
-
-.spectrum--idle .spectrum__day:nth-child(2n) {
-  animation-delay: -2.1s;
-}
-
-.spectrum--idle .spectrum__day:nth-child(3n) {
-  animation-delay: -3.7s;
-}
-
+/* ------------------------------------------------------- 课表待机静态层级 */
+/* 移除原本 8 个元素的无限帧呼吸动画与常驻 will-change，保证低功耗 120Hz 零掉帧 */
 .spectrum--idle .spectrum__scale {
-  animation: idle-glow 6s ease-in-out infinite;
-}
-
-@keyframes idle-breathe {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-1.5px);
-  }
-}
-
-@keyframes idle-glow {
-  0%,
-  100% {
-    opacity: 0.35;
-  }
-  50% {
-    opacity: 0.7;
-  }
+  opacity: 0.72;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -7800,4 +7765,170 @@ html {
     gap: 8px;
     align-items: flex-start;
   }
+}
+
+/* ==========================================================================
+   Liquid Glass Specular Sheen · 6-Palette Selector · Inline Delete Pill
+   --------------------------------------------------------------------------
+   手机端零掉帧原则：滚动列表内的卡片只走 GPU 友好的半透叠色 + 顶部 1px 镜面高光
+   （inset box-shadow），不在几十张滚动卡片上挂实时 backdrop-filter。
+   ========================================================================== */
+
+.swipe-surface {
+  touch-action: pan-y;
+}
+
+.card,
+.notice,
+.task,
+.lesson,
+.exam,
+.grade,
+.term,
+.qrcard,
+.scoreboard {
+  background: var(--glass-surface, var(--surface));
+  box-shadow: inset 0 1px 0 var(--glass-rim), var(--shadow-1);
+}
+
+.seg__pill,
+.steps__pill,
+.chip__pill {
+  box-shadow: inset 0 1px 0 var(--glass-rim), var(--shadow-1);
+}
+
+/* 6 套校园色系选择器（仅切换色彩令牌，所有动效与功能严格一致） */
+.palette-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+@media (min-width: 520px) {
+  .palette-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.palette-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 58px;
+  padding: 10px 12px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--ink);
+  text-align: left;
+  transition:
+    transform var(--t-fast) var(--ease-jelly),
+    background var(--t-base) var(--ease-out),
+    border-color var(--t-base) var(--ease-out),
+    box-shadow var(--t-base) var(--ease-out);
+}
+
+.palette-card:active {
+  transform: scale(0.97);
+}
+
+.palette-card.is-on {
+  background: var(--sea-soft);
+  border-color: color-mix(in oklch, var(--sea) 52%, var(--line));
+  box-shadow: inset 0 1px 0 var(--glass-rim), var(--shadow-1);
+}
+
+.palette-swatch {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 38px;
+  height: 28px;
+  padding: 0 5px;
+  border-radius: var(--r-full);
+  border: 1px solid oklch(0% 0 0 / 0.08);
+  box-shadow: inset 0 1px 0 oklch(100% 0 0 / 0.72);
+}
+
+.palette-swatch__dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+}
+
+.palette-swatch__dot--sm {
+  width: 8px;
+  height: 8px;
+}
+
+.palette-card__meta {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+
+.palette-card__meta b {
+  font-size: var(--fs-14);
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.palette-card.is-on .palette-card__meta b {
+  color: var(--sea-soft-ink);
+}
+
+.palette-card__meta small {
+  font-size: var(--fs-11);
+  color: var(--ink-3);
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.palette-card__check {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--sea);
+  color: var(--sea-ink);
+}
+
+/* 事项行内两步式删除（替代阻塞式 window.confirm，零手势冲突） */
+.plan-row__del {
+  color: var(--ink-3);
+  transition: color var(--t-fast) var(--ease-std), transform var(--t-fast) var(--ease-std);
+}
+
+.plan-row__del:hover,
+.plan-row__del:focus-visible {
+  color: var(--cinnabar-ink);
+}
+
+.confirm-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: var(--r-full);
+  background: var(--cinnabar-soft);
+  border: 1px solid color-mix(in oklch, var(--cinnabar) 38%, transparent);
+  color: var(--cinnabar-ink);
+  font-size: var(--fs-12);
+  font-weight: 700;
+  white-space: nowrap;
+  box-shadow: inset 0 1px 0 var(--glass-rim);
+  transition: transform var(--t-fast) var(--ease-jelly), background var(--t-fast) var(--ease-std);
+}
+
+.confirm-pill:active {
+  transform: scale(0.95);
 }

@@ -41,6 +41,38 @@
       html[data-theme="dark"][data-palette="classic"] body {
         background: #0b0e14;
       }
+      html[data-palette="phoenix"],
+      html[data-palette="phoenix"] body {
+        background: #fff3e8;
+      }
+      html[data-theme="dark"][data-palette="phoenix"],
+      html[data-theme="dark"][data-palette="phoenix"] body {
+        background: #1e1612;
+      }
+      html[data-palette="pine"],
+      html[data-palette="pine"] body {
+        background: #eff8f2;
+      }
+      html[data-theme="dark"][data-palette="pine"],
+      html[data-theme="dark"][data-palette="pine"] body {
+        background: #101a16;
+      }
+      html[data-palette="lilac"],
+      html[data-palette="lilac"] body {
+        background: #f6f2ff;
+      }
+      html[data-theme="dark"][data-palette="lilac"],
+      html[data-theme="dark"][data-palette="lilac"] body {
+        background: #171422;
+      }
+      html[data-palette="latte"],
+      html[data-palette="latte"] body {
+        background: #faf4ea;
+      }
+      html[data-theme="dark"][data-palette="latte"],
+      html[data-theme="dark"][data-palette="latte"] body {
+        background: #1b1713;
+      }
     </style>
     <script>
       // Theme + palette before first paint: no flash of the wrong background.
@@ -49,16 +81,21 @@
         var saved = q || localStorage.getItem("stu.theme") || "system";
         var dark = saved === "dark" || (saved === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
         document.documentElement.dataset.theme = dark ? "dark" : "light";
+        var bars = {
+          sweet: ["#fff0f1", "#1f161e"],
+          classic: ["#f9f6f1", "#0b0e14"],
+          phoenix: ["#fff3e8", "#1e1612"],
+          pine: ["#eff8f2", "#101a16"],
+          lilac: ["#f6f2ff", "#171422"],
+          latte: ["#faf4ea", "#1b1713"],
+        };
         var pal =
           new URLSearchParams(location.search).get("palette") || localStorage.getItem("stu.palette") || "sweet";
-        if (pal !== "classic") pal = "sweet";
+        if (!bars[pal]) pal = "sweet";
         document.documentElement.dataset.palette = pal;
         document
           .querySelector('meta[name="theme-color"]')
-          .setAttribute(
-            "content",
-            pal === "classic" ? (dark ? "#0b0e14" : "#f9f6f1") : dark ? "#1f161e" : "#fff0f1",
-          );
+          .setAttribute("content", bars[pal][dark ? 1 : 0]);
       } catch (e) {}
     </script>
   </head>

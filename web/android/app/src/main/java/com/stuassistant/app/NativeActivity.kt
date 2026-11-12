@@ -15,7 +15,11 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.unit.dp
@@ -59,8 +63,7 @@ class NativeActivity:ComponentActivity() {
     val s by store.state.collectAsState()
     val systemDark=isSystemInDarkTheme()
     val dark=s.theme=="dark" || (s.theme=="system"&&systemDark)
-    val classic=s.palette=="classic"
-    val colors=remember(dark,classic) {nativeColors(dark,classic)}
+    val colors=remember(dark,s.palette) {nativeColors(dark,s.palette)}
     val context=androidx.compose.ui.platform.LocalContext.current
     val activity=context as ComponentActivity
     SideEffect {WindowCompat.getInsetsController(activity.window,activity.window.decorView).apply {isAppearanceLightStatusBars=!dark;isAppearanceLightNavigationBars=!dark}}
@@ -93,7 +96,34 @@ class NativeActivity:ComponentActivity() {
     BackHandler(enabled=!needsWelcome&&!connect&&route!="today"&&sheets.entries.isEmpty()) {route=if(route=="import"||route=="medical")"week"else"today"}
     CompositionLocalProvider(LocalCalendarComposer provides {calendarOpen=true},LocalNativeColors provides colors,LocalNativePalette provides s.palette,LocalNativeForegroundEpoch provides resumeEpoch,LocalNativeBackdrop provides base,LocalNativeFeedback provides feedback,LocalNativeStrength provides s.hapticStrength,LocalNativeConnect provides onConnect,LocalNativeSheets provides sheets,LocalLiquidGlassDarkTheme provides dark,LocalLiquidGlassAccentColor provides colors.brand,LocalLiquidGlassReducedMotion provides reduced) {
         Box(Modifier.fillMaxSize().background(colors.bg)) {
-            Box(Modifier.fillMaxSize().layerBackdrop(base).background(colors.bg))
+            val orbPrimary = colors.brand.copy(alpha = if (dark) 0.22f else 0.15f)
+            val orbWarm = lerp(colors.brand, colors.danger, 0.42f).copy(alpha = if (dark) 0.14f else 0.10f)
+            val orbBreeze = lerp(colors.brand, Color(0xFF38A89D), 0.38f).copy(alpha = if (dark) 0.12f else 0.085f)
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .layerBackdrop(base)
+                    .background(colors.bg)
+                    .drawWithCache {
+                        val w = size.width
+                        val h = size.height
+                        val valid = w > 1f && h > 1f
+                        val c1 = Offset(w * 0.86f, h * 0.10f)
+                        val r1 = (w * 0.80f).coerceAtLeast(1f)
+                        val c2 = Offset(w * 0.12f, h * 0.34f)
+                        val r2 = (w * 0.70f).coerceAtLeast(1f)
+                        val c3 = Offset(w * 0.84f, h * 0.72f)
+                        val r3 = (w * 0.74f).coerceAtLeast(1f)
+                        val b1 = if (valid) Brush.radialGradient(listOf(orbPrimary, Color.Transparent), c1, r1) else null
+                        val b2 = if (valid) Brush.radialGradient(listOf(orbWarm, Color.Transparent), c2, r2) else null
+                        val b3 = if (valid) Brush.radialGradient(listOf(orbBreeze, Color.Transparent), c3, r3) else null
+                        onDrawBehind {
+                            if (b1 != null) drawCircle(b1, r1, c1)
+                            if (b2 != null) drawCircle(b2, r2, c2)
+                            if (b3 != null) drawCircle(b3, r3, c3)
+                        }
+                    },
+            )
             Box(Modifier.fillMaxSize().layerBackdrop(page).nativeSheetBackground(sheets)
                 .then(if(calendarOpen) Modifier.clearAndSetSemantics {} else Modifier)) {
                 if(!ready) NPage("STU 事项助手"){NLoading()}

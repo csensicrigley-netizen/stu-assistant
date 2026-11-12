@@ -139,8 +139,10 @@
 
   --shadow-1: 0 1px 2px oklch(35% 0.05 340 / 0.05), 0 2px 8px -4px oklch(35% 0.05 340 / 0.08);
   --shadow-2: 0 2px 6px oklch(35% 0.05 340 / 0.05), 0 18px 40px -16px oklch(35% 0.05 340 / 0.22);
+  --glass-rim: oklch(100% 0 0 / 0.72);
+  --glass-surface: oklch(99.6% 0.005 18 / 0.84);
   --scrim: oklch(28% 0.05 340 / 0.42);
-  --bar-bg: oklch(99.4% 0.006 18 / 0.9);
+  --bar-bg: oklch(99.4% 0.006 18 / 0.88);
 
   /* ---------- brand: the welcome panel and the mark ---------- */
   --brand-bg: linear-gradient(160deg, #8d76e0, #4f3f8f);
@@ -191,8 +193,10 @@
 
   --shadow-1: 0 1px 2px oklch(0% 0 0 / 0.3);
   --shadow-2: 0 2px 6px oklch(0% 0 0 / 0.3), 0 24px 48px -20px oklch(0% 0 0 / 0.6);
+  --glass-rim: oklch(100% 0 0 / 0.11);
+  --glass-surface: oklch(26% 0.024 330 / 0.82);
   --scrim: oklch(8% 0.02 328 / 0.62);
-  --bar-bg: oklch(25% 0.022 330 / 0.9);
+  --bar-bg: oklch(25% 0.022 330 / 0.86);
 }
 
 /* Course colours. A custom property that references var() is resolved where it
@@ -327,4 +331,366 @@
   --course-soft: oklch(26% 0.04 var(--h, 258));
   --course-mid: oklch(42% 0.08 var(--h, 258));
   --course-ink: oklch(88% 0.06 var(--h, 258));
+}
+
+/* ==========================================================================
+   凤凰 · 盛夏红棉 (<html data-palette="phoenix">)
+   暖杏米纸 + 烘焙深褐墨字 + 凤凰珊瑚红强调色
+   ========================================================================== */
+
+[data-palette="phoenix"] {
+  --bg: oklch(97.1% 0.017 58);
+  --surface: oklch(99.6% 0.005 58);
+  --surface-2: oklch(94.8% 0.018 56);
+  --surface-3: oklch(91.6% 0.022 54);
+  --line: oklch(89.8% 0.018 55);
+  --line-strong: oklch(80.2% 0.024 52);
+
+  --ink: oklch(25% 0.036 38);
+  --ink-2: oklch(40% 0.03 40);
+  --ink-3: oklch(48% 0.026 42);
+  --ink-inverse: oklch(99.5% 0.005 58);
+
+  --sea: oklch(54% 0.165 36);
+  --sea-ink: oklch(99.5% 0.005 58);
+  --sea-soft: oklch(94.5% 0.032 42);
+  --sea-soft-ink: oklch(42% 0.145 36);
+
+  --cinnabar: oklch(55% 0.16 18);
+  --cinnabar-soft: oklch(94.4% 0.03 20);
+  --cinnabar-ink: oklch(45% 0.145 20);
+
+  --leaf: oklch(48% 0.1 162);
+  --leaf-soft: oklch(94.4% 0.034 162);
+  --amber: oklch(49% 0.1 76);
+  --amber-soft: oklch(94.8% 0.042 80);
+
+  --shadow-1: 0 1px 2px oklch(30% 0.05 42 / 0.05), 0 2px 8px -4px oklch(30% 0.05 42 / 0.08);
+  --shadow-2: 0 2px 6px oklch(30% 0.05 42 / 0.05), 0 18px 40px -16px oklch(30% 0.05 42 / 0.22);
+  --glass-surface: oklch(99.6% 0.006 58 / 0.85);
+  --scrim: oklch(24% 0.04 38 / 0.42);
+  --bar-bg: oklch(99.2% 0.008 58 / 0.88);
+
+  --brand-bg: linear-gradient(160deg, #df6842, #9e321d);
+  --brand-glow-a: oklch(76% 0.14 45 / 0.55);
+  --brand-glow-b: oklch(82% 0.11 75 / 0.42);
+  --brand-ink: #fff7f2;
+  --brand-ink-2: oklch(95% 0.016 55);
+  --brand-ink-3: oklch(93% 0.025 50);
+  --brand-bead: #ffca7a;
+  --brand-shadow: oklch(22% 0.07 35 / 0.56);
+  --logo-hi: #f07a54;
+  --logo-lo: #b53b24;
+  --logo-paper: #fff7f2;
+  --logo-bead: #ffca7a;
+  --logo-glow: oklch(68% 0.14 38 / 0.32);
+  --logo-shadow: oklch(45% 0.13 36 / 0.44);
+}
+
+[data-theme="dark"][data-palette="phoenix"] {
+  --bg: oklch(20.5% 0.02 42);
+  --surface: oklch(24.8% 0.022 42);
+  --surface-2: oklch(28.8% 0.024 42);
+  --surface-3: oklch(32.8% 0.026 42);
+  --line: oklch(34% 0.022 42);
+  --line-strong: oklch(44.5% 0.028 42);
+
+  --ink: oklch(95.8% 0.01 62);
+  --ink-2: oklch(83.5% 0.018 55);
+  --ink-3: oklch(74% 0.02 52);
+  --ink-inverse: oklch(22% 0.02 42);
+
+  --sea: oklch(77% 0.135 40);
+  --sea-ink: oklch(20% 0.045 38);
+  --sea-soft: oklch(32% 0.055 38);
+  --sea-soft-ink: oklch(89% 0.075 42);
+
+  --cinnabar: oklch(76% 0.12 20);
+  --cinnabar-soft: oklch(31% 0.05 20);
+  --cinnabar-ink: oklch(86% 0.07 22);
+
+  --leaf: oklch(78% 0.09 162);
+  --leaf-soft: oklch(30% 0.042 162);
+  --amber: oklch(84% 0.1 82);
+  --amber-soft: oklch(31% 0.045 82);
+
+  --glass-surface: oklch(25.2% 0.022 42 / 0.84);
+  --scrim: oklch(8% 0.02 40 / 0.62);
+  --bar-bg: oklch(23.8% 0.02 42 / 0.86);
+}
+
+/* ==========================================================================
+   青松 · 水库林荫 (<html data-palette="pine">)
+   青瓷茶白纸 + 松烟深绿墨 + 翠竹松石强调色
+   ========================================================================== */
+
+[data-palette="pine"] {
+  --bg: oklch(97.2% 0.013 152);
+  --surface: oklch(99.6% 0.004 152);
+  --surface-2: oklch(94.8% 0.014 152);
+  --surface-3: oklch(91.6% 0.018 152);
+  --line: oklch(89.8% 0.014 152);
+  --line-strong: oklch(80% 0.018 154);
+
+  --ink: oklch(24% 0.032 162);
+  --ink-2: oklch(39.5% 0.026 162);
+  --ink-3: oklch(47% 0.024 162);
+  --ink-inverse: oklch(99.5% 0.004 152);
+
+  --sea: oklch(48% 0.125 164);
+  --sea-ink: oklch(99.5% 0.004 152);
+  --sea-soft: oklch(94.2% 0.032 162);
+  --sea-soft-ink: oklch(38% 0.115 164);
+
+  --cinnabar: oklch(55% 0.15 32);
+  --cinnabar-soft: oklch(94.2% 0.03 32);
+  --cinnabar-ink: oklch(45% 0.14 30);
+
+  --leaf: oklch(47% 0.11 162);
+  --leaf-soft: oklch(94.2% 0.034 162);
+  --amber: oklch(49% 0.095 76);
+  --amber-soft: oklch(94.6% 0.042 82);
+
+  --shadow-1: 0 1px 2px oklch(24% 0.04 162 / 0.05), 0 2px 8px -4px oklch(24% 0.04 162 / 0.08);
+  --shadow-2: 0 2px 6px oklch(24% 0.04 162 / 0.05), 0 18px 40px -16px oklch(24% 0.04 162 / 0.22);
+  --glass-surface: oklch(99.6% 0.005 152 / 0.85);
+  --scrim: oklch(20% 0.03 162 / 0.42);
+  --bar-bg: oklch(99.2% 0.005 152 / 0.88);
+
+  --brand-bg: linear-gradient(160deg, #2d8f72, #145441);
+  --brand-glow-a: oklch(74% 0.12 162 / 0.52);
+  --brand-glow-b: oklch(80% 0.1 85 / 0.38);
+  --brand-ink: #f4fbf7;
+  --brand-ink-2: oklch(94% 0.016 155);
+  --brand-ink-3: oklch(92% 0.025 155);
+  --brand-bead: #f58d62;
+  --brand-shadow: oklch(18% 0.06 164 / 0.56);
+  --logo-hi: #42a889;
+  --logo-lo: #1c6b54;
+  --logo-paper: #f4fbf7;
+  --logo-bead: #f58d62;
+  --logo-glow: oklch(62% 0.12 162 / 0.32);
+  --logo-shadow: oklch(38% 0.1 164 / 0.44);
+}
+
+[data-theme="dark"][data-palette="pine"] {
+  --bg: oklch(19.5% 0.018 162);
+  --surface: oklch(23.8% 0.02 162);
+  --surface-2: oklch(27.8% 0.022 162);
+  --surface-3: oklch(31.8% 0.023 162);
+  --line: oklch(33% 0.02 162);
+  --line-strong: oklch(43.5% 0.024 162);
+
+  --ink: oklch(95.5% 0.008 152);
+  --ink-2: oklch(83% 0.014 156);
+  --ink-3: oklch(74% 0.018 158);
+  --ink-inverse: oklch(20% 0.018 162);
+
+  --sea: oklch(77% 0.115 162);
+  --sea-ink: oklch(19% 0.04 162);
+  --sea-soft: oklch(30% 0.05 164);
+  --sea-soft-ink: oklch(88% 0.07 162);
+
+  --cinnabar: oklch(75% 0.12 35);
+  --cinnabar-soft: oklch(30% 0.05 32);
+  --cinnabar-ink: oklch(85% 0.075 32);
+
+  --leaf: oklch(79% 0.105 162);
+  --leaf-soft: oklch(30% 0.045 162);
+  --amber: oklch(84% 0.09 82);
+  --amber-soft: oklch(31% 0.045 80);
+
+  --glass-surface: oklch(24.2% 0.02 162 / 0.84);
+  --scrim: oklch(6% 0.02 162 / 0.62);
+  --bar-bg: oklch(22.8% 0.018 162 / 0.86);
+}
+
+[data-palette="pine"],
+[data-palette="pine"] [style*="--h"],
+[data-palette="pine"] .now {
+  --course-mark: oklch(60% 0.13 var(--h, 164));
+  --course-soft: oklch(95% 0.032 var(--h, 164));
+  --course-mid: oklch(87% 0.07 var(--h, 164));
+  --course-ink: oklch(36% 0.1 var(--h, 164));
+}
+
+[data-theme="dark"][data-palette="pine"],
+[data-theme="dark"][data-palette="pine"] [style*="--h"],
+[data-theme="dark"][data-palette="pine"] .now {
+  --course-mark: oklch(70% 0.12 var(--h, 164));
+  --course-soft: oklch(26% 0.04 var(--h, 164));
+  --course-mid: oklch(42% 0.08 var(--h, 164));
+  --course-ink: oklch(88% 0.06 var(--h, 164));
+}
+
+/* ==========================================================================
+   暮紫 · 钟楼晚霞 (<html data-palette="lilac">)
+   紫藤薄雾纸 + 暮色青黛墨 + 鸢尾紫罗兰强调色
+   ========================================================================== */
+
+[data-palette="lilac"] {
+  --bg: oklch(97% 0.015 296);
+  --surface: oklch(99.6% 0.004 296);
+  --surface-2: oklch(94.8% 0.016 296);
+  --surface-3: oklch(91.6% 0.02 296);
+  --line: oklch(89.8% 0.016 296);
+  --line-strong: oklch(80.2% 0.022 294);
+
+  --ink: oklch(24.5% 0.036 292);
+  --ink-2: oklch(40% 0.028 292);
+  --ink-3: oklch(48% 0.026 292);
+  --ink-inverse: oklch(99.5% 0.005 296);
+
+  --sea: oklch(51% 0.165 286);
+  --sea-ink: oklch(99.5% 0.005 296);
+  --sea-soft: oklch(94.2% 0.034 288);
+  --sea-soft-ink: oklch(40% 0.145 286);
+
+  --cinnabar: oklch(56% 0.15 18);
+  --cinnabar-soft: oklch(94.4% 0.028 20);
+  --cinnabar-ink: oklch(45% 0.14 18);
+
+  --leaf: oklch(48% 0.095 166);
+  --leaf-soft: oklch(94.4% 0.033 166);
+  --amber: oklch(49% 0.095 78);
+  --amber-soft: oklch(94.8% 0.04 82);
+
+  --shadow-1: 0 1px 2px oklch(28% 0.05 290 / 0.05), 0 2px 8px -4px oklch(28% 0.05 290 / 0.08);
+  --shadow-2: 0 2px 6px oklch(28% 0.05 290 / 0.05), 0 18px 40px -16px oklch(28% 0.05 290 / 0.22);
+  --glass-surface: oklch(99.6% 0.005 296 / 0.85);
+  --scrim: oklch(22% 0.04 290 / 0.42);
+  --bar-bg: oklch(99.2% 0.006 296 / 0.88);
+
+  --brand-bg: linear-gradient(160deg, #7664de, #3f2e8f);
+  --brand-glow-a: oklch(76% 0.13 288 / 0.55);
+  --brand-glow-b: oklch(80% 0.11 18 / 0.42);
+  --brand-ink: #f8f5ff;
+  --brand-ink-2: oklch(95% 0.015 295);
+  --brand-ink-3: oklch(93% 0.024 290);
+  --brand-bead: #ff9887;
+  --brand-shadow: oklch(20% 0.08 288 / 0.56);
+  --logo-hi: #8b7bf0;
+  --logo-lo: #4e3ca3;
+  --logo-paper: #f8f5ff;
+  --logo-bead: #ff9887;
+  --logo-glow: oklch(64% 0.14 288 / 0.32);
+  --logo-shadow: oklch(42% 0.14 286 / 0.44);
+}
+
+[data-theme="dark"][data-palette="lilac"] {
+  --bg: oklch(19.8% 0.022 292);
+  --surface: oklch(24% 0.024 292);
+  --surface-2: oklch(28% 0.026 292);
+  --surface-3: oklch(32% 0.028 292);
+  --line: oklch(33.5% 0.024 292);
+  --line-strong: oklch(44.5% 0.03 292);
+
+  --ink: oklch(95.8% 0.008 296);
+  --ink-2: oklch(83.5% 0.016 294);
+  --ink-3: oklch(74.5% 0.02 292);
+  --ink-inverse: oklch(21% 0.022 292);
+
+  --sea: oklch(78% 0.125 286);
+  --sea-ink: oklch(20% 0.05 286);
+  --sea-soft: oklch(31% 0.06 286);
+  --sea-soft-ink: oklch(89% 0.075 286);
+
+  --cinnabar: oklch(77% 0.11 20);
+  --cinnabar-soft: oklch(31% 0.048 20);
+  --cinnabar-ink: oklch(87% 0.065 20);
+
+  --leaf: oklch(79% 0.085 166);
+  --leaf-soft: oklch(30% 0.04 166);
+  --amber: oklch(84% 0.09 82);
+  --amber-soft: oklch(31% 0.04 82);
+
+  --glass-surface: oklch(24.5% 0.024 292 / 0.84);
+  --scrim: oklch(7% 0.02 292 / 0.62);
+  --bar-bg: oklch(23% 0.022 292 / 0.86);
+}
+
+/* ==========================================================================
+   燕麦 · 自习暖咖 (<html data-palette="latte">)
+   燕麦羊皮纸 + 浓缩可可墨 + 焦糖肉桂强调色
+   ========================================================================== */
+
+[data-palette="latte"] {
+  --bg: oklch(96.8% 0.014 78);
+  --surface: oklch(99.5% 0.005 78);
+  --surface-2: oklch(94.4% 0.015 76);
+  --surface-3: oklch(91.2% 0.018 75);
+  --line: oklch(89.5% 0.016 76);
+  --line-strong: oklch(79.8% 0.02 74);
+
+  --ink: oklch(25% 0.03 62);
+  --ink-2: oklch(40% 0.024 64);
+  --ink-3: oklch(48% 0.022 65);
+  --ink-inverse: oklch(99.5% 0.005 78);
+
+  --sea: oklch(50% 0.12 62);
+  --sea-ink: oklch(99.5% 0.005 78);
+  --sea-soft: oklch(94.2% 0.028 68);
+  --sea-soft-ink: oklch(40% 0.11 62);
+
+  --cinnabar: oklch(54% 0.155 28);
+  --cinnabar-soft: oklch(94.2% 0.03 28);
+  --cinnabar-ink: oklch(44% 0.14 28);
+
+  --leaf: oklch(48% 0.095 160);
+  --leaf-soft: oklch(94.4% 0.032 160);
+  --amber: oklch(49% 0.095 76);
+  --amber-soft: oklch(94.6% 0.04 80);
+
+  --shadow-1: 0 1px 2px oklch(28% 0.04 65 / 0.05), 0 2px 8px -4px oklch(28% 0.04 65 / 0.08);
+  --shadow-2: 0 2px 6px oklch(28% 0.04 65 / 0.05), 0 18px 40px -16px oklch(28% 0.04 65 / 0.22);
+  --glass-surface: oklch(99.5% 0.006 78 / 0.85);
+  --scrim: oklch(22% 0.03 62 / 0.42);
+  --bar-bg: oklch(99% 0.007 78 / 0.88);
+
+  --brand-bg: linear-gradient(160deg, #b87b4b, #6f4220);
+  --brand-glow-a: oklch(76% 0.11 68 / 0.52);
+  --brand-glow-b: oklch(78% 0.12 32 / 0.4);
+  --brand-ink: #fcf7f0;
+  --brand-ink-2: oklch(95% 0.014 75);
+  --brand-ink-3: oklch(93% 0.022 72);
+  --brand-bead: #eb6f52;
+  --brand-shadow: oklch(20% 0.06 60 / 0.56);
+  --logo-hi: #c58b59;
+  --logo-lo: #7d4e29;
+  --logo-paper: #fcf7f0;
+  --logo-bead: #eb6f52;
+  --logo-glow: oklch(64% 0.11 65 / 0.32);
+  --logo-shadow: oklch(42% 0.1 62 / 0.44);
+}
+
+[data-theme="dark"][data-palette="latte"] {
+  --bg: oklch(20.2% 0.016 65);
+  --surface: oklch(24.4% 0.018 65);
+  --surface-2: oklch(28.4% 0.02 65);
+  --surface-3: oklch(32.4% 0.021 65);
+  --line: oklch(33.5% 0.018 65);
+  --line-strong: oklch(44% 0.022 65);
+
+  --ink: oklch(95.5% 0.009 80);
+  --ink-2: oklch(83% 0.014 75);
+  --ink-3: oklch(74% 0.016 72);
+  --ink-inverse: oklch(21% 0.016 65);
+
+  --sea: oklch(78% 0.11 68);
+  --sea-ink: oklch(20% 0.04 65);
+  --sea-soft: oklch(31% 0.048 65);
+  --sea-soft-ink: oklch(89% 0.065 68);
+
+  --cinnabar: oklch(75% 0.125 32);
+  --cinnabar-soft: oklch(30% 0.048 30);
+  --cinnabar-ink: oklch(85% 0.075 30);
+
+  --leaf: oklch(78% 0.09 160);
+  --leaf-soft: oklch(30% 0.04 160);
+  --amber: oklch(84% 0.095 82);
+  --amber-soft: oklch(31% 0.042 80);
+
+  --glass-surface: oklch(24.8% 0.018 65 / 0.84);
+  --scrim: oklch(7% 0.015 65 / 0.62);
+  --bar-bg: oklch(23.4% 0.016 65 / 0.86);
 }

@@ -13,8 +13,9 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } fro
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useShell, useStore } from "../lib/store";
 import { addDaysIso, dayStartMs, daysUntil, moment, monthDayCn, useNow, WEEKDAY_SHORT, weekdayCn } from "../lib/clock";
-import { JELLY_SOFT, OUT, PILL, SETTLE, TAP } from "../lib/motion";
+import { JELLY_SOFT, OUT, PILL, SETTLE, STEP_IN, TAP } from "../lib/motion";
 import { planApi, planErrorText, type Plan, type PlanSummary } from "../lib/plan-api";
+import { useHorizontalSwipe } from "../lib/useHorizontalSwipe";
 import { Icon } from "../components/Icon";
 import { Empty, ModePill, Notice, PageHead, Section, rise } from "../components/Layout";
 
@@ -60,6 +61,7 @@ export function PlanScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
+  const [dayDir, setDayDir] = useState(0);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -97,10 +99,36 @@ export function PlanScreen() {
     void load();
   }, [load, preview]);
 
-  const days = useMemo(
-    () => Array.from({ length: 7 }, (_, i) => addDaysIso(today, i - 3)),
-    [today],
+  const days = useMemo(() => {
+    const offset = daysUntil(day, dayStartMs(today));
+    const centerShift = offset > 3 ? offset - 3 : offset < -3 ? offset + 3 : 0;
+    const anchor = centerShift === 0 ? today : addDaysIso(today, centerShift);
+    return Array.from({ length: 7 }, (_, i) => addDaysIso(anchor, i - 3));
+  }, [day, today]);
+
+  const selectDay = useCallback(
+    (nextIso: string | null) => {
+      const target = nextIso ?? today;
+      if (target === day) return;
+      setDayDir(target > day ? 1 : -1);
+      setSelected(target === today ? null : target);
+    },
+    [day, today],
   );
+
+  const stepDay = useCallback(
+    (delta: -1 | 1) => {
+      const next = addDaysIso(day, delta);
+      setDayDir(delta);
+      setSelected(next === today ? null : next);
+    },
+    [day, today],
+  );
+
+  const daySwipe = useHorizontalSwipe({
+    onSwipePrevious: () => stepDay(-1),
+    onSwipeNext: () => stepDay(1),
+  });
 
   const rows = useMemo(
     () => items.filter((p) => p.date === day).slice().sort(orderOf),
@@ -122,7 +150,6 @@ export function PlanScreen() {
   };
 
   const remove = async (plan: Plan) => {
-    if (!window.confirm(`删掉「${plan.title}」？删了就找不回来了。`)) return;
     const before = items;
     setItems((prev) => prev.filter((p) => p.id !== plan.id));
     try {
@@ -208,7 +235,7 @@ export function PlanScreen() {
                 role="radio"
                 aria-checked={on}
                 className={`chip chip--btn chip--day${on ? " is-on" : ""}`}
-                onClick={() => setSelected(iso)}
+                onClick={() => selectDay(iso)}
                 aria-label={`${monthDayCn(iso)} ${weekdayCn(weekdayOf(iso))}${isToday ? "，今天" : ""}`}
               >
                 {/* 选中底板是一块跟着走的药丸（共享布局动画），不重画 */}
@@ -222,7 +249,7 @@ export function PlanScreen() {
         <button
           type="button"
           className="link-btn plan-days__today"
-          onClick={() => setSelected(null)}
+          onClick={() => selectDay(null)}
           disabled={day === today}
         >
           今天
@@ -281,45 +308,58 @@ export function PlanScreen() {
 
           {error && <Notice action={{ label: "重试", onClick: () => void load() }}>{error}</Notice>}
 
-          <Section
-            title={day === today ? "今天的安排" : `${monthDayCn(day)} ${weekdayCn(weekdayOf(day))}`}
-            note={loading ? undefined : `${rows.length} 项`}
-          >
-            {loading ? (
-              <div className="sk-list" aria-hidden="true">
-                <span className="sk sk--row" />
-                <span className="sk sk--row" />
-                <span className="sk sk--row" />
-              </div>
-            ) : rows.length === 0 ? (
-              <Empty icon={<Icon name="spark" size={22} />} title={day === today ? "今天还空着" : "这一天还空着"}>
-                {day === today ? "把想做的事写下来，完成一件勾一件。" : "想给这天加点什么？"}
-                <div className="mt-3">
-                  <button type="button" className="btn btn--soft btn--sm" onClick={() => setOpen(true)}>
-                    加一条
-                  </button>
-                </div>
-              </Empty>
-            ) : (
-              <ul className="list">
-                <AnimatePresence initial={false}>
-                  {rows.map((plan, i) => (
-                    <PlanRow
-                      key={plan.id}
-                      plan={plan}
-                      index={i}
-                      reduced={reduced}
-                      onToggle={() => void toggle(plan)}
-                      onDelete={() => void remove(plan)}
-                      onMove={(delta) => void move(plan, delta)}
-                      canUp={rows[0]?.id !== plan.id}
-                      canDown={rows[rows.length - 1]?.id !== plan.id}
-                    />
-                  ))}
-                </AnimatePresence>
-              </ul>
-            )}
-          </Section>
+          <div {...daySwipe} className="swipe-surface">
+            <AnimatePresence mode="wait" initial={false} custom={dayDir}>
+              <motion.div
+                key={day}
+                custom={dayDir}
+                initial={reduced ? { opacity: 0 } : { opacity: 0, x: dayDir !== 0 ? dayDir * 18 : 0 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={reduced ? { opacity: 0 } : { opacity: 0, x: dayDir !== 0 ? dayDir * -14 : 0, transition: OUT }}
+                transition={reduced ? { duration: 0.12 } : STEP_IN}
+              >
+                <Section
+                  title={day === today ? "今天的安排" : `${monthDayCn(day)} ${weekdayCn(weekdayOf(day))}`}
+                  note={loading ? undefined : `${rows.length} 项`}
+                >
+                  {loading ? (
+                    <div className="sk-list" aria-hidden="true">
+                      <span className="sk sk--row" />
+                      <span className="sk sk--row" />
+                      <span className="sk sk--row" />
+                    </div>
+                  ) : rows.length === 0 ? (
+                    <Empty icon={<Icon name="spark" size={22} />} title={day === today ? "今天还空着" : "这一天还空着"}>
+                      {day === today ? "把想做的事写下来，完成一件勾一件。" : "想给这天加点什么？"}
+                      <div className="mt-3">
+                        <button type="button" className="btn btn--soft btn--sm" onClick={() => setOpen(true)}>
+                          加一条
+                        </button>
+                      </div>
+                    </Empty>
+                  ) : (
+                    <ul className="list">
+                      <AnimatePresence initial={false}>
+                        {rows.map((plan, i) => (
+                          <PlanRow
+                            key={plan.id}
+                            plan={plan}
+                            index={i}
+                            reduced={reduced}
+                            onToggle={() => void toggle(plan)}
+                            onDelete={() => void remove(plan)}
+                            onMove={(delta) => void move(plan, delta)}
+                            canUp={rows[0]?.id !== plan.id}
+                            canDown={rows[rows.length - 1]?.id !== plan.id}
+                          />
+                        ))}
+                      </AnimatePresence>
+                    </ul>
+                  )}
+                </Section>
+              </motion.div>
+            </AnimatePresence>
+          </div>
 
           {/* 新增：内联表单，不是弹窗。
               只做 opacity + 位移，不做 height 动画 —— 高度动画每帧都要重新布局，
@@ -428,9 +468,7 @@ export function PlanScreen() {
 
           {!open && (
             <button type="button" className="btn btn--soft btn--block" onClick={() => setOpen(true)}>
-              <span className="btn__plus" aria-hidden="true">
-                ＋
-              </span>
+              <Icon name="plus" size={16} />
               加一条
             </button>
           )}
@@ -470,6 +508,7 @@ function PlanRow({
   canDown: boolean;
 }) {
   const [armed, setArmed] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const timer = useRef<number | undefined>(undefined);
   const time = timeText(plan);
 
@@ -481,7 +520,13 @@ function PlanRow({
   };
   useEffect(() => clear, []);
 
-  // 长按 550ms 展开操作区（和点「⋯」同一条路）；真正删除还要过一次 confirm
+  useEffect(() => {
+    if (!confirmingDelete) return;
+    const id = window.setTimeout(() => setConfirmingDelete(false), 3200);
+    return () => window.clearTimeout(id);
+  }, [confirmingDelete]);
+
+  // 长按 550ms 展开排序操作区（和点「⋯」同一条路）
   const press = () => {
     clear();
     timer.current = window.setTimeout(() => {
@@ -540,15 +585,37 @@ function PlanRow({
       </div>
 
       <div className="task__side">
-        {time && <span className="task__when">{time}</span>}
-        {plan.priority > 0 && (
+        {time && !confirmingDelete && <span className="task__when">{time}</span>}
+        {plan.priority > 0 && !confirmingDelete && (
           <span
             className={DOT_CLASS[plan.priority as 1 | 2]}
             role="img"
             aria-label={plan.priority === 2 ? "紧急" : "重要"}
           />
         )}
-        {armed ? (
+        {confirmingDelete ? (
+          <div className="row-actions">
+            <motion.button
+              type="button"
+              className="confirm-pill"
+              aria-label={`确认删除：${plan.title}`}
+              onClick={onDelete}
+              initial={reduced ? false : { opacity: 0, scale: 0.88 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={reduced ? { duration: 0.1 } : JELLY_SOFT}
+            >
+              确认删除
+            </motion.button>
+            <button
+              type="button"
+              className="icon-btn"
+              aria-label="取消删除"
+              onClick={() => setConfirmingDelete(false)}
+            >
+              <Icon name="close" size={16} />
+            </button>
+          </div>
+        ) : armed ? (
           <div className="row-actions">
             <button
               type="button"
@@ -568,7 +635,12 @@ function PlanRow({
             >
               <Icon name="chevron-right" size={16} className="rot-down" />
             </button>
-            <button type="button" className="icon-btn btn--danger-text" aria-label="删除" onClick={onDelete}>
+            <button
+              type="button"
+              className="icon-btn btn--danger-text"
+              aria-label={`删除：${plan.title}`}
+              onClick={() => setConfirmingDelete(true)}
+            >
               <Icon name="trash" size={18} />
             </button>
             <button type="button" className="icon-btn" aria-label="收起" onClick={() => setArmed(false)}>
@@ -576,11 +648,19 @@ function PlanRow({
             </button>
           </div>
         ) : (
-          <button type="button" className="icon-btn" aria-label={`更多操作：${plan.title}`} onClick={() => setArmed(true)}>
-            <span className="dots" aria-hidden="true">
-              ⋯
-            </span>
-          </button>
+          <div className="row-actions">
+            <button
+              type="button"
+              className="icon-btn plan-row__del"
+              aria-label={`删除：${plan.title}`}
+              onClick={() => setConfirmingDelete(true)}
+            >
+              <Icon name="trash" size={17} />
+            </button>
+            <button type="button" className="icon-btn" aria-label={`更多操作：${plan.title}`} onClick={() => setArmed(true)}>
+              <Icon name="more" size={18} />
+            </button>
+          </div>
         )}
       </div>
     </motion.li>

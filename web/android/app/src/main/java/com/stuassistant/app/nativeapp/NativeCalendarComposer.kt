@@ -160,12 +160,12 @@ fun NativeCalendarComposer(store: NativeStore, s: NativeState, inputBackdrop: Ba
                     Modifier.weight(1f).height(56.dp).wrapContentHeight(Alignment.CenterVertically).focusRequester(focus)
                         .semantics { contentDescription = "记一件事输入框" },
                     enabled = phase == "input", maxLines = 2,
-                    textStyle = TextStyle(color = c.ink, fontSize = 17.sp, lineHeight = 24.sp, fontFamily = NativeFontFamily),
+                    textStyle = nativeTextStyle(color = c.ink, sizeSp = 17f, lineHeightSp = 24f),
                     cursorBrush = SolidColor(c.brand), keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                     keyboardActions = KeyboardActions(onSend = { submit(false) }),
-                    decorationBox = { inner -> Box { if (text.isEmpty()) NText("想做什么，写下来…", 17, muted = true); inner() } })
+                    decorationBox = { inner -> Box(contentAlignment = Alignment.CenterStart) { if (text.isEmpty()) NText("想做什么，写下来…", 17, muted = true, maxLines = 1, softWrap = false); inner() } })
                 if (phase == "input") Box(Modifier.size(36.dp).semantics { contentDescription = "记录方式" }
-                    .clickable { manualMenu = !manualMenu }, contentAlignment = Alignment.Center) { NText("⋯", 21, muted = true) }
+                    .clickable { manualMenu = !manualMenu }, contentAlignment = Alignment.Center) { NativeIcon("more", c.muted, size = 20.dp) }
                 else Spacer(Modifier.width(36.dp))
                 // Explicit square constraints make the existing Kyant capsule a circle.
                 // NButton retains the project's paired press/release haptics, including disposal.
@@ -194,7 +194,7 @@ fun NativeCalendarComposer(store: NativeStore, s: NativeState, inputBackdrop: Ba
                                             .semantics { contentDescription = "第${index+1}条事项" }.clickable {
                                                 selected = index; day = CalendarDrafts.date(draft) ?: day; options = false
                                             }, contentAlignment = Alignment.Center) {
-                                            BasicText("${index+1}", style = TextStyle(color = if (selected == index) c.onBrand else c.brand, fontSize = 14.sp, fontWeight = FontWeight.SemiBold))
+                                            BasicText("${index+1}", maxLines = 1, softWrap = false, style = nativeTextStyle(color = if (selected == index) c.onBrand else c.brand, sizeSp = 14f, lineHeightSp = 16f, weight = FontWeight.SemiBold, tabularNums = true))
                                         }
                                     }
                                 }

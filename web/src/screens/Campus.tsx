@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { useStore } from "../lib/store";
-import { api } from "../lib/api";
 import { agoText, monthDayCn, moment, useNow } from "../lib/clock";
 import {
   CALENDAR_SOURCE,
@@ -26,43 +25,67 @@ import { SOURCE_NAME } from "../lib/records";
 import { Segmented } from "../components/Segmented";
 import { Icon } from "../components/Icon";
 import { BusBoard } from "../components/BusBoard";
-import { rise } from "../lib/motion";
+import { OUT, STEP_IN, rise } from "../lib/motion";
+import { useHorizontalSwipe } from "../lib/useHorizontalSwipe";
 import { Empty, ModePill, PageHead, Section } from "../components/Layout";
 
 type View = "notices" | "life" | "calendar";
+const CAMPUS_VIEWS: View[] = ["notices", "life", "calendar"];
 
 export function CampusScreen({ initialView }: { initialView?: string } = {}) {
   const [view, setView] = useState<View>((initialView as View) || "notices");
+  const [dir, setDir] = useState(0);
   // 从别的页面带进来的子视图要生效：useState 只认第一次，后续跳转得同步一次
   useEffect(() => {
-    if (initialView) setView(initialView as View);
+    if (initialView) {
+      setDir(0);
+      setView(initialView as View);
+    }
   }, [initialView]);
+
+  const viewIdx = CAMPUS_VIEWS.indexOf(view);
+  const selectView = (next: View) => {
+    const nextIdx = CAMPUS_VIEWS.indexOf(next);
+    if (nextIdx === viewIdx || nextIdx < 0) return;
+    setDir(nextIdx > viewIdx ? 1 : -1);
+    setView(next);
+  };
+  const viewSwipe = useHorizontalSwipe({
+    canSwipePrevious: viewIdx > 0,
+    canSwipeNext: viewIdx < CAMPUS_VIEWS.length - 1,
+    onSwipePrevious: () => selectView(CAMPUS_VIEWS[viewIdx - 1]),
+    onSwipeNext: () => selectView(CAMPUS_VIEWS[viewIdx + 1]),
+  });
+
   return (
     <>
       <PageHead eyebrow="汕头大学" title="校园" aside={<ModePill />} />
       <Segmented
         label="校园分类"
         value={view}
-        onChange={setView}
+        onChange={selectView}
         options={[
           { key: "notices", label: "通知" },
           { key: "life", label: "生活" },
           { key: "calendar", label: "校历" },
         ]}
       />
-      <AnimatePresence mode="wait" initial={false}>
-        <motion.div
-          key={view}
-          initial={{ opacity: 0, y: 6 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -4 }}
-          transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-        >
-          {view === "notices" && <Notices />}
-          {view === "life" && <Life />}
-          {view === "calendar" && <Calendar />}
-        </motion.div>
-      </AnimatePresence>
+      <div {...viewSwipe} className="swipe-surface">
+        <AnimatePresence mode="wait" initial={false} custom={dir}>
+          <motion.div
+            key={view}
+            custom={dir}
+            initial={{ opacity: 0, x: dir !== 0 ? dir * 18 : 0, y: dir === 0 ? 6 : 0 }}
+            animate={{ opacity: 1, x: 0, y: 0 }}
+            exit={{ opacity: 0, x: dir !== 0 ? dir * -14 : 0, y: dir === 0 ? -4 : 0, transition: OUT }}
+            transition={STEP_IN}
+          >
+            {view === "notices" && <Notices />}
+            {view === "life" && <Life />}
+            {view === "calendar" && <Calendar />}
+          </motion.div>
+        </AnimatePresence>
+      </div>
     </>
   );
 }
@@ -73,25 +96,6 @@ function Notices() {
   const { notices } = useStore();
   const [q, setQ] = useState("");
   const [src, setSrc] = useState<string>("all");
-  const [facts, setFacts] = useState<{ text: string; index: number }[]>([]);
-
-  useEffect(() => {
-    let alive = true;
-    const load = async () => {
-      try {
-        const res = await api.facts();
-        if (alive) setFacts(res.items ?? []);
-      } catch {
-        /* 拉不到就不显示，不影响官网消息 */
-      }
-    };
-    void load();
-    const id = window.setInterval(() => void load(), 30 * 60_000);
-    return () => {
-      alive = false;
-      window.clearInterval(id);
-    };
-  }, []);
 
   const sources = [...new Set(notices.map((n) => n.source))];
   const shown = notices.filter(
@@ -113,23 +117,6 @@ function Notices() {
 
   return (
     <div className="stack-6">
-      <Section title="今日冷知识" note={facts.length ? `${facts.length} 条` : "每天 5 条"}>
-        {facts.length > 0 ? (
-          <ul className="list">
-            {facts.map((f, i) => (
-              <motion.li key={f.index} className="notice" {...rise(i, { y: 8, scale: 1 })}>
-                <span className="notice__src notice__src--oa">冷知识</span>
-                <span className="notice__title">{f.text}</span>
-              </motion.li>
-            ))}
-          </ul>
-        ) : (
-          <p className="cite" style={{ padding: "4px 2px" }}>
-            今天这 5 条还没生成，过一会儿再来看看。
-          </p>
-        )}
-      </Section>
-
       <label className="search">
         <Icon name="search" size={18} />
         <input
@@ -190,7 +177,7 @@ function Notices() {
       )}
       <p className="footnote">
         <Icon name="info" size={14} />
-        <span>标题和日期按学校原文显示，正式要求以原文为准。冷知识每日更新，图个乐子，别拿去写论文。</span>
+        <span>标题和日期按学校原文显示，正式要求以学校原文为准。</span>
       </p>
     </div>
   );

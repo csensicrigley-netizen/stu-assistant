@@ -41,9 +41,9 @@ private fun updateUrl(server:String,info:JSONObject)= info.optString("apk","/dow
     var checked by remember {mutableStateOf(false)}
     var info by remember {mutableStateOf<JSONObject?>(null)}
     val scope=rememberCoroutineScope()
-    NText("版本与更新",18,true)
+    MeSectionHeader("版本与更新", "spark")
     NCard {
-        NRow("当前版本 ${version.first}",when {checking->"正在问服务器…";info!=null->"有新版 ${info!!.optString("versionName")}（装新安装包）";checked->"已经是最新版本。";else->"发了新版会在这里和底部提示条上告诉你。"})
+        NRow("当前版本 ${version.first}", when {checking->"正在问服务器…";info!=null->"有新版 ${info!!.optString("versionName")}（装新安装包）";checked->"已经是最新版本。";else->"发了新版会在这里和底部提示条上告诉你。"})
         if(info!=null)NButton("下载 ${info!!.optString("versionName")}",{nativeOpenLink(context,updateUrl(store.state.value.server,info!!))},primary=true,haptic=NativeButtonHaptic.Navigation)
         NButton(if(checking)"检查中…"else"检查更新",{scope.launch {checking=true;info=null;prefs.edit().remove("skip").apply();info=checkNativeUpdate(store,version);checked=true;checking=false}},!checking,haptic=NativeButtonHaptic.Submit)
         info?.optJSONArray("notes")?.let {notes->(0 until notes.length()).forEach {NText("· ${notes.optString(it)}",14,muted=true)}}

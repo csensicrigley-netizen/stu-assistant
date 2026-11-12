@@ -12,7 +12,7 @@ export type TabKey = "today" | "plan" | "week" | "study" | "campus" | "me" | "im
 
 export const TABS: { key: TabKey; label: string; icon: IconName }[] = [
   { key: "today", label: "今天", icon: "today" },
-  { key: "plan", label: "计划", icon: "check" },
+  { key: "plan", label: "计划", icon: "items" },
   { key: "week", label: "课表", icon: "week" },
   { key: "study", label: "学业", icon: "study" },
   { key: "campus", label: "校园", icon: "campus" },

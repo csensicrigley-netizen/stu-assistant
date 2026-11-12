@@ -2,18 +2,93 @@ import { useCallback, useEffect, useState } from "react";
 import { setNativeChrome, setStatusBarDark } from "./native";
 
 export type ThemePref = "light" | "dark" | "system";
-/** 樱粉 = 温柔可爱（默认）；经典 = 最早那套海蓝 + 朱 */
-export type PalettePref = "sweet" | "classic";
+export type PalettePref = "sweet" | "classic" | "phoenix" | "pine" | "lilac" | "latte";
+
+export interface PaletteOption {
+  key: PalettePref;
+  label: string;
+  subtitle: string;
+  swatchPaper: string;
+  swatchBrand: string;
+  swatchAccent: string;
+}
+
+export const PALETTE_OPTIONS: readonly PaletteOption[] = [
+  {
+    key: "sweet",
+    label: "樱粉",
+    subtitle: "春日奶纸",
+    swatchPaper: "#fff0f1",
+    swatchBrand: "#cc5683",
+    swatchAccent: "#e07a68",
+  },
+  {
+    key: "classic",
+    label: "海蓝",
+    subtitle: "桑浦海风",
+    swatchPaper: "#f9f6f1",
+    swatchBrand: "#235da1",
+    swatchAccent: "#d9613f",
+  },
+  {
+    key: "phoenix",
+    label: "凤凰",
+    subtitle: "盛夏红棉",
+    swatchPaper: "#fff3e8",
+    swatchBrand: "#cb5433",
+    swatchAccent: "#df8b3c",
+  },
+  {
+    key: "pine",
+    label: "青松",
+    subtitle: "水库林荫",
+    swatchPaper: "#eff8f2",
+    swatchBrand: "#23735b",
+    swatchAccent: "#d46c46",
+  },
+  {
+    key: "lilac",
+    label: "暮紫",
+    subtitle: "钟楼晚霞",
+    swatchPaper: "#f6f2ff",
+    swatchBrand: "#6253c7",
+    swatchAccent: "#dc6b6c",
+  },
+  {
+    key: "latte",
+    label: "燕麦",
+    subtitle: "自习暖咖",
+    swatchPaper: "#faf4ea",
+    swatchBrand: "#8b5c34",
+    swatchAccent: "#cb5a3e",
+  },
+];
 
 const KEY = "stu.theme";
 const PALETTE_KEY = "stu.palette";
+const PALETTE_SET = new Set<string>(PALETTE_OPTIONS.map((item) => item.key));
+
+export function normalizePalette(value: string | null | undefined): PalettePref {
+  return value && PALETTE_SET.has(value) ? (value as PalettePref) : "sweet";
+}
 
 /** the browser chrome / status bar colour per palette */
 function barColor(palette: PalettePref, dark: boolean): string {
-  if (palette === "classic") return dark ? "#0b0e14" : "#f9f6f1";
-  // 必须等于 tokens.css 里樱粉的 --bg，也要等于 android 的 res/values/colors.xml::paper。
-  // 三处任一处不同，系统栏那一条就会露出来，看着就是"黑边"。
-  return dark ? "#1f161e" : "#fff0f1";
+  switch (palette) {
+    case "classic":
+      return dark ? "#0b0e14" : "#f9f6f1";
+    case "phoenix":
+      return dark ? "#1e1612" : "#fff3e8";
+    case "pine":
+      return dark ? "#101a16" : "#eff8f2";
+    case "lilac":
+      return dark ? "#171422" : "#f6f2ff";
+    case "latte":
+      return dark ? "#1b1713" : "#faf4ea";
+    default:
+      // 必须等于 tokens.css 里樱粉的 --bg，也要等于 android 的 res/values/colors.xml::paper。
+      return dark ? "#1f161e" : "#fff0f1";
+  }
 }
 
 function fromQuery(name: string): string | null {
@@ -40,10 +115,10 @@ function readPref(): ThemePref {
 function readPalette(): PalettePref {
   // ?palette= wins for the same reason
   const asked = fromQuery("palette");
-  if (asked === "classic" || asked === "sweet") return asked;
+  if (asked && PALETTE_SET.has(asked)) return asked as PalettePref;
   try {
     const saved = localStorage.getItem(PALETTE_KEY);
-    if (saved === "classic" || saved === "sweet") return saved;
+    if (saved && PALETTE_SET.has(saved)) return saved as PalettePref;
   } catch {
     /* storage blocked */
   }
@@ -65,8 +140,6 @@ function apply(pref: ThemePref) {
     .querySelector('meta[name="theme-color"]')
     ?.setAttribute("content", barColor(currentPalette, dark));
   setStatusBarDark(dark);
-  // 原生那半：系统区的底色也跟着页面的实际深浅色走。少了这一句，用户在页内
-  // 强制浅色、系统却是深色时，上下两条系统栏就会被原生涂成近黑——黑边。
   setNativeChrome(dark);
 }
 
@@ -95,13 +168,13 @@ export function useTheme() {
   return { pref, choose };
 }
 
-/** 樱粉 / 经典, applied to <html data-palette>; the tokens do the rest. */
+/** Applied to <html data-palette>; tokens do the rest without altering motion or features. */
 export function usePalette() {
   const [palette, setPalette] = useState<PalettePref>(readPalette);
 
   useEffect(() => {
     currentPalette = palette;
-    apply(readPref()); // refresh the attribute and the browser chrome
+    apply(readPref());
   }, [palette]);
 
   const choose = useCallback((next: PalettePref) => {

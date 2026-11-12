@@ -103,10 +103,12 @@ fun NativeWelcomeScreen(
                 NativeLogo()
                 NTitle("下一节课在哪，\n作业几点截止。", 32, 40.32f)
                 NText("教务课表、MySTU 作业和学校通知收在一处，按教务处官方作息算准每一节课。", muted = true)
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    NText("现在该去哪间教室，还有几分钟")
-                    NText("作业按截止时间排好，考试倒数")
-                    NText("只读不代办，账号密码由你本人输入、加密存在你自己的空间")
+                NCard {
+                    NRow("实时课程与教室", "现在该去哪间教室，还有几分钟", leadingIcon = "clock")
+                    NDivider()
+                    NRow("事项与考试倒数", "作业按截止时间排好，考试倒数", leadingIcon = "items")
+                    NDivider()
+                    NRow("本人只读授权", "只读不代办，账号密码由你本人输入、加密存在你自己的空间", leadingIcon = "shield")
                 }
                 NButton("开始使用", { step = "account" }, primary = true, modifier = Modifier.fillMaxWidth(), haptic = NativeButtonHaptic.Navigation)
                 NButton("先看看示例", { store.enterPreview(); done() }, modifier = Modifier.fillMaxWidth(), haptic = NativeButtonHaptic.Navigation)
@@ -543,8 +545,7 @@ private fun AccountCheckbox(checked: Boolean, onCheckedChange: (Boolean) -> Unit
                 drawPath(check, Color.White.copy(alpha = alpha), style = Stroke(2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
             }
         }
-        BasicText(label, style = TextStyle(color = colors.ink.copy(alpha = alpha), fontFamily = NativeFontFamily,
-            fontSize = 14.sp, lineHeight = 22.sp))
+        BasicText(label, style = nativeTextStyle(color = colors.ink.copy(alpha = alpha), sizeSp = 14f, lineHeightSp = 22f))
     }
 }
 

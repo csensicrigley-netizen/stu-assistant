@@ -75,7 +75,7 @@ internal fun nativeImportDocument(doc:AcademicTimetableDoc):JSONObject = JSONObj
     BackHandler {onNavigate("week")}
     NPage("导入课表","手动录入 · $semester",actions={NButton("返回课表",{onNavigate("week")},haptic=NativeButtonHaptic.Navigation)}) {
         NText("医学院的教务系统和主校区不是一套，没法自动同步，只能自己录。录完和自动同步的课表一样显示。",14,muted=true)
-        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {listOf("选校区","录入","核对","完成").forEachIndexed {i,label->NText("${if(i<step)"✓"else i+1} $label",14,bold=i==step,muted=i!=step)}}
+        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {listOf("选校区","录入","核对","完成").forEachIndexed {i,label->NText("${if(i<step)"✓"else i+1} $label",13,bold=i==step,muted=i!=step,maxLines=1,softWrap=false,tabularNums=true)}}
         when(step) {
             0->{
                 importSchools.forEach {(id,name,hint)->NCard {NRow(name,hint,if(existing==id)"这个学期已录过"else"",onClick={school=id;go(1)});if(id=="med")NText("医学院教务系统和主校区不同，需要你自己录入；录完之后和自动同步的课表一样显示。",14,muted=true)}}
@@ -108,7 +108,7 @@ internal fun nativeImportDocument(doc:AcademicTimetableDoc):JSONObject = JSONObj
                 val pair=stats?.optJSONArray("weeks")
                 val from=pair?.optInt(0)?.takeIf{it>0}?:weeks.minOrNull()?:0
                 val to=pair?.optInt(1)?.takeIf{it>0}?:weeks.maxOrNull()?:0
-                NCard {Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {Column{NText("课程",14,muted=true);NText("${courses.size} 门",24,true)};Column{NText("上课",14,muted=true);NText("$meetings 段",24,true)};Column{NText("周次",14,muted=true);NText(if(to==0)"周次未标注"else if(from==to)"第 $from 周"else"$from–$to 周",18,true)}}}
+                NCard {Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {Column{NText("课程",13,muted=true,maxLines=1,softWrap=false);NText("${courses.size} 门",22,true,maxLines=1,softWrap=false,tabularNums=true)};Column{NText("上课",13,muted=true,maxLines=1,softWrap=false);NText("$meetings 段",22,true,maxLines=1,softWrap=false,tabularNums=true)};Column(horizontalAlignment=Alignment.End){NText("周次",13,muted=true,maxLines=1,softWrap=false);NText(if(to==0)"周次未标注"else if(from==to)"第 $from 周"else"$from–$to 周",18,true,maxLines=1,softWrap=false,tabularNums=true)}}}
                 val errors=academicStrings(raw?.optJSONArray("errors"))
                 if(errors.isNotEmpty())NCard {NText("有 ${errors.size} 处没读懂",16,true);errors.forEach{NError(it)};NText("这几行先跳过了，改好再解析一次；其余课可以照常导入。",14,muted=true)}
                 val warnings=academicStrings(raw?.optJSONArray("warnings"))
@@ -189,15 +189,15 @@ internal fun nativeImportDocument(doc:AcademicTimetableDoc):JSONObject = JSONObj
 @Composable private fun ImportPreviewGrid(courses:List<AcademicCourse>) {
     NCard {
         NText("周视图预览",16,true)
-        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(4.dp)){Box(Modifier.width(20.dp));(1..7).forEach{Box(Modifier.weight(1f),contentAlignment=Alignment.Center){NText(listOf("一","二","三","四","五","六","日")[it-1],14,muted=true)}}}
+        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(4.dp)){Box(Modifier.width(24.dp));(1..7).forEach{Box(Modifier.weight(1f),contentAlignment=Alignment.Center){NText(listOf("一","二","三","四","五","六","日")[it-1],12,muted=true,maxLines=1,softWrap=false)}}}
         Column(verticalArrangement=Arrangement.spacedBy(3.dp)) {AcademicTimetable.periods.forEach {p->Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(4.dp),verticalAlignment=Alignment.CenterVertically) {
-            Box(Modifier.width(20.dp)){NText(p.code,14,muted=true)}
+            Box(Modifier.width(24.dp),contentAlignment=Alignment.Center){NText(p.code,12,muted=true,maxLines=1,softWrap=false,tabularNums=true)}
             (1..7).forEach {day->
                 val course=courses.firstOrNull{it.meetings.any{m->m.weekday==day&&p.index in m.periods}}
                 val dark=LocalNativeColors.current.bg.luminance()<.2f
-                val classic=LocalNativePalette.current=="classic"
-                val mark=if(course!=null)academicCourseColor(course.hue)else LocalNativeColors.current.border.copy(alpha=.4f)
-                val mid=if(course==null)mark else nativeOklch(if(dark){if(classic).42 else .44}else{if(classic).87 else .885},if(dark){if(classic).08 else .065}else{if(classic).07 else .06},course.hue.toDouble())
+                val swatch=course?.let{nativeCourseSwatch(it.hue,dark,LocalNativePalette.current)}
+                val mark=swatch?.mark?:LocalNativeColors.current.border.copy(alpha=.4f)
+                val mid=swatch?.mid?:mark
                 val shape=RoundedRectangle(4.dp)
                 Box(Modifier.weight(1f).height(18.dp).clip(shape).background(mid).then(if(course!=null)Modifier.border(1.dp,mark,shape)else Modifier).semantics{contentDescription=if(course==null)"${AcademicClock.weekdayText(day)} 第${p.code}节 空"else"${course.title} · ${AcademicClock.weekdayText(day)} 第${p.code}节"})
             }

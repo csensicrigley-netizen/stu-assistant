@@ -1,13 +1,14 @@
 {
   "channel": "product",
-  "versionName": "1.1.3",
-  "versionCode": 59,
+  "versionName": "1.1.4",
+  "versionCode": 60,
   "apk": "/download/stu-assistant.apk",
   "notes": [
-    "事项交互：完成与详情展开分离，完成后原位保留、可撤销",
-    "考试与成绩使用独立学业层级，恢复全局顶部柔性模糊"
+    "全新液态玻璃光学透视与丝滑弹簧动效，支持左右滑动切换日期、周次与校园分栏",
+    "外观新增樱粉、海蓝、凤凰、青松、暮紫、燕麦六款校园配色，事项支持二次确认删除",
+    "重绘全套矢量图标与校历视图，精简移除今日冷知识，更新反馈群二维码"
   ],
   "mandatory": false,
-  "releasedAt": "2026-11-01T14:45:00Z",
+  "releasedAt": "2026-11-12T04:55:00Z",
   "minSupported": "1.0.0"
 }

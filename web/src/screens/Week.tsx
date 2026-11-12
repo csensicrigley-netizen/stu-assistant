@@ -10,6 +10,7 @@ import { CourseSheet } from "../components/CourseSheet";
 import { Icon } from "../components/Icon";
 import { Magnetic } from "../components/Magnetic";
 import { PILL, rise } from "../lib/motion";
+import { useHorizontalSwipe } from "../lib/useHorizontalSwipe";
 import { Empty, ModePill, PageHead, Section } from "../components/Layout";
 
 export function WeekScreen() {
@@ -43,6 +44,12 @@ export function WeekScreen() {
     setDir(d);
     setWeek(next);
   };
+  const weekSwipe = useHorizontalSwipe({
+    canSwipePrevious: week > 1,
+    canSwipeNext: week < term.totalWeeks,
+    onSwipePrevious: () => step(-1),
+    onSwipeNext: () => step(1),
+  });
 
   return (
     <>
@@ -66,7 +73,7 @@ export function WeekScreen() {
         </Empty>
       )}
 
-      <div className="split split--week">
+      <div className="split split--week swipe-surface" {...weekSwipe}>
       <div className="split__main">
       <div className="weekbar">
         <button type="button" className="icon-btn icon-btn--soft" onClick={() => step(-1)} disabled={week <= 1} aria-label="上一周">

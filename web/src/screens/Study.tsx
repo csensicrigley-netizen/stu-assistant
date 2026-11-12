@@ -6,9 +6,11 @@ import { dueBucket, EXAM_SESSIONS, SOURCE_NAME, summarize, type DueBucket, type 
 import { Segmented } from "../components/Segmented";
 import { Icon } from "../components/Icon";
 import { OUT, SETTLE, STEP, STEP_IN } from "../lib/motion";
+import { useHorizontalSwipe } from "../lib/useHorizontalSwipe";
 import { Empty, ModePill, PageHead, Section } from "../components/Layout";
 
 type View = "tasks" | "exams" | "grades";
+const STUDY_VIEWS: View[] = ["tasks", "exams", "grades"];
 
 const BUCKETS: { key: DueBucket; label: string }[] = [
   { key: "overdue", label: "已过截止" },
@@ -22,6 +24,21 @@ export function StudyScreen() {
   const store = useStore();
   const now = useNow(60_000);
   const [view, setView] = useState<View>("tasks");
+  const [dir, setDir] = useState(0);
+
+  const viewIdx = STUDY_VIEWS.indexOf(view);
+  const selectView = (next: View) => {
+    const nextIdx = STUDY_VIEWS.indexOf(next);
+    if (nextIdx === viewIdx || nextIdx < 0) return;
+    setDir(nextIdx > viewIdx ? 1 : -1);
+    setView(next);
+  };
+  const viewSwipe = useHorizontalSwipe({
+    canSwipePrevious: viewIdx > 0,
+    canSwipeNext: viewIdx < STUDY_VIEWS.length - 1,
+    onSwipePrevious: () => selectView(STUDY_VIEWS[viewIdx - 1]),
+    onSwipeNext: () => selectView(STUDY_VIEWS[viewIdx + 1]),
+  });
 
   const open = store.tasks.filter((t) => !store.done.has(t.id) && dueBucket(t, now.ms) !== "expired");
   const urgent = open.filter((t) => {
@@ -48,26 +65,29 @@ export function StudyScreen() {
       <Segmented
         label="学业分类"
         value={view}
-        onChange={setView}
+        onChange={selectView}
         options={[
           { key: "tasks", label: "作业", badge: urgent || undefined },
           { key: "exams", label: "考试" },
           { key: "grades", label: "成绩" },
         ]}
       />
-      <AnimatePresence mode="wait" initial={false}>
-        <motion.div
-          key={view}
-          initial={{ opacity: 0, y: 6 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -4, transition: OUT }}
-          transition={STEP_IN}
-        >
-          {view === "tasks" && <Tasks nowMs={now.ms} />}
-          {view === "exams" && <Exams nowMs={now.ms} />}
-          {view === "grades" && <Grades />}
-        </motion.div>
-      </AnimatePresence>
+      <div {...viewSwipe} className="swipe-surface">
+        <AnimatePresence mode="wait" initial={false} custom={dir}>
+          <motion.div
+            key={view}
+            custom={dir}
+            initial={{ opacity: 0, x: dir !== 0 ? dir * 18 : 0, y: dir === 0 ? 6 : 0 }}
+            animate={{ opacity: 1, x: 0, y: 0 }}
+            exit={{ opacity: 0, x: dir !== 0 ? dir * -14 : 0, y: dir === 0 ? -4 : 0, transition: OUT }}
+            transition={STEP_IN}
+          >
+            {view === "tasks" && <Tasks nowMs={now.ms} />}
+            {view === "exams" && <Exams nowMs={now.ms} />}
+            {view === "grades" && <Grades />}
+          </motion.div>
+        </AnimatePresence>
+      </div>
     </>
   );
 }

@@ -56,7 +56,16 @@ internal fun CalendarTimeline(day: String, onDay: (String) -> Unit, drafts: List
         }
     }
     Column(Modifier.fillMaxSize()) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .ergonomicHorizontalSwipe(
+                    onSwipePrevious = { onDay(AcademicClock.addDays(day, -1)) },
+                    onSwipeNext = { onDay(AcademicClock.addDays(day, 1)) },
+                )
+                .padding(horizontal = 24.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             NButton("‹", { onDay(AcademicClock.addDays(day,-1)) }, modifier = Modifier.size(48.dp).semantics { contentDescription = "前一天" })
             Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
                 CalendarCounter(day.take(7).replace("-", "年")+"月", AcademicClock.dayStart(day),
@@ -81,7 +90,17 @@ internal fun CalendarTimeline(day: String, onDay: (String) -> Unit, drafts: List
             val slots = naturalSlots.map { slot -> heldColumns[slot.mark.key]?.let { slot.copy(column=it.first,columns=it.second) } ?: slot }
                 .sortedBy { if(it.mark.item == selected) 2 else if(it.mark.item >= 0) 1 else 0 }
             Column(Modifier.fillMaxSize()) {
-                Row(Modifier.fillMaxWidth().height(42.dp).padding(start=52.dp,end=12.dp), verticalAlignment=Alignment.CenterVertically) {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(42.dp)
+                        .ergonomicHorizontalSwipe(
+                            onSwipePrevious = { onDay(AcademicClock.addDays(date, -1)) },
+                            onSwipeNext = { onDay(AcademicClock.addDays(date, 1)) },
+                        )
+                        .padding(start=52.dp,end=12.dp),
+                    verticalAlignment=Alignment.CenterVertically,
+                ) {
                     dates.forEach { d ->
                         val chosen = d == date
                         Row(Modifier.weight(1f).fillMaxHeight().clickable { if(!chosen) { scrollTick(); onDay(d) } },
@@ -130,8 +149,8 @@ internal fun CalendarTimeline(day: String, onDay: (String) -> Unit, drafts: List
                         }
                         for(minute in 0..1440 step major) {
                             val y=(minute-displayedStart)/windowMinutes*height
-                            if(y in -20f..(height+20)) Box(Modifier.offset{IntOffset(0,(y-7.dp.toPx()).roundToInt())}.width(44.dp),contentAlignment=Alignment.CenterEnd) {
-                                BasicText(AcademicClock.clock(minute),style=TextStyle(color=colors.muted,fontSize=10.sp,fontFamily=NativeFontFamily,fontFeatureSettings="tnum"))
+                            if(y in -20f..(height+20)) Box(Modifier.offset{IntOffset(0,(y-7.dp.toPx()).roundToInt())}.width(46.dp),contentAlignment=Alignment.CenterEnd) {
+                                BasicText(AcademicClock.clock(minute),maxLines=1,softWrap=false,style=nativeTextStyle(color=colors.muted,sizeSp=10f,lineHeightSp=13f,tabularNums=true))
                             }
                         }
                         boxes.forEach { rect ->
@@ -158,7 +177,7 @@ internal fun CalendarTimeline(day: String, onDay: (String) -> Unit, drafts: List
                                             Box(Modifier.size(12.dp).clip(CircleShape).background(tint).border(1.5.dp,colors.bg,CircleShape))
                                         }
                                         BasicText(mark.title,Modifier.align(Alignment.TopStart).padding(start=3.dp,end=3.dp),
-                                            style=TextStyle(color=tint,fontSize=10.sp,fontFamily=NativeFontFamily),maxLines=1,overflow=TextOverflow.Ellipsis)
+                                            style=nativeTextStyle(color=tint,sizeSp=10f,lineHeightSp=14f),maxLines=1,softWrap=false,overflow=TextOverflow.Ellipsis)
                                         if(editable&&mark.field=="schedule")Box(Modifier.align(Alignment.BottomEnd).size(20.dp).semantics{contentDescription="拖出时长"},contentAlignment=Alignment.Center){
                                             Box(Modifier.size(8.dp).border(1.5.dp,tint,CircleShape))
                                         }
@@ -167,8 +186,8 @@ internal fun CalendarTimeline(day: String, onDay: (String) -> Unit, drafts: List
                                             else listOf(tint.copy(alpha=.15f),tint.copy(alpha=.23f))))
                                         .border(1.dp,if(editable)colors.onBrand.copy(alpha=.2f)else tint.copy(alpha=.18f),blockShape)) {
                                         Column(Modifier.fillMaxSize().padding(horizontal=7.dp,vertical=8.dp),verticalArrangement=Arrangement.Center) {
-                                            BasicText(mark.title,style=TextStyle(color=if(editable)colors.onBrand else colors.ink,fontSize=11.sp,lineHeight=15.sp,fontFamily=NativeFontFamily,
-                                                fontWeight=if(focused)androidx.compose.ui.text.font.FontWeight.SemiBold else androidx.compose.ui.text.font.FontWeight.Normal),
+                                            BasicText(mark.title,style=nativeTextStyle(color=if(editable)colors.onBrand else colors.ink,sizeSp=11f,lineHeightSp=15f,
+                                                weight=if(focused)androidx.compose.ui.text.font.FontWeight.SemiBold else androidx.compose.ui.text.font.FontWeight.Normal),
                                                 maxLines=if(rect.height>=with(density){68.dp.toPx()})2 else 1,overflow=TextOverflow.Ellipsis)
                                             if(rect.height>=with(density){68.dp.toPx()}) {
                                                 Spacer(Modifier.height(3.dp))

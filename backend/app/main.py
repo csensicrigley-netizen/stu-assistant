@@ -688,19 +688,6 @@ def notices(limit: int = Query(default=10, ge=1, le=200),
     return {"items": [_shape_item(r) for r in rows], "count": len(rows), "daily_cap": 10}
 
 
-@app.get("/v1/facts")
-def daily_facts(uid: str = Depends(current_user)) -> dict:
-    """今天 5 条冷知识：搞笑、有趣、鲜为人知。同一天固定，隔天换一批。"""
-    from . import facts as factslib
-
-    try:
-        rows = factslib.daily(uid)
-    except Exception as exc:  # noqa: BLE001 - 冷知识不该让通知页崩
-        log.warning("facts 生成失败 %s", type(exc).__name__)
-        return {"day": "", "items": [], "count": 0, "error": "facts_unavailable"}
-    return factslib.payload_json(rows)
-
-
 @app.get("/v1/grades")
 def grades(semester: str = Query(default=""), uid: str = Depends(current_user)) -> dict:
     db = DB(settings.db_path)

@@ -12,7 +12,7 @@ import {
 
 import { forgetUser, useShell, useStore } from "../lib/store";
 import { agoText } from "../lib/clock";
-import { usePalette, useTheme, type PalettePref, type ThemePref } from "../lib/useTheme";
+import { PALETTE_OPTIONS, usePalette, useTheme, type ThemePref } from "../lib/useTheme";
 import { SOURCE_NAME } from "../lib/records";
 import { Icon } from "../components/Icon";
 import { Magnetic } from "../components/Magnetic";
@@ -226,18 +226,42 @@ export function MeScreen({ onSignOut }: { onSignOut: () => void }) {
             />
           </div>
           <div className="stack-2">
-            <p className="field__label">色系</p>
-            <Segmented<PalettePref>
-              label="色系"
-              value={palette}
-              onChange={choosePalette}
-              options={[
-                { key: "sweet", label: "樱粉" },
-                { key: "classic", label: "海蓝" },
-              ]}
-            />
+            <p className="field__label">校园色系</p>
+            <div className="palette-grid" role="radiogroup" aria-label="校园色系">
+              {PALETTE_OPTIONS.map((item) => {
+                const active = palette === item.key;
+                return (
+                  <button
+                    key={item.key}
+                    type="button"
+                    role="radio"
+                    aria-checked={active}
+                    className={`palette-card${active ? " is-on" : ""}`}
+                    onClick={() => choosePalette(item.key)}
+                  >
+                    <span
+                      className="palette-swatch"
+                      style={{ background: item.swatchPaper }}
+                      aria-hidden="true"
+                    >
+                      <span className="palette-swatch__dot" style={{ background: item.swatchBrand }} />
+                      <span className="palette-swatch__dot palette-swatch__dot--sm" style={{ background: item.swatchAccent }} />
+                    </span>
+                    <span className="palette-card__meta">
+                      <b>{item.label}</b>
+                      <small>{item.subtitle}</small>
+                    </span>
+                    {active && (
+                      <span className="palette-card__check" aria-hidden="true">
+                        <Icon name="check" size={15} strokeWidth={2.3} />
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-          <p className="field__hint">跟手机系统的深浅色走，装到桌面之后也不会跳。</p>
+          <p className="field__hint">色系仅切换全局色彩氛围，所有动效与功能体验完全一致；深浅色可跟随手机系统。</p>
         </div>
       </Section>
 
@@ -267,7 +291,7 @@ export function MeScreen({ onSignOut }: { onSignOut: () => void }) {
           <img className="qrcard__img" src="./feedback-group.png" alt="反馈群二维码" loading="lazy" />
           <div className="qrcard__text">
             <b>扫码进反馈群</b>
-            <small>有 bug、想加功能、觉得哪条冷知识不对，或者就想骂我两句，都可以进群说。</small>
+            <small>遇到问题、有新点子，或者想聊聊校园日常使用体验，随时欢迎进群交流。</small>
           </div>
         </div>
       </Section>

@@ -1,6 +1,7 @@
 import { Capacitor, registerPlugin, type PluginListenerHandle } from "@capacitor/core";
 import { useEffect, useRef, useState } from "react";
 import { getHapticStrength, HAPTIC_STRENGTH_CHANGED } from "./haptics";
+import { normalizePalette, type PalettePref } from "./useTheme";
 
 export interface NativeNavigationItem {
   key: string;
@@ -14,7 +15,7 @@ export interface NativeNavigationState {
   current: string;
   tabs: NativeNavigationItem[];
   theme: "light" | "dark";
-  palette: "sweet" | "classic";
+  palette: PalettePref;
   strength: number;
   visible: boolean;
   sheetOpen: boolean;
@@ -74,7 +75,7 @@ export function useNativeNavigation(
         current: route.current.current,
         tabs: route.current.tabs,
         theme: root.dataset.theme === "dark" ? "dark" : "light",
-        palette: root.dataset.palette === "classic" ? "classic" : "sweet",
+        palette: normalizePalette(root.dataset.palette),
         strength: getHapticStrength(),
         visible: document.visibilityState === "visible" && !wide.matches,
         sheetOpen: Boolean(document.querySelector('.sheet-layer,[aria-modal="true"]')),
