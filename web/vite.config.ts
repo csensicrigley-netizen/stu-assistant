@@ -19,24 +19,8 @@ export default defineConfig({
       disable: true,
       registerType: "autoUpdate",
       includeAssets: ["icon.svg", "favicon-32.png", "apple-touch-icon.png"],
-      manifest: {
-        name: "STU 事项助手",
-        short_name: "STU 助手",
-        description: "下一节课在哪，作业几点截止。",
-        theme_color: "#f9f6f1",
-        background_color: "#f9f6f1",
-        display: "standalone",
-        orientation: "portrait",
-        start_url: "./",
-        scope: "./",
-        lang: "zh-CN",
-        icons: [
-          { src: "icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
-          { src: "icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
-          { src: "icon-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
-          { src: "icon.svg", sizes: "any", type: "image/svg+xml", purpose: "any" },
-        ],
-      },
+      // index.html links to public/manifest.webmanifest for home-screen icons.
+      manifest: false,
       workbox: {
         globPatterns: ["**/*.{js,css,html,svg,woff2,png}"],
         globIgnores: ["**/download/**", "**/shots/**"],

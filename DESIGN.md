@@ -73,9 +73,11 @@ Android 新增或改版的界面默认使用 [Kyant0/Shapes](https://github.com/
 - 真机评估疲劳与辨识度；自动化验证状态、次数、时机和回归，不以模拟器宣称马达手感已验收。
 - 主导航切页沿用 JS 的方向位移、轻缩放与快速退场／弹簧入场节奏，补充短暂 GPU 模糊。底栏独立固定，旧页仅保留短时绘制层；快切不排队、不开双份业务组合。系统减少动画时立即替换。
 
-## 标志
+## 桌面与启动图标
 
-一笔连续的 S：三段路、两个转弯，是一天在教室之间走的路线，也是 STU 的 S；中段一颗珊瑚色圆点是「现在」。纸白画在色系主色上（樱粉紫 / 海蓝），颜色取自 token，跟着色系变。所有尺寸都从 `web/scripts/icons.mjs` 一个定义生成：网页 favicon / PWA（含 maskable）、iOS 主屏、Android 自适应图标（前景、背景、Android 13 主题图标）、启动画面。检查图 `web/shots/icon-sheet.png` 覆盖 240px 到 16px、三种启动器遮罩和深色桌面。
+桌面图标取汕大真理钟的侧面。石塔从弧线后露出，弧线向右挑起悬钟，底端绕回塔后。钟体略作放大，保留钟口的暗面，方便在手机桌面辨认。使用 Kubai Icons 的薰衣草色板，配深紫底色。[汕头大学实景照片](https://www.stu.edu.cn/info/1108/5866.htm)
+
+`web/public/icon.svg` 是矢量母版。进入 `web` 后运行 `node scripts/icons.mjs --android`，可生成网页图标、主屏幕图标、Android 各密度启动图标和启动画面。Android 系统主题色图标复用同一组轮廓，用镂空表现弧线穿过石塔的层次。`node scripts/icons.mjs --sheet` 生成的 `web/shots/icon-sheet.png` 可预览桌面尺寸和不同启动器的裁切效果。
 
 ## 三种形态，一套代码
 
