@@ -75,7 +75,7 @@ Android 新增或改版的界面默认使用 [Kyant0/Shapes](https://github.com/
 
 ## 桌面与启动图标
 
-桌面图标取汕大真理钟的侧面。石塔从弧线后露出，弧线向右挑起悬钟，底端绕回塔后。钟体略作放大，保留钟口的暗面，方便在手机桌面辨认。使用 Kubai Icons 的薰衣草色板，配深紫底色。[汕头大学实景照片](https://www.stu.edu.cn/info/1108/5866.htm)
+桌面图标取汕大真理钟的侧影。蓝底上只有两块前景，浅蓝是石塔，白色弧梁和右端的直筒悬钟共用一条外轮廓。弧线上端经过塔前，下端收在塔后。造型沿用 Kubai Icons 的前后分层，简化程度参考「专注飞机」的整块剪影，以及「罐头冥想」用遮挡表现弧线的做法。[汕大实景](https://www.stu.edu.cn/info/1108/5866.htm) · [专注飞机](https://logoicon.cn/apps/app-mwdky8twhnk?platform=ios&icon=id-3gzsuozey8tw) · [罐头冥想](https://logoicon.cn/apps/app-mwd6t7d3t2q?platform=ios&icon=id-o40bnz3xt7d3)
 
 `web/public/icon.svg` 是矢量母版。进入 `web` 后运行 `node scripts/icons.mjs --android`，可生成网页图标、主屏幕图标、Android 各密度启动图标和启动画面。Android 系统主题色图标复用同一组轮廓，用镂空表现弧线穿过石塔的层次。`node scripts/icons.mjs --sheet` 生成的 `web/shots/icon-sheet.png` 可预览桌面尺寸和不同启动器的裁切效果。
 

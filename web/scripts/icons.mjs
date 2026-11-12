@@ -41,10 +41,7 @@ async function loadArtwork(page) {
       const mark = svg.querySelector("#mark");
       if (shape === "full") tile.setAttribute("rx", "0");
       if (shape === "circle") tile.setAttribute("rx", String(box.width / 2));
-      if (layer === "foreground" || layer === "themed") {
-        tile.remove();
-        mark.parentElement.removeAttribute("clip-path");
-      }
+      if (layer === "foreground" || layer === "themed") tile.remove();
       if (layer === "background") mark.remove();
       if (layer === "themed") mark.setAttribute("href", "#themed-bell");
       if (scale !== 1) {
@@ -116,6 +113,19 @@ async function android(page, art) {
   await mkdir(any, { recursive: true });
   await writeFile(path.join(any, "ic_launcher.xml"), adaptive);
   await writeFile(path.join(any, "ic_launcher_round.xml"), adaptive);
+  // The system splash accepts a colour for its icon plate. Sample the same
+  // background the launcher uses, even when the master contains a gradient.
+  const plate = await page.evaluate(async (src) => {
+    const img = new Image();
+    img.src = src;
+    await img.decode();
+    const ctx = new OffscreenCanvas(1, 1).getContext("2d");
+    ctx.drawImage(img, 0, 0, 1, 1);
+    const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
+    return "#" + [r, g, b].map((channel) => channel.toString(16).padStart(2, "0")).join("").toUpperCase();
+  }, imageUrl(art.background));
+  await writeFile(path.join(ANDROID_RES, "values", "launcher_colors.xml"),
+    `<?xml version="1.0" encoding="utf-8"?>\n<resources>\n    <color name="launcher_surface">${plate}</color>\n</resources>\n`);
   await png(page, art.desktop, 448, path.join(ANDROID_RES, "drawable-nodpi", "splash_mark.png"));
   console.log("Android launcher and splash icons → android/app/src/main/res/");
 }
@@ -127,21 +137,21 @@ async function sheet(page, art) {
   // Launchers mask the middle 72dp of a 108dp layer at rest.
   const masked = (radius, themed = false) => {
     const layers = themed
-      ? `<i style="background:#514366;mask:center / contain url('${imageUrl(art.themed)}') no-repeat"></i>`
+      ? `<i style="background:#33485e;mask:center / contain url('${imageUrl(art.themed)}') no-repeat"></i>`
       : svgImage(art.background, 162) + svgImage(art.foreground, 162);
     return `<div class="mask" style="border-radius:${radius}"><div class="layers">${layers}</div></div>`;
   };
   const html = `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><style>
-    *{box-sizing:border-box}body{margin:0;background:#f6f4f8;color:#352e43;font:16px "Segoe UI","Microsoft YaHei",sans-serif}
+    *{box-sizing:border-box}body{margin:0;background:#f3f5f7;color:#202e3c;font:16px "Segoe UI","Microsoft YaHei",sans-serif}
     main{width:860px;padding:36px;display:grid;gap:28px}h1,h2,p,figure{margin:0}
     header,section,.sizes,.masks{display:flex}header{gap:40px;align-items:center}
     h1{font-size:36px;font-weight:650;letter-spacing:.04em}h2{font-weight:500;font-size:16px}
-    header p,figcaption{color:#665e74}header p{margin:3px 0 18px}
+    header p,figcaption{color:#596673}header p{margin:3px 0 18px}
     .sizes{align-items:flex-end;gap:16px}figure{display:grid;justify-items:center;gap:8px}img{display:block}
     figcaption{font-size:13px}.sizes figcaption{font-family:ui-monospace,Consolas,monospace}
-    section{padding:22px 30px;background:#272332;color:#efeaf7;border-radius:22px;align-items:center;justify-content:space-between}
-    .masks{align-items:flex-start;gap:24px}.masks figcaption{color:#d3cadf}
-    .mask{width:108px;height:108px;background:#e0d8ec;overflow:hidden;position:relative}
+    section{padding:22px 30px;background:#202a35;color:#f2f4f8;border-radius:22px;align-items:center;justify-content:space-between}
+    .masks{align-items:flex-start;gap:24px}.masks figcaption{color:#ccd5df}
+    .mask{width:108px;height:108px;background:#dce6ef;overflow:hidden;position:relative}
     .layers{position:absolute;width:150%;height:150%;left:-25%;top:-25%}
     .layers img,.layers i{position:absolute;inset:0;width:100%;height:100%}
   </style><main><header>${svgImage(art.desktop, 208)}<div><h1>真理钟</h1>
