@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" fill="none">
+  <title>汕大真理钟 · 原弧</title>
+  <desc>保留原版开口，柔化左侧回转。青绿色底，象牙白回弧与浅杏悬点。</desc>
+  <defs>
+    <!-- All edge layers follow the same closed outline. -->
+    <path id="outline" d="M148 0H364
+      C414 0 438 0 461 12.3 C478.1 21.45 490.55 33.9 499.7 51 C512 74 512 98 512 148V364
+      C512 414 512 438 499.7 461 C490.55 478.1 478.1 490.55 461 499.7 C438 512 414 512 364 512H148
+      C98 512 74 512 51 499.7 C33.9 490.55 21.45 478.1 12.3 461 C0 438 0 414 0 364V148
+      C0 98 0 74 12.3 51 C21.45 33.9 33.9 21.45 51 12.3 C74 0 98 0 148 0Z"/>
+    <clipPath id="trim"><use href="#outline"/></clipPath>
+    <linearGradient id="field" gradientUnits="userSpaceOnUse" x1="65" y1="479" x2="407" y2="-29">
+      <stop stop-color="#21625E"/><stop offset=".28" stop-color="#235952"/>
+      <stop offset=".63" stop-color="#204740"/><stop offset="1" stop-color="#152F36"/>
+    </linearGradient>
+    <radialGradient id="sage" gradientUnits="userSpaceOnUse" cx="0" cy="0" r="1" gradientTransform="translate(58 18) rotate(37) scale(420 296)">
+      <stop stop-color="#B8B393" stop-opacity=".53"/>
+      <stop offset=".49" stop-color="#8EAA88" stop-opacity=".30"/><stop offset="1" stop-color="#708C75" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="blue" gradientUnits="userSpaceOnUse" cx="0" cy="0" r="1" gradientTransform="translate(532 393) rotate(-31) scale(368 193)">
+      <stop stop-color="#122835" stop-opacity=".79"/><stop offset=".50" stop-color="#153C42" stop-opacity=".40"/>
+      <stop offset="1" stop-color="#294D4A" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="tide" gradientUnits="userSpaceOnUse" cx="0" cy="0" r="1" gradientTransform="translate(56 572) rotate(-19) scale(372 164)">
+      <stop stop-color="#729B91" stop-opacity=".47"/><stop offset=".52" stop-color="#4D837C" stop-opacity=".24"/><stop offset="1" stop-color="#527C72" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="rim" gradientUnits="userSpaceOnUse" x1="442" y1="14" x2="83" y2="504">
+      <stop stop-color="#87A6A9"/><stop offset=".34" stop-color="#B9C5A9"/><stop offset=".65" stop-color="#9DB6A6"/><stop offset="1" stop-color="#74A29C"/>
+    </linearGradient>
+    <radialGradient id="rim-warm" gradientUnits="userSpaceOnUse" cx="0" cy="0" r="1" gradientTransform="translate(78 39) rotate(16) scale(205 155)">
+      <stop stop-color="#E8D5A9" stop-opacity=".85"/><stop offset=".55" stop-color="#E8D5A9" stop-opacity=".36"/><stop offset="1" stop-color="#E8D5A9" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <g id="tile">
+    <use href="#outline" fill="url(#field)"/>
+    <g clip-path="url(#trim)">
+      <path d="M0 0H512V512H0Z" fill="url(#sage)"/>
+      <path d="M0 0H512V512H0Z" fill="url(#blue)"/>
+      <path d="M0 0H512V512H0Z" fill="url(#tide)"/>
+      <!-- Two colours on the same clipped perimeter give this edge its 3.8 px inside width. -->
+      <g id="edge" stroke-width="7.6">
+        <use href="#outline" stroke="url(#rim)"/>
+        <use href="#outline" stroke="url(#rim-warm)"/>
+      </g>
+    </g>
+  </g>
+  <g id="mark">
+    <path fill="#F5EBCF" d="M427.985 120.27
+      C396.73 126.349 367.126 135.008 340.081 145.62
+      C313.035 156.231 288.549 168.795 267.535 182.55
+      C246.521 196.306 228.979 211.253 215.823 227.11
+      C202.666 242.967 193.895 259.735 190.45 275.375
+      C187.005 291.015 188.887 305.529 195.373 317.86
+      C201.86 330.191 212.95 340.339 227.899 349.048
+      C242.847 357.758 261.654 365.029 283.582 371.127
+      C305.511 377.225 330.561 382.15 357.995 386.309
+      Q359.85 387.52 357.005 388.091
+      C325.527 393.258 295.701 394.29 268.761 391.632
+      C241.82 388.974 217.764 382.627 197.756 373.258
+      C177.749 363.89 161.79 351.501 151.266 335.966
+      C140.742 320.431 135.652 301.75 136.55 282.725
+      C137.448 263.7 144.334 244.331 156.85 225.56
+      C169.365 206.788 187.512 188.616 211.541 172.792
+      C235.57 156.969 265.483 143.495 301.361 133.9
+      C337.239 124.304 379.083 118.586 427.015 118.33
+      Q429.8 118.9 427.985 120.27Z"/>
+    <circle cx="344" cy="244.3" r="43" fill="#EBD38D"/>
+  </g>
+</svg>
