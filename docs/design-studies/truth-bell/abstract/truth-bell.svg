@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" fill="none">
   <title>汕大真理钟 · 回弧</title>
-  <desc>青绿色底上，一道象牙白弧托起悬空的浅杏色圆点。沿四边与转角，一道细边连续环绕。</desc>
+  <desc>深青底上，象牙白回弧与浅杏色圆点间留着开口。细边从左上的暖灰金过渡到右侧的雾青蓝。</desc>
   <defs>
-    <!-- All edge layers follow the same closed outline. -->
+    <!-- One shared contour for the background and its closed hairline. -->
     <path id="outline" d="M148 0H364
       C414 0 438 0 461 12.3 C478.1 21.45 490.55 33.9 499.7 51 C512 74 512 98 512 148V364
       C512 414 512 438 499.7 461 C490.55 478.1 478.1 490.55 461 499.7 C438 512 414 512 364 512H148
@@ -10,32 +10,29 @@
       C0 98 0 74 12.3 51 C21.45 33.9 33.9 21.45 51 12.3 C74 0 98 0 148 0Z"/>
     <clipPath id="trim"><use href="#outline"/></clipPath>
     <linearGradient id="field" gradientUnits="userSpaceOnUse" x1="65" y1="479" x2="407" y2="-29">
-      <stop stop-color="#21625E"/><stop offset=".28" stop-color="#235952"/>
-      <stop offset=".63" stop-color="#204740"/><stop offset="1" stop-color="#152F36"/>
+      <stop stop-color="#26665F"/><stop offset=".28" stop-color="#235952"/>
+      <stop offset=".63" stop-color="#204740"/><stop offset="1" stop-color="#162E38"/>
     </linearGradient>
     <radialGradient id="sage" gradientUnits="userSpaceOnUse" cx="0" cy="0" r="1" gradientTransform="translate(58 18) rotate(37) scale(420 296)">
       <stop stop-color="#B8B393" stop-opacity=".53"/>
       <stop offset=".49" stop-color="#8EAA88" stop-opacity=".30"/><stop offset="1" stop-color="#708C75" stop-opacity="0"/>
     </radialGradient>
     <radialGradient id="blue" gradientUnits="userSpaceOnUse" cx="0" cy="0" r="1" gradientTransform="translate(532 393) rotate(-31) scale(368 193)">
-      <stop stop-color="#0F2433" stop-opacity=".81"/><stop offset=".50" stop-color="#153C42" stop-opacity=".40"/>
+      <stop stop-color="#14263C" stop-opacity=".81"/><stop offset=".50" stop-color="#153C42" stop-opacity=".40"/>
       <stop offset="1" stop-color="#294D4A" stop-opacity="0"/>
     </radialGradient>
     <radialGradient id="tide" gradientUnits="userSpaceOnUse" cx="0" cy="0" r="1" gradientTransform="translate(56 572) rotate(-19) scale(372 164)">
       <stop stop-color="#729B91" stop-opacity=".47"/><stop offset=".52" stop-color="#4D837C" stop-opacity=".24"/><stop offset="1" stop-color="#527C72" stop-opacity="0"/>
     </radialGradient>
-    <linearGradient id="rim" gradientUnits="userSpaceOnUse" x1="6" y1="36" x2="487" y2="476">
-      <stop stop-color="#B8C5AB"/><stop offset=".22" stop-color="#9AB4A0"/><stop offset=".52" stop-color="#75968A"/>
-      <stop offset=".78" stop-color="#5F837A"/><stop offset="1" stop-color="#839585"/>
+    <linearGradient id="rim" gradientUnits="userSpaceOnUse" x1="452" y1="16" x2="73" y2="495">
+      <stop stop-color="#88A9B0"/><stop offset=".25" stop-color="#9AB7B1"/>
+      <stop offset=".47" stop-color="#C5C8A0"/><stop offset=".67" stop-color="#A0B69C"/>
+      <stop offset=".85" stop-color="#86AC9E"/><stop offset="1" stop-color="#78A7A0"/>
     </linearGradient>
-    <linearGradient id="rim-fold" gradientUnits="userSpaceOnUse" x1="445" y1="15" x2="83" y2="505">
-      <stop stop-color="#66827A"/><stop offset=".35" stop-color="#5B7E76"/>
-      <stop offset=".68" stop-color="#66897B"/><stop offset="1" stop-color="#92A590"/>
-    </linearGradient>
-    <linearGradient id="rim-light" gradientUnits="userSpaceOnUse" x1="66" y1="8" x2="411" y2="494">
-      <stop stop-color="#E4E1BE" stop-opacity=".73"/><stop offset=".28" stop-color="#CBDFC1" stop-opacity=".63"/>
-      <stop offset=".59" stop-color="#C1D5C1" stop-opacity=".35"/><stop offset="1" stop-color="#D8CFAC" stop-opacity=".61"/>
-    </linearGradient>
+    <radialGradient id="rim-warm" gradientUnits="userSpaceOnUse" cx="0" cy="0" r="1" gradientTransform="translate(81 50) rotate(-16) scale(255 190)">
+      <stop stop-color="#F2DCA5" stop-opacity=".62"/><stop offset=".6" stop-color="#E8D7AA" stop-opacity=".22"/>
+      <stop offset="1" stop-color="#DFD2A8" stop-opacity="0"/>
+    </radialGradient>
   </defs>
   <g id="tile">
     <use href="#outline" fill="url(#field)"/>
@@ -43,18 +40,36 @@
       <path d="M0 0H512V512H0Z" fill="url(#sage)"/>
       <path d="M0 0H512V512H0Z" fill="url(#blue)"/>
       <path d="M0 0H512V512H0Z" fill="url(#tide)"/>
-      <use href="#outline" stroke="url(#rim)" stroke-width="17.2"/>
-      <use href="#outline" transform="translate(6.5 6.5) scale(.974609375)" stroke="url(#rim-fold)" stroke-width="3.7"/>
-      <use href="#outline" transform="translate(1.25 1.25) scale(.9951171875)" stroke="url(#rim-light)" stroke-width="1.65"/>
-      <use href="#outline" stroke="#142D30" stroke-opacity=".45" stroke-width="1.12"/>
+      <!-- The outer half of each stroke is clipped; together they occupy 2.6 px inward. -->
+      <g id="edge" stroke-width="5.2">
+        <use href="#outline" stroke="url(#rim)"/>
+        <use href="#outline" stroke="url(#rim-warm)"/>
+      </g>
     </g>
   </g>
-  <g id="mark" fill="#F5EBCF" transform="translate(12 -4)">
-    <path d="M406 122
-      C282 146 183 211 169 276
-      C155 341 226.346 370.5 336 388 Q340 388.45 338 389.1 Q337.1 389.5 335.0 389.8
-      C209 410 109.4 363.95 114 283.5
-      C118.2895 208.480375 212.2461 120 405 120 Q408.45 120 408.1 120.85 Q407.85 121.52 406 122Z"/>
-    <circle cx="323" cy="243" r="43.5" fill="#EBD38D"/>
+  <g id="mark">
+    <!-- Each side follows its own curvature profile from one pointed end to the other. -->
+    <path fill="#F5EBCF" d="M422.8 120.7
+      C401.5051 123.3806 380.3152 126.7398 359.3056 130.8479
+      C338.2959 134.956 317.4664 139.8131 296.9684 145.647
+      C276.4704 151.4809 256.304 158.2916 236.9329 166.6646
+      C217.5619 175.0375 198.9862 184.9726 182.821 197.7998
+      C166.6557 210.6269 152.9009 226.346 145.9872 244.4696
+      C139.0736 262.5932 139.0011 283.1213 146.1895 301.0968
+      C153.3778 319.0722 167.8269 334.495 184.8412 346.403
+      C201.8556 358.3111 221.4352 366.7043 241.6842 373.2327
+      C261.9332 379.7611 282.8517 384.4245 303.9868 387.9896
+      C325.122 391.5546 346.4738 394.0213 367.8962 395.7
+      C350.0069 391.0568 332.3685 385.8459 315.2276 379.8033
+      C298.0867 373.7607 281.4434 366.8865 265.9612 358.6664
+      C250.4791 350.4464 236.1581 340.8806 224.7523 329.49
+      C213.3464 318.0994 204.8557 304.8841 201.3824 290.9222
+      C197.9092 276.9603 199.4534 262.2518 205.2125 248.6851
+      C210.9715 235.1183 220.9455 222.6932 232.9411 211.6387
+      C244.9368 200.5843 258.9542 190.9004 273.8683 182.119
+      C288.7825 173.3375 304.5934 165.4586 320.8664 158.1803
+      C337.1394 150.9021 353.8745 144.2245 370.904 138.0097
+      C387.9336 131.7948 405.2576 126.0425 422.8 120.7Z"/>
+    <circle cx="359.8" cy="249.2" r="44.5" fill="#EBD38D"/>
   </g>
 </svg>
