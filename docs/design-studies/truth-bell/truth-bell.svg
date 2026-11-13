@@ -1,0 +1,122 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-1 -4 33 33" width="512" height="512" fill="none">
+  <title>汕大真理钟 · 图标修改稿</title>
+  <desc>青绿色底上，灰白石塔立在主体宽度的 38.2% 处。金属曲线从塔前挑起一口暖铜色悬钟，转过左侧后从塔脚后方收出。</desc>
+  <defs>
+    <!-- Construction envelope x 3.35 to 27.65, y 0.70 to 24.30. Pier axis divides the width at 1/phi². The bell axis divides the remaining span at 1/phi. The ribbon has a vertical tangent at 1/phi of the height. -->
+    <linearGradient id="field" x1=".13" y1=".03" x2=".85" y2="1">
+      <stop offset="0" stop-color="#294C45" />
+      <stop offset=".53" stop-color="#183B35" />
+      <stop offset="1" stop-color="#102D2A" />
+    </linearGradient>
+    <path id="arc-profile" d="M27.07 3.06 C13.97 3.06 3.35 8.534 3.35 15.286 C3.35 19.926 12.68 22.97 25.1 24.16
+      Q25.58 24.20 25.64 24.09 Q25.68 23.99 25.24 23.90 C17.48 22.30 5.57 19.7 5.57 15.286
+      C5.57 9.445 15.187 4.71 27.05 4.71 Q27.65 4.7 27.65 4.17 V3.67 Q27.65 3.07 27.07 3.06 Z" />
+    <path id="pier-profile" d="M10.052 1.79 Q10.052 1.42 10.415 1.348 L13.515 0.735 Q13.692 0.7 13.863 0.754
+      L14.868 1.072 Q15.212 1.18 15.212 1.54 L15.212 23.35 Q15.212 23.65 14.925 23.739
+      L13.883 24.061 Q13.692 24.12 13.493 24.095 L10.419 23.706 Q10.052 23.66 10.052 23.29 Z" />
+    <path id="bell-profile" d="M21.914 9.08 C20.639 9.08 19.639 9.94 19.466 11.18 L18.854 14.46
+      Q18.711 15.19 18.405 15.65 Q18.089 16.16 18.66 16.4 C20.486 17.2 23.342 17.2 25.167 16.4
+      Q25.739 16.16 25.422 15.65 Q25.116 15.19 24.974 14.46 L24.362 11.18
+      C24.188 9.94 23.189 9.08 21.914 9.08 Z" />
+    <path id="sling-profile" d="M20.534 4.46L21.764 9.15 Q21.914 9.48 22.064 9.15 L23.354 4.28" />
+    <filter id="shadow" x="-40%" y="-40%" width="180%" height="190%" color-interpolation-filters="sRGB">
+      <feGaussianBlur in="SourceAlpha" stdDeviation=".70" />
+      <feOffset dy=".80" result="o" />
+      <feColorMatrix in="o" type="matrix" values="0 0 0 0 .015 0 0 0 0 .066 0 0 0 0 .066 0 0 0 .40 0" />
+      <feMerge>
+        <feMergeNode />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+    <filter id="edge-light" x="-10%" y="-10%" width="120%" height="130%" color-interpolation-filters="sRGB">
+      <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="a" />
+      <feOffset in="a" dy=".27" />
+      <feGaussianBlur stdDeviation=".17" />
+      <feComposite in2="a" operator="arithmetic" k2="-1" k3="1" />
+      <feColorMatrix type="matrix" values="0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.5 0" />
+      <feBlend in2="SourceGraphic" mode="overlay" />
+    </filter>
+    <mask id="ol-0" maskUnits="userSpaceOnUse" x="-40" y="-40" width="111" height="109">
+      <rect x="-40" y="-40" width="111" height="109" fill="#fff" />
+      <use href="#arc-profile" fill="#000" fill-rule="nonzero" />
+    </mask>
+    <mask id="ol-1" maskUnits="userSpaceOnUse" x="-40" y="-40" width="111" height="109">
+      <rect x="-40" y="-40" width="111" height="109" fill="#fff" />
+      <use href="#pier-profile" fill="#000" fill-rule="nonzero" />
+    </mask>
+    <mask id="ol-2" maskUnits="userSpaceOnUse" x="-40" y="-40" width="111" height="109">
+      <rect x="-40" y="-40" width="111" height="109" fill="#fff" />
+      <use href="#bell-profile" fill="#000" fill-rule="nonzero" />
+    </mask>
+    <linearGradient id="ribbon-metal" x1=".21" y1=".91" x2=".82" y2=".10">
+      <stop offset="0" stop-color="#83A495" />
+      <stop offset="0.31" stop-color="#568275" />
+      <stop offset="0.66" stop-color="#8AA596" />
+      <stop offset="1" stop-color="#C6C8B1" />
+    </linearGradient>
+    <linearGradient id="stone-face-light" x1="0" y1="0" x2=".33" y2="1">
+      <stop offset="0" stop-color="#DDDCD0" />
+      <stop offset="0.64" stop-color="#BDC5B9" />
+      <stop offset="1" stop-color="#9CAFA2" />
+    </linearGradient>
+    <linearGradient id="stone-side" x1="0" y1="0" x2="1" y2=".90">
+      <stop offset="0" stop-color="#9DAEA2" />
+      <stop offset="1" stop-color="#698B7F" />
+    </linearGradient>
+    <linearGradient id="bell-metal" x1="0" y1=".32" x2="1" y2=".60">
+      <stop offset="0" stop-color="#A87849" />
+      <stop offset="0.31" stop-color="#F5DDA1" />
+      <stop offset="0.58" stop-color="#E7BD76" />
+      <stop offset="1" stop-color="#B7834C" />
+    </linearGradient>
+    <clipPath id="face-clip">
+      <use href="#pier-profile" />
+    </clipPath>
+    <clipPath id="bell-clip">
+      <use href="#bell-profile" />
+    </clipPath>
+    <clipPath id="crossing">
+      <path d="M8 0H20V13H8Z" />
+    </clipPath>
+    <g filter="url(#shadow)" id="landmark">
+      <use href="#sling-profile" id="suspension" fill="none" stroke-linejoin="round" stroke-linecap="round" stroke-width=".94" stroke="#B5AD84" />
+      <g id="ribbon">
+        <g filter="url(#edge-light)">
+          <use href="#arc-profile" fill="url(#ribbon-metal)" />
+        </g>
+        <use href="#arc-profile" stroke-linejoin="round" mask="url(#ol-0)" stroke="#678D7D" fill="none" stroke-width=".97" />
+      </g>
+      <g id="pier" mask="url(#stone-under-ribbon)">
+        <use href="#pier-profile" fill="url(#stone-side)" />
+        <g clip-path="url(#face-clip)">
+          <path d="M10.052 1.42L13.692 0.7V24.12L10.052 23.66Z" fill="url(#stone-face-light)" />
+          <path d="M9.912 13.34L12.362 13.22 M11.192 17.48L13.742 17.6" fill="none" stroke-width=".37" stroke="#879F91" />
+        </g>
+        <use href="#pier-profile" stroke-linejoin="round" mask="url(#ol-1)" stroke="#708C7C" fill="none" stroke-width=".98" />
+      </g>
+      <g id="bell">
+        <g filter="url(#edge-light)">
+          <use href="#bell-profile" fill="url(#bell-metal)" />
+        </g>
+        <g clip-path="url(#bell-clip)">
+          <path d="M17.885 14.85Q21.914 15.8 25.943 14.85V17.5H17.914Z" fill="#F1CD8C" />
+          <path d="M18.17 16.14Q21.914 15.14 25.657 16.14V17.50H18.014Z" fill="#71513C" />
+        </g>
+        <use href="#bell-profile" stroke-linejoin="round" mask="url(#ol-2)" stroke="#B18B5D" fill="none" stroke-width="1.12" />
+      </g>
+    </g>
+    <clipPath id="tile-clip">
+      <rect x="-1" y="-4" width="33" height="33" rx="7.4" />
+    </clipPath>
+    <mask id="stone-under-ribbon" maskUnits="userSpaceOnUse" x="-1" y="-4" width="33" height="33">
+      <rect x="-1" y="-4" width="33" height="33" fill="white" />
+      <g clip-path="url(#crossing)">
+        <use href="#arc-profile" fill="black" stroke="black" stroke-width=".97" stroke-linejoin="round" />
+      </g>
+    </mask>
+  </defs>
+  <rect id="tile" x="-1" y="-4" width="33" height="33" rx="7.4" fill="url(#field)" />
+  <g clip-path="url(#tile-clip)">
+    <use href="#landmark" id="mark" transform="translate(-0.06 0.54)" />
+  </g>
+</svg>
