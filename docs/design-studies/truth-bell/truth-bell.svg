@@ -1,122 +1,224 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="-1 -4 33 33" width="512" height="512" fill="none">
-  <title>汕大真理钟 · 图标修改稿</title>
-  <desc>青绿色底上，灰白石塔立在主体宽度的 38.2% 处。金属曲线从塔前挑起一口暖铜色悬钟，转过左侧后从塔脚后方收出。</desc>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" fill="none">
+  <title>汕头大学真理钟</title>
+  <desc>暮色青绿的底板上，石塔立在金属弧的转折处。梁从塔前挑起铜钟，越过左端后收在塔脚后方。</desc>
   <defs>
-    <!-- Construction envelope x 3.35 to 27.65, y 0.70 to 24.30. Pier axis divides the width at 1/phi². The bell axis divides the remaining span at 1/phi. The ribbon has a vertical tangent at 1/phi of the height. -->
-    <linearGradient id="field" x1=".13" y1=".03" x2=".85" y2="1">
-      <stop offset="0" stop-color="#294C45" />
-      <stop offset=".53" stop-color="#183B35" />
-      <stop offset="1" stop-color="#102D2A" />
+    <path id="plate" d="M148 0H364
+      C414 0 438 0 461 12.3 C478.1 21.45 490.55 33.9 499.7 51 C512 74 512 98 512 148V364
+      C512 414 512 438 499.7 461 C490.55 478.1 478.1 490.55 461 499.7 C438 512 414 512 364 512H148
+      C98 512 74 512 51 499.7 C33.9 490.55 21.45 478.1 12.3 461 C0 438 0 414 0 364V148
+      C0 98 0 74 12.3 51 C21.45 33.9 33.9 21.45 51 12.3 C74 0 98 0 148 0Z"/>
+    <!-- The two cubics on each edge match tangent and curvature at the western turn. -->
+    <path id="metal-arc" d="M427 111.8
+      C258 111.8 82 201 82 297 C82 372 189.422 398 409.0 424.2
+      Q414.3 424.86 415.3 424.72 Q416.5 424.48 414.84 423.89 Q412.4 422.95 409.2 422.15
+      C185.84 389.2 107 357.7 107 296.5 C107 208.5 270 128.6 424.1 128.35
+      Q427.1 128.3 428.8 126.9 L431.1 124.9 Q432 124.1 432.1 122.8 L432.5 114.1
+      Q432.6 112 430.5 111.9Z"/>
+    <path id="stele" d="M177.4 85.6Q177.4 83.8 179.3 83.45L219.9 75.7
+      Q222.0 75.25 224 75.81L241.5 80.17 Q243.7 80.76 243.72 82.87L244.6 414.3
+      Q244.6 416.15 242.8 416.9L224.1 423.64Q222.0 424.4 220.1 424.15L180.0 419.75
+      Q177.75 419.5 177.75 417.28Z"/>
+    <path id="stele-front" d="M176.6 84.4L222.24 76.0L222.05 425.5L176.65 420.10Z"/>
+    <path id="bell-body" d="M348 189.4
+      C333.2 189.4 324.2 198.4 321.55 211.1
+      C316.3 236.25 315.7 261.9 308.7 285.4 C306.7 292.2 303.6 296.65 299.1 303.7
+      C296.9 307.05 297.65 309.54 300.82 311.35
+      C319.6 322.12 374.7 322.62 394.76 312.1 C398.17 310.31 399.2 307.24 397.05 303.97
+      C392.74 297.16 389.33 292.05 387.35 285.65 C379.86 261.49 378.41 236.6 374.6 211.65
+      C372.6 198.65 363.2 189.4 348 189.4Z"/>
+    <clipPath id="face-clip"><use href="#plate" transform="translate(.6 .65) scale(.99766 .9855)"/></clipPath>
+    <clipPath id="pier-clip"><use href="#stele"/></clipPath>
+    <clipPath id="front-clip"><use href="#stele-front"/></clipPath>
+    <clipPath id="ribbon-clip"><use href="#metal-arc"/></clipPath>
+    <clipPath id="upper"><path d="M164 57H255V237H164Z"/></clipPath>
+    <clipPath id="lower"><path d="M163 337H270V436H163Z"/></clipPath>
+    <mask id="beam-behind-foot" maskUnits="userSpaceOnUse" x="65" y="65" width="390" height="390">
+      <rect x="65" y="65" width="390" height="390" fill="white"/>
+      <g clip-path="url(#lower)"><use href="#stele" fill="black"/></g>
+    </mask>
+    <clipPath id="bell-clip"><use href="#bell-body"/></clipPath>
+    <linearGradient id="plate-edge" gradientUnits="userSpaceOnUse" x1="65" y1="4" x2="390" y2="526">
+      <stop stop-color="#819389"/><stop offset=".28" stop-color="#43615a"/>
+      <stop offset=".62" stop-color="#233e3b"/><stop offset=".88" stop-color="#172d2e"/><stop offset="1" stop-color="#263f3c"/>
     </linearGradient>
-    <path id="arc-profile" d="M27.07 3.06 C13.97 3.06 3.35 8.534 3.35 15.286 C3.35 19.926 12.68 22.97 25.1 24.16
-      Q25.58 24.20 25.64 24.09 Q25.68 23.99 25.24 23.90 C17.48 22.30 5.57 19.7 5.57 15.286
-      C5.57 9.445 15.187 4.71 27.05 4.71 Q27.65 4.7 27.65 4.17 V3.67 Q27.65 3.07 27.07 3.06 Z" />
-    <path id="pier-profile" d="M10.052 1.79 Q10.052 1.42 10.415 1.348 L13.515 0.735 Q13.692 0.7 13.863 0.754
-      L14.868 1.072 Q15.212 1.18 15.212 1.54 L15.212 23.35 Q15.212 23.65 14.925 23.739
-      L13.883 24.061 Q13.692 24.12 13.493 24.095 L10.419 23.706 Q10.052 23.66 10.052 23.29 Z" />
-    <path id="bell-profile" d="M21.914 9.08 C20.639 9.08 19.639 9.94 19.466 11.18 L18.854 14.46
-      Q18.711 15.19 18.405 15.65 Q18.089 16.16 18.66 16.4 C20.486 17.2 23.342 17.2 25.167 16.4
-      Q25.739 16.16 25.422 15.65 Q25.116 15.19 24.974 14.46 L24.362 11.18
-      C24.188 9.94 23.189 9.08 21.914 9.08 Z" />
-    <path id="sling-profile" d="M20.534 4.46L21.764 9.15 Q21.914 9.48 22.064 9.15 L23.354 4.28" />
-    <filter id="shadow" x="-40%" y="-40%" width="180%" height="190%" color-interpolation-filters="sRGB">
-      <feGaussianBlur in="SourceAlpha" stdDeviation=".70" />
-      <feOffset dy=".80" result="o" />
-      <feColorMatrix in="o" type="matrix" values="0 0 0 0 .015 0 0 0 0 .066 0 0 0 0 .066 0 0 0 .40 0" />
-      <feMerge>
-        <feMergeNode />
-        <feMergeNode in="SourceGraphic" />
-      </feMerge>
+    <linearGradient id="enamel" gradientUnits="userSpaceOnUse" x1="131" y1="4" x2="370" y2="514">
+      <stop stop-color="#365b55"/><stop offset=".39" stop-color="#234a45"/>
+      <stop offset=".78" stop-color="#163934"/><stop offset="1" stop-color="#112b30"/>
+    </linearGradient>
+    <radialGradient id="sky" gradientUnits="userSpaceOnUse" cx="0" cy="0" r="1" gradientTransform="translate(146 24) rotate(24) scale(314 241)">
+      <stop stop-color="#b8b7a0" stop-opacity=".33"/><stop offset=".5" stop-color="#8ea896" stop-opacity=".17"/><stop offset="1" stop-color="#78988d" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="cool-reflection" gradientUnits="userSpaceOnUse" cx="0" cy="0" r="1" gradientTransform="translate(7 370) rotate(-27) scale(308 167)">
+      <stop stop-color="#4d8586" stop-opacity=".31"/><stop offset="1" stop-color="#508480" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="warm-reflection" gradientUnits="userSpaceOnUse" cx="0" cy="0" r="1" gradientTransform="translate(462 528) rotate(-24) scale(236 143)">
+      <stop stop-color="#ad976c" stop-opacity=".25"/><stop offset=".55" stop-color="#93896b" stop-opacity=".10"/><stop offset="1" stop-color="#748271" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="perimeter" gradientUnits="userSpaceOnUse" x1="40" y1="5" x2="410" y2="487">
+      <stop stop-color="#f2ecce" stop-opacity=".49"/><stop offset=".41" stop-color="#b9c6b1" stop-opacity=".1"/>
+      <stop offset=".72" stop-color="#0d302f" stop-opacity=".48"/><stop offset="1" stop-color="#d2d1b4" stop-opacity=".17"/>
+    </linearGradient>
+    <linearGradient id="bottom-reflex" gradientUnits="userSpaceOnUse" x1="67" y1="501" x2="445" y2="501">
+      <stop stop-color="#90a398" stop-opacity="0"/><stop offset=".30" stop-color="#a3b0a3" stop-opacity=".21"/>
+      <stop offset=".65" stop-color="#aeb2a3" stop-opacity=".27"/><stop offset="1" stop-color="#aea088" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="enamel-grain" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency=".58" numOctaves="2" seed="11" stitchTiles="stitch"/>
+      <feColorMatrix type="saturate" values="0"/>
     </filter>
-    <filter id="edge-light" x="-10%" y="-10%" width="120%" height="130%" color-interpolation-filters="sRGB">
-      <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="a" />
-      <feOffset in="a" dy=".27" />
-      <feGaussianBlur stdDeviation=".17" />
-      <feComposite in2="a" operator="arithmetic" k2="-1" k3="1" />
-      <feColorMatrix type="matrix" values="0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.5 0" />
-      <feBlend in2="SourceGraphic" mode="overlay" />
+    <linearGradient id="ribbon-side" gradientUnits="userSpaceOnUse" x1="122" y1="413" x2="376" y2="112">
+      <stop stop-color="#416c64"/><stop offset=".36" stop-color="#3a625a"/><stop offset=".64" stop-color="#87a297"/><stop offset="1" stop-color="#b8b8a0"/>
+    </linearGradient>
+    <linearGradient id="ribbon-face" gradientUnits="userSpaceOnUse" x1="111" y1="409" x2="344" y2="99">
+      <stop stop-color="#a9baa3"/><stop offset=".20" stop-color="#668c7d"/><stop offset=".44" stop-color="#719789"/>
+      <stop offset=".65" stop-color="#b8c7b4"/><stop offset=".85" stop-color="#d2d0b4"/><stop offset="1" stop-color="#dbceb0"/>
+    </linearGradient>
+    <linearGradient id="top-ridge" gradientUnits="userSpaceOnUse" x1="95" y1="295" x2="383" y2="105">
+      <stop stop-color="#afceba" stop-opacity=".13"/><stop offset=".34" stop-color="#d5e0c6" stop-opacity=".72"/>
+      <stop offset=".67" stop-color="#fff1d0" stop-opacity=".93"/><stop offset="1" stop-color="#e5d3a6" stop-opacity=".27"/>
+    </linearGradient>
+    <linearGradient id="tail-ridge" gradientUnits="userSpaceOnUse" x1="104" y1="288" x2="404" y2="425">
+      <stop stop-color="#a7c5af" stop-opacity=".40"/><stop offset=".34" stop-color="#698e7d" stop-opacity=".13"/><stop offset=".70" stop-color="#c0c3a5" stop-opacity=".61"/><stop offset="1" stop-color="#c7c1a0" stop-opacity=".25"/>
+    </linearGradient>
+    <linearGradient id="stone" gradientUnits="userSpaceOnUse" x1="171" y1="84" x2="247" y2="408">
+      <stop stop-color="#d4d5c5"/><stop offset=".34" stop-color="#c6ccbb"/><stop offset=".78" stop-color="#bac6b7"/><stop offset="1" stop-color="#adbdaf"/>
+    </linearGradient>
+    <linearGradient id="stone-side" gradientUnits="userSpaceOnUse" x1="219" y1="145" x2="256" y2="355">
+      <stop stop-color="#a5b29e"/><stop offset=".52" stop-color="#889f8e"/><stop offset="1" stop-color="#657f74"/>
+    </linearGradient>
+    <linearGradient id="stone-cap" gradientUnits="userSpaceOnUse" x1="177" y1="81" x2="243" y2="84">
+      <stop stop-color="#e9e5cc"/><stop offset=".69" stop-color="#f0ecd7"/><stop offset="1" stop-color="#bbc3ad"/>
+    </linearGradient>
+    <linearGradient id="stone-arris" gradientUnits="userSpaceOnUse" x1="221" y1="87" x2="221" y2="420">
+      <stop stop-color="#fff6da" stop-opacity=".72"/><stop offset=".56" stop-color="#e0e7cf" stop-opacity=".18"/><stop offset="1" stop-color="#c2d0b9" stop-opacity=".46"/>
+    </linearGradient>
+    <linearGradient id="bronze" gradientUnits="userSpaceOnUse" x1="294" y1="239" x2="401" y2="255">
+      <stop stop-color="#654b39"/><stop offset=".14" stop-color="#92734d"/><stop offset=".24" stop-color="#b39463"/>
+      <stop offset=".37" stop-color="#eacf96"/><stop offset=".47" stop-color="#debb7e"/><stop offset=".66" stop-color="#bc8d53"/>
+      <stop offset=".84" stop-color="#85643f"/><stop offset=".94" stop-color="#88724f"/><stop offset="1" stop-color="#8b8c66"/>
+    </linearGradient>
+    <radialGradient id="bell-light" gradientUnits="userSpaceOnUse" cx="0" cy="0" r="1" gradientTransform="translate(335 204) rotate(11) scale(60 94)">
+      <stop stop-color="#ffebbc" stop-opacity=".62"/><stop offset=".45" stop-color="#ecd3a0" stop-opacity=".21"/><stop offset="1" stop-color="#cf9d66" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="bell-band" gradientUnits="userSpaceOnUse" x1="298" y1="300" x2="399" y2="303">
+      <stop stop-color="#a08455"/><stop offset=".26" stop-color="#edca92"/><stop offset=".43" stop-color="#f9dfaa"/>
+      <stop offset=".71" stop-color="#cda266"/><stop offset="1" stop-color="#93805b"/>
+    </linearGradient>
+    <radialGradient id="bell-interior" cx=".52" cy=".10" r=".90">
+      <stop stop-color="#342d26"/><stop offset=".58" stop-color="#534435"/><stop offset="1" stop-color="#97734b"/>
+    </radialGradient>
+    <linearGradient id="suspension-metal" x1="0" y1="0" x2="1" y2=".65">
+      <stop stop-color="#8c8872"/><stop offset=".28" stop-color="#c0b797"/><stop offset=".60" stop-color="#958d6e"/><stop offset="1" stop-color="#736f56"/>
+    </linearGradient>
+    <filter id="cast-shadow" x="-20%" y="-25%" width="145%" height="165%" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="2.4"/>
     </filter>
-    <mask id="ol-0" maskUnits="userSpaceOnUse" x="-40" y="-40" width="111" height="109">
-      <rect x="-40" y="-40" width="111" height="109" fill="#fff" />
-      <use href="#arc-profile" fill="#000" fill-rule="nonzero" />
-    </mask>
-    <mask id="ol-1" maskUnits="userSpaceOnUse" x="-40" y="-40" width="111" height="109">
-      <rect x="-40" y="-40" width="111" height="109" fill="#fff" />
-      <use href="#pier-profile" fill="#000" fill-rule="nonzero" />
-    </mask>
-    <mask id="ol-2" maskUnits="userSpaceOnUse" x="-40" y="-40" width="111" height="109">
-      <rect x="-40" y="-40" width="111" height="109" fill="#fff" />
-      <use href="#bell-profile" fill="#000" fill-rule="nonzero" />
-    </mask>
-    <linearGradient id="ribbon-metal" x1=".21" y1=".91" x2=".82" y2=".10">
-      <stop offset="0" stop-color="#83A495" />
-      <stop offset="0.31" stop-color="#568275" />
-      <stop offset="0.66" stop-color="#8AA596" />
-      <stop offset="1" stop-color="#C6C8B1" />
-    </linearGradient>
-    <linearGradient id="stone-face-light" x1="0" y1="0" x2=".33" y2="1">
-      <stop offset="0" stop-color="#DDDCD0" />
-      <stop offset="0.64" stop-color="#BDC5B9" />
-      <stop offset="1" stop-color="#9CAFA2" />
-    </linearGradient>
-    <linearGradient id="stone-side" x1="0" y1="0" x2="1" y2=".90">
-      <stop offset="0" stop-color="#9DAEA2" />
-      <stop offset="1" stop-color="#698B7F" />
-    </linearGradient>
-    <linearGradient id="bell-metal" x1="0" y1=".32" x2="1" y2=".60">
-      <stop offset="0" stop-color="#A87849" />
-      <stop offset="0.31" stop-color="#F5DDA1" />
-      <stop offset="0.58" stop-color="#E7BD76" />
-      <stop offset="1" stop-color="#B7834C" />
-    </linearGradient>
-    <clipPath id="face-clip">
-      <use href="#pier-profile" />
-    </clipPath>
-    <clipPath id="bell-clip">
-      <use href="#bell-profile" />
-    </clipPath>
-    <clipPath id="crossing">
-      <path d="M8 0H20V13H8Z" />
-    </clipPath>
-    <g filter="url(#shadow)" id="landmark">
-      <use href="#sling-profile" id="suspension" fill="none" stroke-linejoin="round" stroke-linecap="round" stroke-width=".94" stroke="#B5AD84" />
-      <g id="ribbon">
-        <g filter="url(#edge-light)">
-          <use href="#arc-profile" fill="url(#ribbon-metal)" />
-        </g>
-        <use href="#arc-profile" stroke-linejoin="round" mask="url(#ol-0)" stroke="#678D7D" fill="none" stroke-width=".97" />
-      </g>
-      <g id="pier" mask="url(#stone-under-ribbon)">
-        <use href="#pier-profile" fill="url(#stone-side)" />
-        <g clip-path="url(#face-clip)">
-          <path d="M10.052 1.42L13.692 0.7V24.12L10.052 23.66Z" fill="url(#stone-face-light)" />
-          <path d="M9.912 13.34L12.362 13.22 M11.192 17.48L13.742 17.6" fill="none" stroke-width=".37" stroke="#879F91" />
-        </g>
-        <use href="#pier-profile" stroke-linejoin="round" mask="url(#ol-1)" stroke="#708C7C" fill="none" stroke-width=".98" />
-      </g>
-      <g id="bell">
-        <g filter="url(#edge-light)">
-          <use href="#bell-profile" fill="url(#bell-metal)" />
-        </g>
-        <g clip-path="url(#bell-clip)">
-          <path d="M17.885 14.85Q21.914 15.8 25.943 14.85V17.5H17.914Z" fill="#F1CD8C" />
-          <path d="M18.17 16.14Q21.914 15.14 25.657 16.14V17.50H18.014Z" fill="#71513C" />
-        </g>
-        <use href="#bell-profile" stroke-linejoin="round" mask="url(#ol-2)" stroke="#B18B5D" fill="none" stroke-width="1.12" />
+    <filter id="contact" x="-30%" y="-300%" width="180%" height="700%" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="1.45"/>
+    </filter>
+    <radialGradient id="ground-bounce">
+      <stop stop-color="#071b1a" stop-opacity=".38"/><stop offset=".42" stop-color="#0a2422" stop-opacity=".23"/><stop offset="1" stop-color="#143533" stop-opacity="0"/>
+    </radialGradient>
+    <path id="small-arc-return" d="M102 352 C148.4 392.4 251 412.7 409.1 424.1"/>
+    <g id="beam">
+      <use href="#metal-arc" fill="url(#ribbon-side)"/>
+      <g clip-path="url(#ribbon-clip)">
+        <!-- The upper plane narrows at the cantilever and runs out into the lower tail. -->
+        <path d="M434 109 C258 109 80.5 201 80.5 297
+          C80.5 372.8 188.0 399 417.2 426.4 L413.2 423.0
+          C192.7 392.1 99.5 359.5 99.5 296.0 C99.5 209.0 267.6 124.65 426.1 124.02
+          Q429.6 123.9 431.9 122.1 L434.4 118.5Z" fill="url(#ribbon-face)"/>
+        <path d="M83.1 294.6 C83.8 201.0 260.3 112.8 425.7 112.72
+          C261.5 116.0 92.8 203.4 83.1 294.6Z" fill="url(#top-ridge)"/>
+        <path d="M100.9 299.1 C104.2 359.0 199.6 392.5 408.3 423.0
+          C199.5 391.0 107.1 358.8 100.9 299.1Z" fill="url(#tail-ridge)"/>
+        <path class="fine-detail" d="M426.4 112L432.3 112.4L432.05 123.0L428.5 126.0L429.3 115.7
+          Q429.4 113.1 426.4 112Z" fill="#a89c7c" opacity=".55"/>
       </g>
     </g>
-    <clipPath id="tile-clip">
-      <rect x="-1" y="-4" width="33" height="33" rx="7.4" />
-    </clipPath>
-    <mask id="stone-under-ribbon" maskUnits="userSpaceOnUse" x="-1" y="-4" width="33" height="33">
-      <rect x="-1" y="-4" width="33" height="33" fill="white" />
-      <g clip-path="url(#crossing)">
-        <use href="#arc-profile" fill="black" stroke="black" stroke-width=".97" stroke-linejoin="round" />
-      </g>
-    </mask>
+    <style>
+      .small-detail { display:none }
+      @media (max-width: 48px) {
+        .fine-detail { display:none }
+        .small-detail { display:inline }
+        #bell-body-small-edge { stroke:#c8a675; stroke-width:2.4 }
+        #sling-light { stroke-width:5 }
+      }
+    </style>
   </defs>
-  <rect id="tile" x="-1" y="-4" width="33" height="33" rx="7.4" fill="url(#field)" />
-  <g clip-path="url(#tile-clip)">
-    <use href="#landmark" id="mark" transform="translate(-0.06 0.54)" />
+
+  <g id="background">
+    <use href="#plate" fill="url(#plate-edge)"/>
+    <g clip-path="url(#face-clip)">
+      <path fill="url(#enamel)" d="M0 0H512V512H0Z"/>
+      <path fill="url(#sky)" d="M0 0H512V512H0Z"/>
+      <path fill="url(#cool-reflection)" d="M0 0H512V512H0Z"/>
+      <path fill="url(#warm-reflection)" d="M0 0H512V512H0Z"/>
+      <rect class="fine-detail" width="512" height="512" filter="url(#enamel-grain)" opacity=".081" style="mix-blend-mode:soft-light"/>
+    </g>
+    <use href="#plate" transform="translate(.6 .65) scale(.99766 .9855)" stroke="url(#perimeter)" stroke-width="1.25"/>
+    <path d="M54 498 C76 507.6 106 508.0 150 508.0H362 C404 508.0 435 506.9 460 496.4"
+      stroke="url(#bottom-reflex)" stroke-width=".92" stroke-linecap="round"/>
+  </g>
+
+  <g id="landmark" transform="translate(6 8)">
+    <g id="grounding">
+      <ellipse cx="231" cy="423.15" rx="83" ry="12.4" fill="url(#ground-bounce)"/>
+      <path d="M177.7 418.4L222 423.2L243.1 415.8L253.8 418.2L225.8 427.6L181.0 422.0Z"
+        fill="#102521" opacity=".44" filter="url(#contact)"/>
+    </g>
+    <g id="suspension">
+      <path d="M329.3 134L342.7 193.6Q344 197.4 347.7 197.4
+        Q351 197.4 352.3 193.6L367.1 125" stroke="#37504a" stroke-linejoin="round" stroke-linecap="round" stroke-width="6.1"/>
+      <path id="sling-light" d="M329.2 134.0L343.0 192.9Q344.2 195.7 347.5 195.7 Q350.3 195.7 351.4 192.7L366.1 125.0"
+        stroke="url(#suspension-metal)" stroke-linejoin="round" stroke-linecap="round" stroke-width="4.15"/>
+      <path transform="translate(0 13)" fill-rule="evenodd" d="M337.5 192.6V185.8C337.5 178.4 341.3 173.4 347.3 173.4
+        C353.8 173.4 358 178.6 358 185.9V192.6Z M342.4 190.1H352.8V185.7C352.8 181.3 350.5 177.9 347.5 177.9
+        C344.3 177.9 342.4 181.4 342.4 185.8Z" fill="url(#suspension-metal)"/>
+    </g>
+    <g id="stone-tower">
+      <use href="#stele" fill="url(#stone-side)"/>
+      <g clip-path="url(#pier-clip)">
+        <use href="#stele-front" fill="url(#stone)"/>
+        <path d="M177 83.2L221.9 74.7L245.2 80.7L222.1 79.4L177 87.4Z" fill="url(#stone-cap)"/>
+        <path d="M178.08 89.2L178.35 416.2" stroke="#e1e7cf" stroke-opacity=".42" stroke-width="1.15"/>
+        <path d="M222.2 80.1L222.1 422.3" stroke="url(#stone-arris)" stroke-width="1.27"/>
+        <g class="fine-detail" clip-path="url(#front-clip)" stroke-linecap="round">
+          <path d="M176 242.3L198.8 241.3 M203.1 245.5L223.5 244.6 M176.3 324.1L193.4 324.6 M205.3 347.9L224.9 348.8"
+            stroke="#708c80" stroke-width="1.05" opacity=".72"/>
+          <path d="M176 243.6L198.8 242.6 M203.1 246.8L223.5 245.9 M205.3 349.1L225 350.0" stroke="#f1efdc" stroke-width=".8" opacity=".5"/>
+          <path d="M182.8 295.6L199.8 295.8 M208.1 116.2L224.2 113.9" stroke="#738d7e" stroke-width=".75" opacity=".38"/>
+        </g>
+        <g clip-path="url(#upper)">
+          <use href="#metal-arc" transform="translate(4.1 8.5)" fill="#314b3f" opacity=".45" filter="url(#cast-shadow)"/>
+          <use href="#metal-arc" transform="translate(1.35 2.2)" fill="#384b40" opacity=".32"/>
+        </g>
+      </g>
+    </g>
+    <g mask="url(#beam-behind-foot)">
+      <use href="#beam"/>
+      <g clip-path="url(#ribbon-clip)">
+        <use class="small-detail" href="#small-arc-return" stroke="#afc1a4" stroke-width="5.5"/>
+        <g clip-path="url(#lower)">
+          <use href="#stele" transform="translate(5.1 2.5)" fill="#193931" opacity=".46" filter="url(#cast-shadow)"/>
+        </g>
+      </g>
+    </g>
+
+    <g id="cast-bell" transform="translate(-23.32 6.05) scale(1.067 1.037)">
+      <use id="bell-body-small-edge" href="#bell-body" fill="url(#bronze)" paint-order="stroke fill"/>
+      <g clip-path="url(#bell-clip)">
+        <use href="#bell-body" fill="url(#bell-light)"/>
+        <path class="fine-detail" d="M319.9 218.6C324.6 195.7 335.4 190.4 347.8 190.4
+          C335.9 192.9 328.6 197.6 324.2 211.0C322.1 218.1 320.3 230.0 317.2 241.1Z"
+          fill="#fff2ca" opacity=".57"/>
+        <path d="M305.7 288.2C325.7 295.0 370.1 296.1 390.0 288.5L399.2 310.9
+          C374.2 324 321.4 325.2 295.3 309.6Z" fill="url(#bell-band)"/>
+        <path class="fine-detail" d="M305.8 287.8C327.8 295.35 368.3 295.6 389.1 288.5" stroke="#f5d69c" stroke-opacity=".86" stroke-width="1.25"/>
+        <path d="M296.9 307.8 C313.5 296.0 379.3 295.4 397.6 307.6
+          C384.6 321.2 317.5 326.1 296.9 307.8Z" fill="url(#bell-interior)"/>
+        <path d="M300.5 310.0C323.8 320.6 371.0 320.4 393.7 311.0" stroke="#e6c38b" stroke-opacity=".76" stroke-width="1.45"/>
+      </g>
+    </g>
   </g>
 </svg>
