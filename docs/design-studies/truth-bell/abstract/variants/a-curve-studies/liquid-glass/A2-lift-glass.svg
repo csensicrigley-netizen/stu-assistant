@@ -1,0 +1,283 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="512" height="512" viewBox="0 0 512 512" fill="none">
+  <title>汕大真理钟 · A2 轻挑 · 液态玻璃</title>
+  <desc>暖杏色底板、透明金色回弧和珊瑚红悬点。弧面与圆点从同一底图取色，边缘产生折射与两侧高光。</desc>
+  <defs>
+    <!-- All edge layers follow the same closed outline. -->
+    <path id="outline" d="M148 0H364
+      C414 0 438 0 461 12.3 C478.1 21.45 490.55 33.9 499.7 51 C512 74 512 98 512 148V364
+      C512 414 512 438 499.7 461 C490.55 478.1 478.1 490.55 461 499.7 C438 512 414 512 364 512H148
+      C98 512 74 512 51 499.7 C33.9 490.55 21.45 478.1 12.3 461 C0 438 0 414 0 364V148
+      C0 98 0 74 12.3 51 C21.45 33.9 33.9 21.45 51 12.3 C74 0 98 0 148 0Z"/>
+    <clipPath id="trim"><use href="#outline"/></clipPath>
+    <linearGradient id="field" gradientUnits="userSpaceOnUse" x1="176" y1="14" x2="305" y2="516">
+      <stop stop-color="#F1E9DA"/>
+      <stop offset=".36" stop-color="#ECE0CC"/>
+      <stop offset=".61" stop-color="#E1CAAE"/>
+      <stop offset=".86" stop-color="#D1AD90"/>
+      <stop offset="1" stop-color="#BE9988"/>
+    </linearGradient>
+    <radialGradient id="upper-warm" gradientUnits="userSpaceOnUse" cx="0" cy="0" r="1" gradientTransform="translate(88 66) rotate(27) scale(399 298)">
+      <stop stop-color="#F8F3E8" stop-opacity=".85"/>
+      <stop offset=".53" stop-color="#F0E6D9" stop-opacity=".51"/>
+      <stop offset="1" stop-color="#E8D8C5" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="lower-warm" gradientUnits="userSpaceOnUse" cx="0" cy="0" r="1" gradientTransform="translate(72 541) rotate(-17) scale(365 208)">
+      <stop stop-color="#F2BD87" stop-opacity=".71"/>
+      <stop offset=".58" stop-color="#E7BB94" stop-opacity=".28"/>
+      <stop offset="1" stop-color="#D4A787" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="lower-cool" gradientUnits="userSpaceOnUse" cx="0" cy="0" r="1" gradientTransform="translate(522 459) rotate(-26) scale(318 237)">
+      <stop stop-color="#BA9490" stop-opacity=".69"/>
+      <stop offset=".50" stop-color="#C5A299" stop-opacity=".36"/>
+      <stop offset="1" stop-color="#CEB3A5" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="rim" gradientUnits="userSpaceOnUse" x1="407" y1="16" x2="201" y2="514">
+      <stop stop-color="#CFC6BA"/>
+      <stop offset=".34" stop-color="#DDBF92"/>
+      <stop offset=".72" stop-color="#B68A6C"/>
+      <stop offset="1" stop-color="#9F7E78"/>
+    </linearGradient>
+    <radialGradient id="rim-warm" gradientUnits="userSpaceOnUse" cx="0" cy="0" r="1" gradientTransform="translate(64 43) rotate(15) scale(247 172)">
+      <stop stop-color="#ECDDAD" stop-opacity=".79"/>
+      <stop offset=".55" stop-color="#DBC28E" stop-opacity=".36"/>
+      <stop offset="1" stop-color="#CCAA80" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="sweep-gold" gradientUnits="userSpaceOnUse" x1="380" y1="118" x2="226" y2="392">
+      <stop stop-color="#F5B400"/>
+      <stop offset=".23" stop-color="#FFC300"/>
+      <stop offset=".52" stop-color="#F5AD07"/>
+      <stop offset=".82" stop-color="#D28C0A"/>
+      <stop offset="1" stop-color="#B57813"/>
+    </linearGradient>
+    <linearGradient id="dot-coral" gradientUnits="userSpaceOnUse" x1="314" y1="209" x2="371" y2="281">
+      <stop stop-color="#FF7967"/>
+      <stop offset=".43" stop-color="#FA5151"/>
+      <stop offset=".76" stop-color="#EB494B"/>
+      <stop offset="1" stop-color="#D94349"/>
+    </linearGradient>
+    <path id="sweep" d="M441.801 99.901
+      C405.744 106.544 373.135 115.701 344.133 126.84
+      C315.132 137.979 289.737 151.101 268.091 166.058
+      C246.445 181.016 228.547 197.809 214.793 216.091
+      C201.038 234.372 191.426 254.141 187.102 272.559
+      C182.779 290.976 183.743 308.041 189.712 321.926
+      C195.681 335.81 206.655 346.514 221.871 355.029
+      C237.088 363.544 256.546 369.869 279.095 375.23
+      C301.644 380.59 327.284 384.986 354.985 389.327
+      C356.86 389.621 355.891 390.788 354.015 391.073
+      C322.346 395.88 291.952 397.473 264.367 395.607
+      C236.781 393.741 212.003 388.416 191.728 379.239
+      C171.454 370.062 155.683 357.032 146.046 339.851
+      C136.409 322.669 132.906 301.336 135.898 279.541
+      C138.889 257.746 148.376 235.489 163.339 214.738
+      C178.302 193.988 198.74 174.745 224.415 158.447
+      C250.091 142.149 281.003 128.797 317.174 118.68
+      C353.346 108.564 394.778 101.683 441.199 98.699
+      C442.474 98.617 443.057 99.67 441.801 99.901Z"/>
+    <circle id="bead" cx="344" cy="244.3" r="43"/>
+    <g id="silhouette" fill="white"><use href="#sweep"/><use href="#bead"/></g>
+    <clipPath id="gold-clip"><use href="#sweep"/></clipPath>
+    <clipPath id="coral-clip"><use href="#bead"/></clipPath>
+    <filter id="wash-blur" x="-20%" y="-60%" width="140%" height="240%" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="14"/></filter>
+    <filter id="dye-blur" x="-20%" y="-25%" width="145%" height="160%" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="2.1"/></filter>
+    <linearGradient id="ambient-fold" gradientUnits="userSpaceOnUse" x1="-12" y1="289" x2="500" y2="235">
+      <stop offset="0" stop-color="#ffefd3" stop-opacity="0.46"/>
+      <stop offset="0.34" stop-color="#ffe7b9" stop-opacity="0.54"/>
+      <stop offset="0.71" stop-color="#ffead8" stop-opacity="0.44"/>
+      <stop offset="1" stop-color="#ffefe1" stop-opacity="0.12"/>
+    </linearGradient>
+    <linearGradient id="tint-gold" gradientUnits="userSpaceOnUse" x1="119" y1="161" x2="311" y2="399">
+      <stop offset="0" stop-color="#FFE890"/>
+      <stop offset="0.3" stop-color="#FFD437"/>
+      <stop offset="0.58" stop-color="#F6BA25"/>
+      <stop offset="0.82" stop-color="#E8A42F"/>
+      <stop offset="1" stop-color="#FFCC61"/>
+    </linearGradient>
+    <linearGradient id="tint-coral" gradientUnits="userSpaceOnUse" x1="301" y1="198" x2="389" y2="284">
+      <stop offset="0" stop-color="#FFAC99"/>
+      <stop offset="0.38" stop-color="#FF645F"/>
+      <stop offset="0.69" stop-color="#F84952"/>
+      <stop offset="1" stop-color="#EE6265"/>
+    </linearGradient>
+    <linearGradient id="plate-rim" gradientUnits="userSpaceOnUse" x1="60" y1="8" x2="438" y2="495">
+      <stop offset="0" stop-color="#fff5d9" stop-opacity="0.86"/>
+      <stop offset="0.22" stop-color="#fff0d7" stop-opacity="0.42"/>
+      <stop offset="0.47" stop-color="#cda983" stop-opacity="0.65"/>
+      <stop offset="0.76" stop-color="#a88172" stop-opacity="0.65"/>
+      <stop offset="1" stop-color="#f4c5a9" stop-opacity="0.82"/>
+    </linearGradient>
+    <linearGradient id="edge-fire" gradientUnits="userSpaceOnUse" x1="80" y1="173" x2="368" y2="400">
+      <stop offset="0" stop-color="#FFEDBD" stop-opacity="0.29"/>
+      <stop offset="0.32" stop-color="#FFF2CE" stop-opacity="0.23"/>
+      <stop offset="0.52" stop-color="#E6A340" stop-opacity="0.05"/>
+      <stop offset="0.8" stop-color="#E6823A" stop-opacity="0.23"/>
+      <stop offset="1" stop-color="#FFB67B" stop-opacity="0.27"/>
+    </linearGradient>
+    <linearGradient id="gold-density" gradientUnits="userSpaceOnUse" x1="82" y1="167" x2="329" y2="364">
+      <stop offset="0" stop-color="#DADADA"/>
+      <stop offset="0.26" stop-color="#F5F5F5"/>
+      <stop offset="0.43" stop-color="#A7A7A7"/>
+      <stop offset="0.57" stop-color="#DDDDDD"/>
+      <stop offset="0.79" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#E8E8E8"/>
+    </linearGradient>
+    <linearGradient id="coral-density" gradientUnits="userSpaceOnUse" x1="320" y1="209" x2="368" y2="277">
+      <stop offset="0" stop-color="#B0B0B0"/>
+      <stop offset="0.28" stop-color="#C4C4C4"/>
+      <stop offset="0.6" stop-color="#F3F3F3"/>
+      <stop offset="1" stop-color="#FEFEFE"/>
+    </linearGradient>
+    <mask id="gold-absorption" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512"><rect width="512" height="512" fill="url(#gold-density)"/></mask>
+    <mask id="red-absorption" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512"><rect width="512" height="512" fill="url(#coral-density)"/></mask>
+    <filter id="edge-caustic" x="0" y="0" width="512" height="512" filterUnits="userSpaceOnUse" primitiveUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feOffset in="SourceAlpha" dx="-4.3" dy="-6.4" result="outer"/>
+      <feOffset in="SourceAlpha" dx="-7.7" dy="-11.0" result="inner"/>
+      <feComposite in="outer" in2="inner" operator="out"/>
+      <feGaussianBlur stdDeviation="1.55"/><feComposite in2="SourceAlpha" operator="in" result="throw"/>
+      <feFlood flood-color="#FFF1BA" flood-opacity=".44"/>
+      <feComposite in2="throw" operator="in"/>
+    </filter>
+    <filter id="tinted-light" x="0" y="0" width="512" height="512" filterUnits="userSpaceOnUse" primitiveUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feOffset in="SourceAlpha" dx="2.5" dy="6.8" result="pool"/>
+      <feComposite in="pool" in2="SourceAlpha" operator="out"/>
+      <feGaussianBlur stdDeviation="2.4" result="spill"/>
+      <feFlood flood-color="#F3B344" flood-opacity=".35"/><feComposite in2="spill" operator="in"/>
+    </filter>
+    <filter id="tinted-red" x="0" y="0" width="512" height="512" filterUnits="userSpaceOnUse" primitiveUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feOffset in="SourceAlpha" dx="1.5" dy="5.5" result="pool"/>
+      <feComposite in="pool" in2="SourceAlpha" operator="out"/>
+      <feGaussianBlur stdDeviation="2.8" result="spill"/>
+      <feFlood flood-color="#F8867E" flood-opacity=".43"/><feComposite in2="spill" operator="in"/>
+    </filter>
+    <radialGradient id="honey-core" gradientUnits="userSpaceOnUse" cx="0" cy="0" r="1" gradientTransform="translate(219 245) rotate(40) scale(163 130)">
+      <stop stop-color="#FFDB35" stop-opacity=".72"/><stop offset=".56" stop-color="#FFC025" stop-opacity=".40"/><stop offset="1" stop-color="#F9A522" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="coral-core" gradientUnits="userSpaceOnUse" cx="0" cy="0" r="1" gradientTransform="translate(352 262) rotate(24) scale(46 34)">
+      <stop stop-color="#E43251" stop-opacity=".82"/><stop offset=".48" stop-color="#FB3E4B" stop-opacity=".50"/><stop offset="1" stop-color="#FF6F59" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="recess-light" gradientUnits="userSpaceOnUse" cx="0" cy="0" r="1" gradientTransform="translate(326 226) rotate(-32) scale(24 15)">
+      <stop stop-color="#FFEABC" stop-opacity=".52"/><stop offset=".45" stop-color="#FFE1B2" stop-opacity=".25"/><stop offset="1" stop-color="#FFC795" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="rose-bounce" gradientUnits="userSpaceOnUse" cx="0" cy="0" r="1" gradientTransform="translate(365 300) rotate(9) scale(105 118)">
+      <stop stop-color="#E38D8B" stop-opacity=".21"/><stop offset=".6" stop-color="#E9AC96" stop-opacity=".08"/><stop offset="1" stop-color="#E9AC96" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="inner-band" x="0" y="0" width="512" height="512" filterUnits="userSpaceOnUse" primitiveUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feOffset in="SourceAlpha" dx="-2" dy="-4.2"/><feGaussianBlur stdDeviation="2.1" result="recess"/>
+      <feComposite in="SourceAlpha" in2="recess" operator="out" result="underside"/>
+      <feFlood flood-color="#A0543F" flood-opacity=".27"/><feComposite in2="underside" operator="in"/>
+    </filter>
+
+    <g id="underpaint">
+      <rect x="-40" y="-40" width="592" height="592" fill="url(#field)"/>
+      <rect width="512" height="512" fill="url(#upper-warm)"/>
+      <rect width="512" height="512" fill="url(#lower-warm)"/>
+      <rect width="512" height="512" fill="url(#lower-cool)"/>
+      <rect width="512" height="512" fill="url(#rose-bounce)"/>
+      <path id="backdrop-light" d="M-80 307 C50 332 135 313 231 262 C324 212 436 198 597 220
+        L594 268 C476 240 385 242 292 283 C161 341 65 383 -82 349Z" fill="url(#ambient-fold)" filter="url(#wash-blur)"/>
+    </g>
+    <g id="colour-backing">
+      <use href="#underpaint"/>
+      <g opacity="0.78" transform="translate(-2.8 4.8)" filter="url(#dye-blur)">
+        <use href="#sweep" fill="url(#sweep-gold)" mask="url(#gold-absorption)"/>
+        <use href="#bead" fill="url(#dot-coral)" mask="url(#red-absorption)"/>
+      </g>
+      <g transform="translate(-2.8 4.8)">
+        <use href="#sweep" fill="url(#honey-core)"/>
+        <use href="#bead" fill="url(#coral-core)"/>
+      </g>
+    </g>
+    <filter id="plate-lens" x="0" y="0" width="512" height="512" filterUnits="userSpaceOnUse" primitiveUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feImage href="#underpaint" xlink:href="#underpaint" x="0" y="0" width="512" height="512" preserveAspectRatio="none" result="back"/>
+      <feColorMatrix in="back" type="saturate" values="1.055"/>
+      <feGaussianBlur stdDeviation="1.3" edgeMode="duplicate" result="soft-back"/>
+      <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 1 0  0 0 0 1 0  0 0 0 1 0  0 0 0 0 1"/>
+      <feGaussianBlur stdDeviation="2.66667" result="distance-proxy"/>
+      <feComponentTransfer in="distance-proxy" result="height">
+        <feFuncR type="table" tableValues="0 0 0 0.01569 0.04977 0.07751 0.10113 0.12185 0.14042 0.15732 0.17288 0.18735 0.20091 0.2137 0.22584 0.2374 0.24847 0.2591 0.26934 0.27924 0.28882 0.29813 0.30719 0.31601 0.32463 0.33306 0.34132 0.34943 0.35738 0.36521 0.37292 0.38051 0.38801 0.39541 0.40274 0.40998 0.41715 0.42427 0.43132 0.43833 0.44529 0.45221 0.4591 0.46596 0.4728 0.47961 0.48642 0.49321 0.5 0.50619 0.5119 0.51729 0.52244 0.52738 0.53214 0.53674 0.54119 0.54552 0.54972 0.55381 0.5578 0.56169 0.56549 0.56921 0.57285 0.57642 0.57992 0.58335 0.58672 0.59004 0.5933 0.59651 0.59967 0.60279 0.60586 0.6089 0.61189 0.61486 0.61779 0.6207 0.62358 0.62643 0.62927 0.63209 0.63489 0.63769 0.64047 0.64325 0.64604 0.64883 0.65163 0.65444 0.65728 0.66015 0.66302 0.6658 0.66739"/>
+        <feFuncG type="identity"/><feFuncB type="identity"/><feFuncA type="identity"/>
+      </feComponentTransfer>
+      <feConvolveMatrix in="height" order="3 1" kernelMatrix="-1.76835 0 1.76835" kernelUnitLength="1.45" divisor="1" bias=".5" preserveAlpha="true"/>
+      <feColorMatrix type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0 1" result="nx"/>
+      <feConvolveMatrix in="height" order="1 3" kernelMatrix="-1.76835 0 1.76835" kernelUnitLength="1.45" divisor="1" bias=".5" preserveAlpha="true"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 0  1 0 0 0 0  0 0 0 0 0  0 0 0 0 1" result="ny"/>
+      <feComposite in="nx" in2="ny" operator="arithmetic" k2="1" k3="1" result="normal-map"/>
+      <feDisplacementMap in="soft-back" in2="normal-map" scale="30" xChannelSelector="R" yChannelSelector="G"/>
+      <feComposite in2="SourceAlpha" operator="in"/>
+    </filter>
+    <filter id="mark-lens" x="0" y="0" width="512" height="512" filterUnits="userSpaceOnUse" primitiveUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feImage href="#colour-backing" xlink:href="#colour-backing" x="0" y="0" width="512" height="512" preserveAspectRatio="none" result="back"/>
+      <feColorMatrix in="back" type="saturate" values="1.12"/>
+      <feGaussianBlur stdDeviation="1.5" edgeMode="duplicate" result="soft-back"/>
+      <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 1 0  0 0 0 1 0  0 0 0 1 0  0 0 0 0 1"/>
+      <feGaussianBlur stdDeviation="4.16667" result="distance-proxy"/>
+      <feComponentTransfer in="distance-proxy" result="height">
+        <feFuncR type="table" tableValues="0 0 0 0.01569 0.04977 0.07751 0.10113 0.12185 0.14042 0.15732 0.17288 0.18735 0.20091 0.2137 0.22584 0.2374 0.24847 0.2591 0.26934 0.27924 0.28882 0.29813 0.30719 0.31601 0.32463 0.33306 0.34132 0.34943 0.35738 0.36521 0.37292 0.38051 0.38801 0.39541 0.40274 0.40998 0.41715 0.42427 0.43132 0.43833 0.44529 0.45221 0.4591 0.46596 0.4728 0.47961 0.48642 0.49321 0.5 0.50619 0.5119 0.51729 0.52244 0.52738 0.53214 0.53674 0.54119 0.54552 0.54972 0.55381 0.5578 0.56169 0.56549 0.56921 0.57285 0.57642 0.57992 0.58335 0.58672 0.59004 0.5933 0.59651 0.59967 0.60279 0.60586 0.6089 0.61189 0.61486 0.61779 0.6207 0.62358 0.62643 0.62927 0.63209 0.63489 0.63769 0.64047 0.64325 0.64604 0.64883 0.65163 0.65444 0.65728 0.66015 0.66302 0.6658 0.66739"/>
+        <feFuncG type="identity"/><feFuncB type="identity"/><feFuncA type="identity"/>
+      </feComponentTransfer>
+      <feConvolveMatrix in="height" order="3 1" kernelMatrix="-2.76304 0 2.76304" kernelUnitLength="1.45" divisor="1" bias=".5" preserveAlpha="true"/>
+      <feColorMatrix type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0 1" result="nx"/>
+      <feConvolveMatrix in="height" order="1 3" kernelMatrix="-2.76304 0 2.76304" kernelUnitLength="1.45" divisor="1" bias=".5" preserveAlpha="true"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 0  1 0 0 0 0  0 0 0 0 0  0 0 0 0 1" result="ny"/>
+      <feComposite in="nx" in2="ny" operator="arithmetic" k2="1" k3="1" result="normal-map"/>
+      <feDisplacementMap in="soft-back" in2="normal-map" scale="42" xChannelSelector="R" yChannelSelector="G"/>
+      <feComposite in2="SourceAlpha" operator="in"/>
+    </filter>
+    <filter id="glass-edge" x="0" y="0" width="512" height="512" filterUnits="userSpaceOnUse" primitiveUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feOffset in="SourceAlpha" dx="1.3" dy="1.7" result="inward"/>
+      <feComposite in="SourceAlpha" in2="inward" operator="out" result="light-mask"/>
+      <feFlood flood-color="#fff9df" flood-opacity="0.9"/><feComposite in2="light-mask" operator="in" result="rim-lit"/>
+      <feOffset in="SourceAlpha" dx="-1.04" dy="-1.377" result="lower"/>
+      <feComposite in="SourceAlpha" in2="lower" operator="out" result="far-mask"/>
+      <feFlood flood-color="#fff0dd" flood-opacity="0.55"/><feComposite in2="far-mask" operator="in" result="rim-far"/>
+      <feGaussianBlur in="SourceAlpha" stdDeviation="1.4"/>
+      <feOffset dx="3.51" dy="4.59" result="inner-roll"/>
+      <feComposite in="SourceAlpha" in2="inner-roll" operator="out" result="wide-mask"/>
+      <feFlood flood-color="#ffe5ac" flood-opacity="0.24"/><feComposite in2="wide-mask" operator="in" result="near-glow"/>
+      <feMerge><feMergeNode in="near-glow"/><feMergeNode in="rim-far"/><feMergeNode in="rim-lit"/></feMerge>
+    </filter>
+    <filter id="relief" x="0" y="0" width="512" height="512" filterUnits="userSpaceOnUse" primitiveUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="4.7"/><feOffset dx="1.3" dy="5.1" result="soft-mask"/>
+      <feFlood flood-color="#8e6048" flood-opacity="0.16"/><feComposite in2="soft-mask" operator="in" result="soft-shadow"/>
+      <feGaussianBlur in="SourceAlpha" stdDeviation="1.05"/><feOffset dx=".65" dy="1.65" result="contact-mask"/>
+      <feFlood flood-color="#985b32" flood-opacity="0.1648"/><feComposite in2="contact-mask" operator="in" result="contact"/>
+      <feMerge><feMergeNode in="soft-shadow"/><feMergeNode in="contact"/></feMerge>
+    </filter>
+    <style>
+      .compact-glass { display: none }
+      @media (max-width: 80px) {
+        .full-glass { display: none }
+        .compact-glass { display: inline }
+      }
+    </style>
+  </defs>
+  <!-- The same backdrop is sampled by the plate and by both coloured lenses. -->
+  <g id="tile" clip-path="url(#trim)">
+    <use href="#underpaint"/>
+    <use class="full-glass" href="#outline" fill="white" filter="url(#plate-lens)"/>
+    <use href="#outline" fill="none" stroke="url(#plate-rim)" stroke-width="7.6"/>
+    <use href="#outline" fill="none" stroke="url(#rim)" stroke-opacity=".65" stroke-width="2.1"/>
+    <use href="#outline" transform="translate(3.65 3.65) scale(.9857422)" fill="none" stroke="url(#plate-rim)" stroke-width="1.05"/>
+  </g>
+  <g id="mark">
+    <use href="#sweep" fill="url(#sweep-gold)"/><use href="#bead" fill="url(#dot-coral)"/>
+    <g class="full-glass">
+      <use href="#silhouette" filter="url(#relief)"/>
+      <use href="#sweep" fill="white" filter="url(#tinted-light)"/>
+      <use href="#bead" fill="white" filter="url(#tinted-red)"/>
+      <use href="#silhouette" filter="url(#mark-lens)"/>
+      <g opacity="0.19"><use href="#sweep" fill="url(#tint-gold)"/><use href="#bead" fill="url(#tint-coral)"/></g>
+      <use href="#silhouette" filter="url(#inner-band)"/>
+      <use href="#sweep" fill="url(#edge-fire)" fill-opacity=".32"/>
+      <use href="#bead" fill="url(#recess-light)" fill-opacity=".72"/>
+      <use href="#silhouette" filter="url(#edge-caustic)"/>
+      <use href="#silhouette" filter="url(#glass-edge)"/>
+    </g>
+    <g class="compact-glass">
+      <use href="#sweep" fill="url(#tint-gold)" opacity=".36"/><use href="#bead" fill="url(#coral-core)" opacity=".68"/>
+      <use href="#bead" fill="url(#recess-light)" opacity=".83"/>
+      <g clip-path="url(#gold-clip)" stroke="url(#plate-rim)" stroke-width="6.4"><use href="#sweep"/></g>
+      <g clip-path="url(#coral-clip)" stroke="url(#plate-rim)" stroke-width="6.4"><use href="#bead"/></g>
+    </g>
+  </g>
+</svg>
