@@ -1,48 +1,55 @@
-import { useEffect, useState } from "react";
-import { motion } from "motion/react";
+import { useEffect, useState, type CSSProperties } from "react";
+import {
+  AnimatePresence,
+  motion,
+  useReducedMotion,
+  type Transition,
+} from "motion/react";
+import { IS_NATIVE } from "../lib/api";
+import {
+  JELLY_SOFT,
+  OUT,
+  PILL,
+  PRESS,
+  SPRING,
+  TAP,
+  stagger,
+} from "../lib/motion";
+import { APP_VERSION_NAME, apkHref } from "../lib/version";
 import { Icon } from "./Icon";
+import { LandingGallery } from "./LandingGallery";
+import { LandingHeroWindow, type HeroMode } from "./LandingHeroWindow";
 import { Logo } from "./Logo";
-import { LdFan, LdGlow, type LdCard } from "./LandingFan";
 
-/**
- * 落地页（2026-10-31 · 推翻重做版）
- *
- * 这一版**不复用** .welcome / .intro / .stage 任何旧类名，
- * 全部走 landing.css 的 .ld-* 前缀。原因是前面几版都在改老规则，
- * 改一处被另一处覆盖一处，越改越乱。
- *
- * 版式照参考图：
- *   奶油纸底上放一块深色圆角大板 → 板上是"小标签 + 小标题 + 卡组 + 按钮"
- *   **标题刻意做小**（1.375–2.1rem），主角是卡组，不是标题。
- */
-
-/* 卡片 = 功能本身。卡名就是这一屏能回答的那句话，插画就是那个功能的软胶化：
-   闹钟=下一节课 / 台历=一周光谱 / 清单=作业排队 / 试卷=考试与成绩 / 铃铛=通知 / 盾牌=隐私。
-   色相跟着功能走（不是随机分配），所以颜色也成了记忆钩子。 */
-const CARDS: LdCard[] = [
-  { id: "today", color: "#b9a7f0", toy: "clock", title: "下一节课", subtitle: "在哪间教室，还剩几分钟" },
-  { id: "week", color: "#f2a7bd", toy: "calendar", title: "一周光谱", subtitle: "卡宽就是真实分钟数" },
-  { id: "plan", color: "#7ed2e6", toy: "checklist", title: "作业排队", subtitle: "今天 / 三天内 / 已过期", cta: true },
-  { id: "study", color: "#8fd99c", toy: "paper", title: "考试与成绩", subtitle: "加权估算标了非官方", cta: true },
-  { id: "campus", color: "#85b0f0", toy: "bell", title: "通知", subtitle: "可搜索、按来源筛" },
-  { id: "privacy", color: "#f6bd93", toy: "shield", title: "账号只属于你", subtitle: "密码加密存你自己空间" },
+const HERO_MODES: ReadonlyArray<{
+  mode: HeroMode;
+  label: string;
+  dotColor: string;
+}> = [
+  { mode: "today", label: "今日课堂", dotColor: "#ec4899" },
+  { mode: "week", label: "一周光谱", dotColor: "#14b8a6" },
+  { mode: "campus", label: "校园生活", dotColor: "#f59e0b" },
 ];
 
-function useClock() {
-  const [t, setT] = useState("");
-  useEffect(() => {
-    const tick = () => {
-      const d = new Date();
-      const h = d.getHours();
-      const m = d.getMinutes();
-      const part = h < 6 ? "凌晨" : h < 11 ? "上午" : h < 13 ? "中午" : h < 18 ? "下午" : "晚上";
-      setT(`${part} ${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
+function heroEntrance(index: number, y: number, reduceMotion: boolean) {
+  if (reduceMotion) {
+    return {
+      initial: false as const,
+      animate: { opacity: 1, y: 0, scale: 1 },
     };
-    tick();
-    const id = window.setInterval(tick, 20_000);
-    return () => window.clearInterval(id);
-  }, []);
-  return t;
+  }
+  const delay = stagger(index);
+  const transition: Transition = {
+    ...JELLY_SOFT,
+    delay,
+    restDelta: 0.005,
+    opacity: { duration: 0.22, ease: [0.22, 1, 0.36, 1], delay },
+  };
+  return {
+    initial: { opacity: 0, y, scale: 0.99 },
+    animate: { opacity: 1, y: 0, scale: 1 },
+    transition,
+  };
 }
 
 export function Landing({
@@ -52,112 +59,397 @@ export function Landing({
   onStart: () => void;
   onPreview?: () => void;
 }) {
-  const [active, setActive] = useState<number | null>(null);
-  const clock = useClock();
+  const [heroMode, setHeroMode] = useState<HeroMode>("today");
+  const [announceVisible, setAnnounceVisible] = useState(true);
+  const [qrOpen, setQrOpen] = useState(false);
+
+  const motionReduced = useReducedMotion();
+  const [mediaReduced, setMediaReduced] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+  );
+
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const onChange = () => setMediaReduced(mq.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+
+  const reduceMotion = Boolean(motionReduced) || mediaReduced;
+
+  const apkUrl = apkHref("/download/stu-assistant.apk");
+
+  /* Keep browser chrome pure white while Landing is mounted; restore user theme on unmount */
+  useEffect(() => {
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (!meta) return;
+    let prev = meta.getAttribute("content");
+    if (prev !== "#ffffff") {
+      meta.setAttribute("content", "#ffffff");
+    }
+    const obs = new MutationObserver(() => {
+      const cur = meta.getAttribute("content");
+      if (cur !== "#ffffff") {
+        if (cur !== null) prev = cur;
+        meta.setAttribute("content", "#ffffff");
+      }
+    });
+    obs.observe(meta, { attributes: true, attributeFilter: ["content"] });
+    return () => {
+      obs.disconnect();
+      if (prev !== null && prev !== "#ffffff") {
+        meta.setAttribute("content", prev);
+      }
+    };
+  }, []);
+
+  /* Dismiss QR modal on Escape */
+  useEffect(() => {
+    if (!qrOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setQrOpen(false);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [qrOpen]);
+
+  const ctaHover = reduceMotion ? undefined : { y: -1.5, transition: SPRING };
+  const ctaTap = reduceMotion ? undefined : { ...PRESS, transition: TAP };
 
   return (
-    <div className="ld">
-      <LdGlow />
-
-      <div className="ld__stage">
-        {/* 顶部导航：参考图是一条居中的胶囊（主页/怎么用/今天/加入）+ 右侧两个按钮。
-            这里换成这个 App 真实的分页，不做假链接。 */}
+    <div className="ld" id="top">
+      <header>
         <motion.nav
-          className="ld__nav"
-          initial={{ opacity: 0, y: -8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
+          className="ld-nav"
           aria-label="主要导航"
+          {...heroEntrance(0, 6, reduceMotion)}
         >
-          <span className="ld__navLeft">
-            <Logo size={26} className="ld__logo" />
-          </span>
-          <span className="ld__navPill">
-            <span className="is-on">今天</span>
-            <span>课表</span>
-            <span>学业</span>
-            <span>校园</span>
-          </span>
-          <span className="ld__navRight">
-            <span className="ld__clock">
-              <i aria-hidden="true" />
-              {clock}
-            </span>
-          </span>
-        </motion.nav>
+          <a className="ld-nav__brand" href="#top">
+            <Logo size={26} className="ld-nav__logo" />
+            <span className="ld-nav__wordmark">STU 助手</span>
+          </a>
 
-        {/* 参考图里飘着几个带名字的小气泡（Robert / Clarissa / 小恐龙）：
-            这里换成课程与地点的真实示例，是"这页在说什么"的注脚。 */}
-        <span className="ld__tag ld__tag--a" aria-hidden="true">生物统计 · 桑浦山 E305</span>
-        <span className="ld__tag ld__tag--b" aria-hidden="true">下一节 10:00</span>
-        <span className="ld__tag ld__tag--c" aria-hidden="true">作业 3 天后截止</span>
+          <div className="ld-nav__pills" role="group" aria-label="切换窗口预览视图">
+            {HERO_MODES.map((item) => {
+              const active = heroMode === item.mode;
+              return (
+                <button
+                  key={item.mode}
+                  type="button"
+                  className={`ld-nav__pill${active ? " is-active" : ""}`}
+                  aria-pressed={active}
+                  onClick={() => setHeroMode(item.mode)}
+                >
+                  {active && (
+                    <motion.span
+                      className="ld-nav__pill-bg"
+                      layoutId="ld-nav-mode-pill"
+                      transition={PILL}
+                      aria-hidden="true"
+                    />
+                  )}
+                  <motion.span
+                    className="ld-nav__dot"
+                    style={{ "--dot-color": item.dotColor } as CSSProperties}
+                    initial={false}
+                    animate={
+                      reduceMotion ? undefined : { scale: active ? 1.16 : 1 }
+                    }
+                    transition={SPRING}
+                    aria-hidden="true"
+                  />
+                  <span className="ld-nav__pill-label">{item.label}</span>
+                </button>
+              );
+            })}
+          </div>
 
-        {/* 标题做小：参考图里标题只占板上方一小块，主角是卡片 */}
-        <motion.h1
-          className="ld__title"
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.42, delay: 0.06, ease: [0.22, 1, 0.36, 1] }}
-        >
-          下一节课在哪，作业几点截止。
-        </motion.h1>
-
-        <motion.p
-          className="ld__lead"
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.42, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
-        >
-          教务课表、MySTU 作业和学校通知收在一处，按教务处官方作息算准每一节课。
-        </motion.p>
-
-        <motion.div
-          className="ld__cards"
-          initial={{ opacity: 0, y: 14 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.14, ease: [0.22, 1, 0.36, 1] }}
-        >
-          <LdFan
-            cards={CARDS}
-            active={active}
-            onActive={setActive}
-          />
-        </motion.div>
-
-        <motion.div
-          className="ld__actions"
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.42, delay: 0.18, ease: [0.22, 1, 0.36, 1] }}
-        >
-          <button type="button" className="ld__cta" onClick={onStart}>
-            开始使用
-          </button>
-          {onPreview && (
-            <button type="button" className="ld__ghost" onClick={onPreview}>
-              先看看示例
+          <div className="ld-nav__links">
+            <a className="ld-nav__link ld-nav__link--hideSm" href="#theming">
+              外观
+            </a>
+            <a className="ld-nav__link" href="#features">
+              功能
+            </a>
+            <a className="ld-nav__link" href="#privacy">
+              隐私
+            </a>
+            <button
+              type="button"
+              className="ld-nav__link"
+              onClick={() => setQrOpen(true)}
+            >
+              反馈群
             </button>
-          )}
-        </motion.div>
+          </div>
+        </motion.nav>
+      </header>
 
-        <motion.ul
-          className="ld__foot"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.42, delay: 0.24 }}
-        >
-          <li>
-            <Icon name="shield" size={14} />
-            密码由你本人输入，加密存你自己空间
-          </li>
-          <li>
-            <Icon name="check" size={14} />
-            只读不代办：不签到、不交作业、不缴费
-          </li>
-        </motion.ul>
-      </div>
+      <main className="ld-main">
+        <section className="ld-hero" aria-labelledby="ld-hero-display">
+          <AnimatePresence initial={!reduceMotion}>
+            {announceVisible && (
+              <motion.div
+                key="ld-announce"
+                className="ld-announce"
+                role="region"
+                aria-label="版本更新公告"
+                {...heroEntrance(1, 8, reduceMotion)}
+                exit={{ opacity: 0, y: -8, scale: 0.96, transition: OUT }}
+                whileHover={
+                  reduceMotion ? undefined : { y: -1, transition: SPRING }
+                }
+              >
+                <span className="ld-announce__icon" aria-hidden="true">
+                  <Icon name="spark" size={16} />
+                </span>
+                <span className="ld-announce__text">
+                  <strong>STU 助手 v{APP_VERSION_NAME} 已发布</strong> — 六套校园色系与医学院教务自动同步
+                </span>
+                <motion.button
+                  type="button"
+                  className="ld-announce__dismiss"
+                  whileTap={reduceMotion ? undefined : PRESS}
+                  transition={TAP}
+                  onClick={() => setAnnounceVisible(false)}
+                  aria-label="关闭版本公告"
+                >
+                  <Icon name="close" size={14} />
+                </motion.button>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-      <p className="ld__credits">个人项目，与汕头大学官方无关 · 联合创始人 小爱 · 大象 · FKL</p>
+          <motion.div
+            className="ld-hero__stage"
+            {...heroEntrance(2, 10, reduceMotion)}
+          >
+            <LandingHeroWindow activeMode={heroMode} onSelectMode={setHeroMode} />
+          </motion.div>
+
+          <motion.h1
+            id="ld-hero-display"
+            className="ld-display"
+            {...heroEntrance(3, 10, reduceMotion)}
+          >
+            STU 助手
+          </motion.h1>
+
+          <motion.h2
+            className="ld-hero__headline"
+            {...heroEntrance(4, 10, reduceMotion)}
+          >
+            下一节课在哪，作业几点截止。
+          </motion.h2>
+
+          <motion.p
+            className="ld-hero__sub"
+            {...heroEntrance(5, 8, reduceMotion)}
+          >
+            教务课表、MySTU 作业、实时校车与充电桩收在一处，按教务处官方作息算准每一节课。
+          </motion.p>
+
+          <motion.div
+            className="ld-hero__actions"
+            {...heroEntrance(6, 8, reduceMotion)}
+          >
+            <motion.button
+              type="button"
+              className="ld-btn ld-btn--primary"
+              whileHover={ctaHover}
+              whileTap={ctaTap}
+              transition={SPRING}
+              onClick={onStart}
+            >
+              开始使用
+            </motion.button>
+
+            {!IS_NATIVE && (
+              <motion.a
+                className="ld-btn ld-btn--outline"
+                href={apkUrl}
+                download
+                whileHover={ctaHover}
+                whileTap={ctaTap}
+                transition={SPRING}
+              >
+                <span>下载 Android 客户端</span>
+                <span className="ld-btn__badge">v{APP_VERSION_NAME}</span>
+              </motion.a>
+            )}
+
+            {onPreview && (
+              <motion.button
+                type="button"
+                className="ld-btn ld-btn--outline"
+                whileHover={ctaHover}
+                whileTap={ctaTap}
+                transition={SPRING}
+                onClick={onPreview}
+              >
+                <span>先看看示例</span>
+                <span className="ld-btn__badge">免登录</span>
+              </motion.button>
+            )}
+          </motion.div>
+
+          <motion.div
+            className="ld-hero__trust"
+            {...heroEntrance(7, 6, reduceMotion)}
+          >
+            <span className="ld-hero__trustItem">
+              <Icon name="shield" size={15} />
+              <span>密码由本人授权，加密存储随时可清</span>
+            </span>
+            <span className="ld-hero__trustItem">
+              <Icon name="check" size={15} />
+              <span>只读不代办：不签到、不交作业、不缴费</span>
+            </span>
+          </motion.div>
+        </section>
+
+        <LandingGallery
+          onStart={onStart}
+          onPreview={onPreview}
+          onOpenQr={() => setQrOpen(true)}
+          apkUrl={apkUrl}
+          versionName={APP_VERSION_NAME}
+          isNative={IS_NATIVE}
+        />
+      </main>
+
+      <footer className="ld-footer">
+        <div className="ld-footer__inner">
+          <div className="ld-footer__bar">
+            <div className="ld-footer__brand">
+              <Logo size={22} className="ld-nav__logo" />
+              <span>STU 助手</span>
+              <span className="ld-footer__version">v{APP_VERSION_NAME}</span>
+            </div>
+
+            <div className="ld-footer__links">
+              <a
+                className="ld-footer__link"
+                href="https://jwc.stu.edu.cn/info/1080/1939.htm"
+                target="_blank"
+                rel="noreferrer noopener"
+              >
+                <span>课堂作息时间表</span>
+                <Icon name="external" size={14} />
+              </a>
+              <a
+                className="ld-footer__link"
+                href="https://jwc.stu.edu.cn/info/1080/3307.htm"
+                target="_blank"
+                rel="noreferrer noopener"
+              >
+                <span>2026–2027 教学校历</span>
+                <Icon name="external" size={14} />
+              </a>
+              <a
+                className="ld-footer__link"
+                href="https://github.com/0error0warning/stu-mcp"
+                target="_blank"
+                rel="noreferrer noopener"
+              >
+                <span>stu-mcp (MIT)</span>
+                <Icon name="external" size={14} />
+              </a>
+              <button
+                type="button"
+                className="ld-footer__link"
+                onClick={() => setQrOpen(true)}
+              >
+                <span>加入反馈群</span>
+              </button>
+            </div>
+          </div>
+
+          <p className="ld-footer__note">
+            个人项目，与汕头大学官方无关 · 学校通知与教务原文始终优先 · 联合创始人 小爱 · 大象 · FKL
+          </p>
+        </div>
+      </footer>
+
+      <AnimatePresence>
+        {qrOpen && (
+          <motion.div
+            key="ld-qr-modal"
+            className="ld-modal"
+            role="presentation"
+            initial={reduceMotion ? { opacity: 1 } : { opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0, transition: OUT }}
+            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+            onClick={() => setQrOpen(false)}
+          >
+            <motion.div
+              className="ld-modal__dialog"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="ld-qr-title"
+              initial={
+                reduceMotion
+                  ? { opacity: 1, scale: 1, y: 0 }
+                  : { opacity: 0, scale: 0.94, y: 14 }
+              }
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={
+                reduceMotion
+                  ? { opacity: 0, transition: OUT }
+                  : { opacity: 0, scale: 0.96, y: 8, transition: OUT }
+              }
+              transition={SPRING}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="ld-modal__head">
+                <h2 id="ld-qr-title" className="ld-modal__title">
+                  加入校园反馈群
+                </h2>
+                <motion.button
+                  type="button"
+                  className="ld-modal__close"
+                  whileTap={reduceMotion ? undefined : PRESS}
+                  transition={TAP}
+                  onClick={() => setQrOpen(false)}
+                  aria-label="关闭二维码弹窗"
+                >
+                  <Icon name="close" size={18} />
+                </motion.button>
+              </div>
+
+              <div className="ld-modal__qrFrame">
+                <img
+                  className="ld-modal__qr"
+                  src="./feedback-group.png"
+                  alt="STU 事项助手反馈群二维码"
+                />
+              </div>
+
+              <p className="ld-modal__caption">
+                扫码加入反馈群，交流课表适配、桑浦山校车时刻或新功能建议。
+              </p>
+
+              <div className="ld-modal__actions">
+                <motion.button
+                  type="button"
+                  className="ld-btn ld-btn--outline"
+                  whileHover={ctaHover}
+                  whileTap={ctaTap}
+                  transition={SPRING}
+                  onClick={() => setQrOpen(false)}
+                >
+                  关闭
+                </motion.button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
