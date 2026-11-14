@@ -14,8 +14,8 @@
  */
 import { api, apiBase, IS_NATIVE } from "./api";
 
-export const APP_VERSION_NAME = "1.1.6";
-export const APP_VERSION_CODE = 62;
+export const APP_VERSION_NAME = "1.1.7";
+export const APP_VERSION_CODE = 63;
 
 export type UpdateInfo = {
   versionName: string;

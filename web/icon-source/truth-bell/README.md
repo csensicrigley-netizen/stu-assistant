@@ -1,5 +1,7 @@
 # Arctic Chrome Prism · 定稿图标
 
+此目录保留上一版工程供追溯。当前应用已改用用户随后指定的 [L1 Clean Badge](../l1-clean-badge/README.md)，`icons.mjs` 默认生成 L1 图标。
+
 2026-11-14 用户选定 `docs/design-studies/truth-bell/a1-color-palettes/variants/05-arctic-chrome-prism-512.png`。
 
 - `arctic-chrome-prism.icon.zip`：该版本的原始可编辑 Liquid Composer 工程，原样复制。

@@ -1,6 +1,6 @@
 /**
- * Package the approved Arctic Chrome Prism artwork in icon-source/truth-bell.
- * Its editable Liquid Composer project is arctic-chrome-prism.icon.zip.
+ * Package the approved L1 Clean Badge in icon-source/l1-clean-badge.
+ * master.svg is the editable source; approved-512.png is the selected reference.
  *
  *   node scripts/icons.mjs            web, PWA and Apple touch icons
  *   node scripts/icons.mjs --android  also Android launcher and splash resources
@@ -14,7 +14,7 @@ import puppeteer from "puppeteer-core";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PUBLIC = path.join(ROOT, "public");
-const SOURCE = path.join(ROOT, "icon-source", "truth-bell");
+const SOURCE = path.join(ROOT, "icon-source", "l1-clean-badge");
 const ANDROID_RES = path.join(ROOT, "android", "app", "src", "main", "res");
 const DENSITIES = [["mdpi", 1], ["hdpi", 1.5], ["xhdpi", 2], ["xxhdpi", 3], ["xxxhdpi", 4]];
 
@@ -29,43 +29,43 @@ const CHROME = [
 ].find((candidate) => candidate && existsSync(candidate));
 
 async function loadArtwork(page) {
-  const images = Object.fromEntries(await Promise.all(
-    ["approved-1024", "approved-512", "reopened-512", "artwork-1024", "silhouette-1024"].map(async name =>
-      [name, "data:image/png;base64," + (await readFile(path.join(SOURCE, name + ".png"))).toString("base64")]),
-  ));
-  const { background } = JSON.parse(await readFile(path.join(SOURCE, "renderer.json"), "utf8"));
-  return page.evaluate(async ({ images, background }) => {
+  const source = await readFile(path.join(SOURCE, "master.svg"), "utf8");
+  const approved = "data:image/png;base64," + (await readFile(path.join(SOURCE, "approved-512.png"))).toString("base64");
+  return page.evaluate(async ({ source, approved }) => {
     const canvas = size => Object.assign(document.createElement("canvas"), { width: size, height: size });
     const decode = async src => { const img = new Image(); img.src = src; await img.decode(); return img; };
     const svg = (body, size = 1024) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}" width="${size}" height="${size}">${body}</svg>`;
     const image = (href, size = 1024) => `<image href="${href}" width="${size}" height="${size}"/>`;
-    const approved = await decode(images["approved-1024"]);
+    const serialize = node => new XMLSerializer().serializeToString(node);
+    const url = text => "data:image/svg+xml;charset=utf-8," + encodeURIComponent(text);
+    const master = new DOMParser().parseFromString(source, "image/svg+xml").documentElement;
+    if (master.localName !== "svg" || master.querySelector("parsererror")) throw Error("Invalid icon SVG");
 
-    // Verify that the editable project really corresponds to the chosen preview.
+    // Check the selected PNG against the original vector, before writing assets.
     const compare = canvas(512), cc = compare.getContext("2d", { willReadFrequently: true });
-    cc.drawImage(await decode(images["approved-512"]), 0, 0);
+    cc.drawImage(await decode(approved), 0, 0, 512, 512);
     const expected = cc.getImageData(0, 0, 512, 512).data;
     cc.clearRect(0, 0, 512, 512);
-    cc.drawImage(await decode(images["reopened-512"]), 0, 0);
+    cc.drawImage(await decode(url(source)), 0, 0, 512, 512);
     const actual = cc.getImageData(0, 0, 512, 512).data;
     let difference = 0;
     for (let i = 0; i < expected.length; i++) difference += Math.abs(expected[i] - actual[i]);
     const meanDifference = difference / expected.length;
-    if (meanDifference > 1) throw Error(`Editable project differs from the approved image: ${meanDifference}`);
+    if (meanDifference > 1) throw Error(`Vector source differs from the approved image: ${meanDifference}`);
 
+    // Android/iOS own the final mask. Remove only the outer tile clip, leaving
+    // the original paths, composition, colors, rim and internal occlusion intact.
+    const fullRoot = master.cloneNode(true);
+    const tile = fullRoot.querySelector('g[clip-path="url(#l1-badge-sqClip)"]');
+    if (!tile) throw Error("L1 tile clip is missing");
+    tile.removeAttribute("clip-path");
+    const fullSvg = serialize(fullRoot);
     const full = canvas(1024), fc = full.getContext("2d");
-    const gradient = fc.createLinearGradient(0, 0, 0, 1024);
-    gradient.addColorStop(0, background.colors[0]); gradient.addColorStop(1, background.colors[1]);
-    fc.fillStyle = gradient; fc.fillRect(0, 0, 1024, 1024);
-    fc.drawImage(await decode(images["artwork-1024"]), 0, 0);
-    // Preserve the approved rim and every interior pixel; only extend transparent
-    // corners for masks imposed by Android/iOS instead of baking a second mask.
-    fc.drawImage(approved, 0, 0);
+    fc.drawImage(await decode(url(fullSvg)), 0, 0, 1024, 1024);
 
     // Android shows the central 72dp of a 108dp layer. Edge-clamped overscan
     // preserves the approved framing without transparent corners during motion.
-    // Refraction is baked with the original sky/column beneath the glass so the
-    // OS cannot separate its optical backdrop and change the selected appearance.
+    // The color composition stays together to preserve the translucent overlap.
     function overscan(source) {
       const c = canvas(1536), ctx = c.getContext("2d");
       const segments = [[0, 1, 0, 256], [0, 1024, 256, 1024], [1023, 1, 1280, 256]];
@@ -73,24 +73,28 @@ async function loadArtwork(page) {
         ctx.drawImage(source, sx, sy, sw, sh, dx, dy, dw, dh);
       return svg(image(c.toDataURL(), 1536), 1536);
     }
-    const mono = canvas(1024), mc = mono.getContext("2d", { willReadFrequently: true });
-    mc.drawImage(await decode(images["silhouette-1024"]), 0, 0);
-    const pixels = mc.getImageData(0, 0, 1024, 1024);
-    for (let i = 0; i < pixels.data.length; i += 4) {
-      pixels.data[i] = pixels.data[i + 1] = pixels.data[i + 2] = 255;
-      pixels.data[i + 3] = Math.round(Math.max(0, Math.min(1, (pixels.data[i + 3] - 70) / 100)) * 255);
+    const monoRoot = fullRoot.cloneNode(true);
+    for (const suffix of ["sky", "atmo", "vig", "rim"]) {
+      monoRoot.querySelectorAll(`[fill="url(#l1-badge-${suffix})"], [stroke="url(#l1-badge-${suffix})"]`).forEach(node => node.remove());
     }
-    mc.putImageData(pixels, 0, 0);
-    const desktop = svg(image(images["approved-1024"]));
+    for (const node of monoRoot.querySelectorAll("path")) {
+      if (node.closest("defs")) continue;
+      if (node.getAttribute("fill") !== "none") node.setAttribute("fill", "#ffffff");
+      if (node.hasAttribute("stroke")) node.setAttribute("stroke", "#ffffff");
+      node.removeAttribute("fill-opacity"); node.removeAttribute("stroke-opacity");
+    }
+    const mono = canvas(1024), mc = mono.getContext("2d");
+    mc.drawImage(await decode(url(serialize(monoRoot))), 0, 0, 1024, 1024);
+    const background = master.querySelector("#l1-badge-sky stop").getAttribute("stop-color");
     const fullImage = image(full.toDataURL());
     return {
-      desktop, legacy: desktop, touch: svg(fullImage), maskable: svg(fullImage),
+      desktop: source, legacy: source, touch: fullSvg, maskable: fullSvg,
       round: svg(`<defs><clipPath id="circle"><circle cx="512" cy="512" r="512"/></clipPath></defs><g clip-path="url(#circle)">${fullImage}</g>`),
       foreground: overscan(full), themed: overscan(mono),
-      background: svg(`<rect width="1024" height="1024" fill="${background.colors[0]}"/>`),
+      background: svg(`<rect width="1024" height="1024" fill="${background}"/>`),
       sourceVerification: { meanChannelDifference: meanDifference, scale: "0–255" },
     };
-  }, { images, background });
+  }, { source, approved });
 }
 
 function imageUrl(svg) {

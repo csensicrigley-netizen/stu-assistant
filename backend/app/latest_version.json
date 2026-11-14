@@ -1,13 +1,13 @@
 {
   "channel": "product",
-  "versionName": "1.1.6",
-  "versionCode": 62,
+  "versionName": "1.1.7",
+  "versionCode": 63,
   "apk": "/download/stu-assistant.apk",
   "notes": [
-    "启用 Arctic Chrome Prism 真理钟图标，保留定稿的星空、石柱及液态玻璃配色",
+    "启用选定的 L1 Clean Badge 简化版真理钟图标，保留原造型、背景与渐变配色",
     "同步安卓桌面、自适应图标、系统主题色图标与启动画面"
   ],
   "mandatory": false,
-  "releasedAt": "2026-11-14T00:00:00Z",
+  "releasedAt": "2026-11-14T12:20:05Z",
   "minSupported": "1.0.0"
 }
