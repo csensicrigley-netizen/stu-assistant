@@ -1,0 +1,1090 @@
+/* ==========================================================================
+   Sleeve Gallery Sections & Embedded Preview Sub-Cards (Slice 3 + Phase 2 Motion)
+   All selectors scoped under `.ld` to beat `app.css` resets without leaking.
+   Strict tokens: radii >= 8px everywhere, zero weight 900, #0e95ee selected
+   layoutId pills with #ffffff text, zero colored CTA buttons.
+   ========================================================================== */
+
+/* Prevent duplicate horizontal padding if Landing wraps Gallery in .ld-container */
+.ld .ld-container .ld-section > .ld-container {
+  max-width: none;
+  padding-inline: 0;
+}
+
+/* Subtle GPU hover lift on fine pointers (independent `translate` composes cleanly
+   with motion's whileInView `transform` without specificity conflicts) */
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .ld .ld-fcard {
+    transition:
+      translate 220ms cubic-bezier(0.22, 1, 0.36, 1),
+      border-color 200ms ease,
+      box-shadow 220ms ease;
+  }
+
+  .ld .ld-fcard:hover {
+    translate: 0 -2px;
+    border-color: #d1d5db;
+    box-shadow: var(--shadow-subtle-4);
+  }
+}
+
+/* Ensure reverse split cards swap visual to left on desktop & stack on mobile */
+@media (min-width: 900px) {
+  .ld .ld-fcard--split.ld-fcard--reverse > .ld-subcard {
+    order: -1;
+  }
+
+  .ld .ld-fcard--split.ld-fcard--reverse > .ld-fcard__copy {
+    order: 1;
+  }
+}
+
+/* Base sub-card preview container (#f9fafb, 16px radius, 12px padding from .ld-subcard) */
+.ld .ld-prev {
+  display: grid;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  color: #333333;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Shared white surface card inside a #f9fafb sub-card */
+.ld .ld-prev-surface {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* Header / toolbar rows inside preview sub-cards */
+.ld .ld-prev-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.ld .ld-prev-pills {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.ld .ld-prev-label {
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 600;
+  color: #000000;
+}
+
+.ld .ld-prev-muted {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 400;
+  color: #999999;
+}
+
+/* Neutral status / metadata tag pill */
+.ld .ld-prev-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 9999px;
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+  color: #374151;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.ld .ld-prev-tag--white {
+  background: #ffffff;
+}
+
+.ld .ld-prev-tag--strong {
+  background: #f9fafb;
+  border-color: #cccccc;
+  color: #000000;
+  font-weight: 600;
+}
+
+/* Shared sliding layoutId #0e95ee pill indicator (9999px radius, z-index: 0) */
+.ld .ld-prev-active-pill {
+  position: absolute;
+  inset: -1px;
+  z-index: 0;
+  border-radius: 9999px;
+  background: #0e95ee;
+  pointer-events: none;
+}
+
+/* Foreground label/icon wrapper above sliding z-index: 0 pill */
+.ld .ld-prev-pill__content {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+/* Interactive toggle pills inside sub-cards (Selected: #0e95ee motion.span + #ffffff text) */
+.ld .ld-prev-pill {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 6px 12px;
+  border-radius: 9999px;
+  border: 1px solid #e5e7eb;
+  background: transparent;
+  color: #374151;
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background-color 0.16s ease,
+    border-color 0.16s ease,
+    color 0.16s ease;
+}
+
+.ld .ld-prev-pill:not([aria-pressed="true"]):hover {
+  border-color: #cccccc;
+  background: #ffffff;
+  color: #000000;
+}
+
+.ld .ld-prev-pill[aria-pressed="true"] {
+  background: transparent;
+  border-color: transparent;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+/* Sleeve Size Toggle Button: ~40x40px, 9999px pill */
+.ld .ld-prev-size {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 9999px;
+  border: 1px solid #e5e7eb;
+  background: transparent;
+  color: #374151;
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color 0.16s ease,
+    border-color 0.16s ease,
+    color 0.16s ease;
+}
+
+.ld .ld-prev-size:not([aria-pressed="true"]):hover {
+  border-color: #cccccc;
+  background: #ffffff;
+  color: #000000;
+}
+
+.ld .ld-prev-size[aria-pressed="true"] {
+  background: transparent;
+  border-color: transparent;
+  color: #ffffff;
+}
+
+/* --------------------------------------------------------------------------
+   Card 1: Sleeve Settings & Campus Palette Preview (.ld-prev--settings)
+   -------------------------------------------------------------------------- */
+
+.ld .ld-prev--settings {
+  grid-template-columns: 148px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.ld .ld-prev-sidebar {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.ld .ld-prev-sidebar__item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 9px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #374151;
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 500;
+  cursor: pointer;
+  min-width: 0;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.ld .ld-prev-sidebar__pill {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: 12px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  box-shadow:
+    rgba(0, 0, 0, 0.05) 0px 1px 3px 0px,
+    rgba(0, 0, 0, 0.04) 0px 1px 2px -1px;
+  pointer-events: none;
+}
+
+.ld .ld-prev-sidebar__item:not([aria-pressed="true"]):hover {
+  background: rgba(255, 255, 255, 0.65);
+  color: #000000;
+}
+
+.ld .ld-prev-sidebar__item[aria-pressed="true"] {
+  background: transparent;
+  border-color: transparent;
+  color: #000000;
+  font-weight: 600;
+}
+
+.ld .ld-prev-sidebar__text {
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Decorative colored icon tiles in the settings sidebar (>= 8px radius) */
+.ld .ld-prev-tile {
+  position: relative;
+  z-index: 1;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  flex-shrink: 0;
+  box-shadow: rgba(0, 0, 0, 0.08) 0px 2px 4px -1px;
+}
+
+.ld .ld-prev-tile--pink {
+  background: linear-gradient(135deg, #ec4899, #f43f5e);
+}
+
+.ld .ld-prev-tile--blue {
+  background: linear-gradient(135deg, #0e95ee, #27c9f5);
+}
+
+.ld .ld-prev-tile--teal {
+  background: linear-gradient(135deg, #10b981, #14b8a6);
+}
+
+.ld .ld-prev-tile--violet {
+  background: linear-gradient(135deg, #8b5cf6, #6366f1);
+}
+
+.ld .ld-prev-pane {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 14px;
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.ld .ld-prev-group {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px;
+  margin: -8px;
+  border-radius: 10px;
+  transition: background-color 0.16s ease;
+}
+
+.ld .ld-prev-group--focus {
+  background: #f9fafb;
+}
+
+.ld .ld-prev-sizes {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ld .ld-prev-palettes {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  min-width: 0;
+}
+
+.ld .ld-prev-palettes .ld-prev-pill {
+  width: 100%;
+  padding-inline: 8px;
+}
+
+.ld .ld-prev-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 9999px;
+  flex-shrink: 0;
+  border: 1.5px solid rgba(255, 255, 255, 0.9);
+  box-shadow: rgba(0, 0, 0, 0.12) 0px 0px 0px 1px;
+  transition: background-color 220ms ease;
+}
+
+/* Live miniature course card swatch inside Settings Preview
+   Geometry morphs via motion `layout` spring; colors fade smoothly over 220ms */
+.ld .ld-prev-mini-course {
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-left-width: 4px;
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  transition:
+    background-color 220ms ease,
+    border-color 220ms ease,
+    color 220ms ease;
+}
+
+.ld .ld-prev-mini-course--s {
+  padding: 9px 12px;
+}
+
+.ld .ld-prev-mini-course--m {
+  padding: 12px 14px;
+}
+
+.ld .ld-prev-mini-course--l {
+  padding: 15px 16px;
+}
+
+.ld .ld-prev-mini-course--xl {
+  padding: 18px 18px;
+}
+
+.ld .ld-prev-mini-course__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ld .ld-prev-mini-course__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 9px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+  color: #333333;
+  transition:
+    background-color 220ms ease,
+    border-color 220ms ease,
+    color 220ms ease;
+}
+
+.ld .ld-prev-mini-course__time {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.ld .ld-prev-mini-course__title {
+  font-weight: 700;
+  color: #000000;
+  letter-spacing: 0;
+  transition: font-size 0.18s ease, line-height 0.18s ease;
+}
+
+.ld .ld-prev-mini-course--s .ld-prev-mini-course__title {
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.ld .ld-prev-mini-course--m .ld-prev-mini-course__title {
+  font-size: 15px;
+  line-height: 22px;
+}
+
+.ld .ld-prev-mini-course--l .ld-prev-mini-course__title {
+  font-size: 17px;
+  line-height: 24px;
+}
+
+.ld .ld-prev-mini-course--xl .ld-prev-mini-course__title {
+  font-size: 19px;
+  line-height: 26px;
+}
+
+.ld .ld-prev-mini-course__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 17px;
+  color: #374151;
+}
+
+.ld .ld-prev-mini-course__note-wrap {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.ld .ld-prev-mini-course__note {
+  display: inline-block;
+}
+
+.ld .ld-prev-mini-course__accent {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  color: #ffffff;
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: 600;
+  transition:
+    background-color 220ms ease,
+    border-color 220ms ease,
+    color 220ms ease;
+}
+
+@media (max-width: 639px) {
+  .ld .ld-prev--settings {
+    grid-template-columns: 1fr;
+  }
+
+  .ld .ld-prev-sidebar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Card 2: STU 13-Period / 5 Unequal Big-Section Rhythm (.ld-prev--rhythm)
+   -------------------------------------------------------------------------- */
+
+.ld .ld-prev-ribbon {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  min-height: 46px;
+  padding-top: 2px;
+  min-width: 0;
+}
+
+.ld .ld-prev-ribbon__seg {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 4px;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+  color: #374151;
+  cursor: pointer;
+  overflow: visible;
+  min-width: 0;
+  transition:
+    background-color 0.16s ease,
+    border-color 0.16s ease,
+    color 0.16s ease;
+}
+
+.ld .ld-prev-ribbon__pill {
+  position: absolute;
+  inset: -1px;
+  z-index: 0;
+  border-radius: 10px;
+  background: #0e95ee;
+  box-shadow: rgba(14, 149, 238, 0.22) 0px 4px 10px -2px;
+  pointer-events: none;
+}
+
+.ld .ld-prev-ribbon__content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.ld .ld-prev-ribbon__seg:not([aria-pressed="true"]):hover {
+  border-color: #cccccc;
+  background: #ffffff;
+  color: #000000;
+}
+
+.ld .ld-prev-ribbon__seg[aria-pressed="true"] {
+  background: transparent;
+  border-color: transparent;
+  color: #ffffff;
+}
+
+.ld .ld-prev-ribbon__seg b {
+  font-size: 12px;
+  line-height: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.ld .ld-prev-ribbon__seg small {
+  font-size: 11px;
+  line-height: 14px;
+  opacity: 0.88;
+  white-space: nowrap;
+}
+
+.ld .ld-prev-ribbon__break {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 2px;
+  border-radius: 10px;
+  border: 1px dashed #cccccc;
+  background: #ffffff;
+  color: #999999;
+  font-size: 11px;
+  line-height: 14px;
+  font-weight: 500;
+  overflow: hidden;
+  min-width: 22px;
+}
+
+.ld .ld-prev-rhythm-panel {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.ld .ld-prev-periods {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ld .ld-prev-period-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+  font-size: 12px;
+  line-height: 16px;
+  color: #333333;
+}
+
+.ld .ld-prev-period-chip b {
+  font-weight: 600;
+  color: #000000;
+}
+
+.ld .ld-prev-hop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+
+.ld .ld-prev-hop__left {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 600;
+  color: #000000;
+  min-width: 0;
+}
+
+.ld .ld-prev-hop__icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #333333;
+  flex-shrink: 0;
+}
+
+@media (max-width: 520px) {
+  .ld .ld-prev-ribbon__seg small {
+    display: none;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Card 3: Weekly Proportional Spectrum & Multi-Source Import (.ld-prev--week)
+   -------------------------------------------------------------------------- */
+
+.ld .ld-prev-week-panel {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.ld .ld-prev-week-head {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+  text-align: center;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.ld .ld-prev-week-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+  min-width: 0;
+}
+
+.ld .ld-prev-week-col {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  min-width: 0;
+}
+
+.ld .ld-prev-course {
+  border-radius: 10px;
+  padding: 7px 6px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.ld .ld-prev-course--short {
+  min-height: 50px;
+}
+
+.ld .ld-prev-course--long {
+  min-height: 70px;
+}
+
+.ld .ld-prev-course--empty {
+  min-height: 50px;
+  background: #f9fafb;
+  border: 1px dashed #e5e7eb;
+}
+
+.ld .ld-prev-course b {
+  font-size: 12px;
+  line-height: 15px;
+  font-weight: 600;
+  color: #000000;
+  word-break: break-word;
+}
+
+.ld .ld-prev-course small {
+  font-size: 11px;
+  line-height: 14px;
+  color: #374151;
+  word-break: break-word;
+}
+
+.ld .ld-prev-course--rose {
+  background: #fff0f3;
+}
+
+.ld .ld-prev-course--sky {
+  background: #eef7ff;
+}
+
+.ld .ld-prev-course--mint {
+  background: #ecfdf5;
+}
+
+.ld .ld-prev-course--violet {
+  background: #f5f3ff;
+}
+
+.ld .ld-prev-course--amber {
+  background: #fff8eb;
+}
+
+.ld .ld-prev-lunch {
+  border-radius: 8px;
+  background: #f9fafb;
+  border: 1px dashed #e5e7eb;
+  padding: 4px 8px;
+  text-align: center;
+  font-size: 11px;
+  line-height: 15px;
+  color: #999999;
+}
+
+/* --------------------------------------------------------------------------
+   Card 4: Deadlines Check-off, Exam Seat & GPA (.ld-prev--academic)
+   -------------------------------------------------------------------------- */
+
+.ld .ld-prev-tasks {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.ld .ld-prev-task {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 10px;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+  cursor: pointer;
+  min-width: 0;
+  transition:
+    background-color 200ms ease,
+    border-color 200ms ease,
+    opacity 220ms ease;
+}
+
+.ld .ld-prev-task:hover {
+  background: #ffffff;
+  border-color: #cccccc;
+}
+
+.ld .ld-prev-task[aria-pressed="true"] {
+  background: #ffffff;
+  opacity: 0.76;
+}
+
+.ld .ld-prev-task__main {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.ld .ld-prev-check {
+  width: 20px;
+  height: 20px;
+  border-radius: 9999px;
+  border: 1.5px solid #cccccc;
+  background: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: transparent;
+  flex-shrink: 0;
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease;
+}
+
+.ld .ld-prev-task[aria-pressed="true"] .ld-prev-check {
+  background: #0e95ee;
+  border-color: #0e95ee;
+  color: #ffffff;
+}
+
+.ld .ld-prev-task__copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ld .ld-prev-task__title {
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 600;
+  color: #000000;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-decoration-line: line-through;
+  text-decoration-color: transparent;
+  transition:
+    color 220ms ease,
+    text-decoration-color 220ms ease;
+}
+
+.ld .ld-prev-task[aria-pressed="true"] .ld-prev-task__title {
+  color: #999999;
+  text-decoration-color: #999999;
+}
+
+.ld .ld-prev-task__sub {
+  font-size: 12px;
+  line-height: 16px;
+  color: #999999;
+  transition: color 200ms ease;
+}
+
+.ld .ld-prev-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  min-width: 0;
+}
+
+.ld .ld-prev-stat {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 12px;
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.ld .ld-prev-stat__value {
+  font-size: 22px;
+  line-height: 28px;
+  font-weight: 700;
+  color: #000000;
+  letter-spacing: 0;
+}
+
+@media (max-width: 440px) {
+  .ld .ld-prev-stats {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Card 5 & Card 6: Campus Bus / 14 Chargers / Library & Privacy Audit Rows
+   -------------------------------------------------------------------------- */
+
+.ld .ld-prev-rows {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.ld .ld-prev-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+  min-width: 0;
+}
+
+.ld .ld-prev-row--card {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+
+.ld .ld-prev-row__main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1 1 180px;
+}
+
+.ld .ld-prev-row__icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #000000;
+  flex-shrink: 0;
+}
+
+.ld .ld-prev-row--card .ld-prev-row__icon {
+  background: #f9fafb;
+}
+
+.ld .ld-prev-row__text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ld .ld-prev-row__text b {
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 600;
+  color: #000000;
+}
+
+.ld .ld-prev-row__text small {
+  font-size: 12px;
+  line-height: 17px;
+  color: #374151;
+}
+
+/* --------------------------------------------------------------------------
+   Section 3 (#download): Pair Cards, Platform Summary & QR Sub-Card
+   -------------------------------------------------------------------------- */
+
+.ld .ld-download-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 20px;
+  min-width: 0;
+}
+
+.ld .ld-download-card__body {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.ld .ld-prev-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+/* Let motion's 120Hz TAP spring drive transform cleanly without CSS transform lag */
+.ld .ld-prev-actions .ld-btn {
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    opacity 160ms ease;
+}
+
+.ld .ld-prev-qr {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.ld .ld-prev-qr__frame {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 8px;
+  flex-shrink: 0;
+}
+
+.ld .ld-prev-qr__img {
+  width: 88px;
+  height: 88px;
+  border-radius: 8px;
+  object-fit: contain;
+}
+
+.ld .ld-prev-qr__copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.ld .ld-prev-qr__copy b {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 600;
+  color: #000000;
+}
+
+.ld .ld-prev-qr__copy small {
+  font-size: 13px;
+  line-height: 19px;
+  color: #374151;
+}
+
+@media (max-width: 420px) {
+  .ld .ld-prev-qr {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ld .ld-fcard,
+  .ld .ld-prev-pill,
+  .ld .ld-prev-size,
+  .ld .ld-prev-sidebar__item,
+  .ld .ld-prev-mini-course,
+  .ld .ld-prev-mini-course__badge,
+  .ld .ld-prev-mini-course__title,
+  .ld .ld-prev-mini-course__accent,
+  .ld .ld-prev-dot,
+  .ld .ld-prev-ribbon__seg,
+  .ld .ld-prev-task,
+  .ld .ld-prev-check,
+  .ld .ld-prev-task__title,
+  .ld .ld-prev-task__sub,
+  .ld .ld-prev-actions .ld-btn {
+    transition: none !important;
+  }
+}
