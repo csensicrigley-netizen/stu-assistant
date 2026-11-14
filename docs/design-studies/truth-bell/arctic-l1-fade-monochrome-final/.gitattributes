@@ -1,0 +1,5 @@
+sources/** -text
+scripts/* text eol=lf
+*.md text eol=lf
+renders/*.png binary
+packages/*.zip binary
