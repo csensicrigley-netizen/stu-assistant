@@ -18,7 +18,19 @@ export default defineConfig({
       // 关掉之后不再产出 sw.js，浏览器发现 /sw.js 404 会把旧 SW 注销掉。
       disable: true,
       registerType: "autoUpdate",
-      includeAssets: ["icon.svg", "favicon-32.png", "apple-touch-icon.png"],
+      includeAssets: [
+        "icon.svg",
+        "favicon-32.png",
+        "favicon-light-32.png",
+        "favicon-dark-32.png",
+        "apple-touch-icon.png",
+        "truth-bell-light-64.png",
+        "truth-bell-light-128.png",
+        "truth-bell-light-256.png",
+        "truth-bell-dark-64.png",
+        "truth-bell-dark-128.png",
+        "truth-bell-dark-256.png",
+      ],
       manifest: {
         name: "STU 事项助手",
         short_name: "STU 助手",

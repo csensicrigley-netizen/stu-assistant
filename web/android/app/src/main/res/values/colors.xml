@@ -17,4 +17,5 @@
     <color name="brand">#6756B9</color>
     <color name="brand_deep">#473788</color>
     <color name="accent">#BC484B</color>
+    <color name="splash_icon_bg">#E2E2E2</color>
 </resources>

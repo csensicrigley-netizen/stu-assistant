@@ -1,99 +1,52 @@
 /**
- * The app mark, and every raster the platforms need, from one definition.
+ * Truth Bell L1 — Unified Web & Android (Light Porcelain + Dark Obsidian) icon pipeline.
  *
  *   node scripts/icons.mjs            web icons (public/)
- *   node scripts/icons.mjs --android  also Android launcher + splash resources
+ *   node scripts/icons.mjs --android  also Android launcher (default + -night) + splash + native badge
  *   node scripts/icons.mjs --sheet    a review sheet in shots/icon-sheet.png
  *
- * The mark: an S drawn as one continuous route (three runs, two turns) — the
- * day's path between classrooms, and the S of STU — with a coral bead on the
- * middle run: where you are right now. Paper on sea blue, one warm accent,
- * the same three colours as the interface.
+ * Master assets live in:
+ *   ../docs/design-studies/truth-bell/arctic-l1-fade-monochrome-final/renders/
  */
 import { existsSync } from "node:fs";
-import { mkdir, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import puppeteer from "puppeteer-core";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const REPO = path.resolve(ROOT, "..");
+const RENDERS = path.join(
+  REPO,
+  "docs",
+  "design-studies",
+  "truth-bell",
+  "arctic-l1-fade-monochrome-final",
+  "renders",
+);
 const PUBLIC = path.join(ROOT, "public");
 const ANDROID_RES = path.join(ROOT, "android", "app", "src", "main", "res");
 
-const C = {
-  hi: "#9d8bf2",
-  lo: "#6a55b0",
-  paper: "#fff7f4",
-  coral: "#ff9d7e",
-};
+const LIGHT_PREFIX = "truth-bell-l1-light-porcelain";
+const DARK_PREFIX = "truth-bell-l1-dark-obsidian";
 
-/* ------------------------------------------------------------- geometry */
+/**
+ * Android Adaptive Icon safe scaling:
+ * Android masks out the central 72dp of the 108dp adaptive layer (66.67%).
+ * Scaling the 1024px Bare master to 0.65 places the entire Truth Bell obelisk
+ * and sweeping glass ribbon inside every squircle, circle, and teardrop mask
+ * with zero clipping while matching the Composer Badge proportions.
+ */
+const ADAPTIVE_SCALE = 0.65;
 
-// All numbers live on a 1024 grid, glyph centred at (512, 512).
-const R = 124; // turn radius (centre line)
-const W = 100; // stroke
-const HALF = 106; // half the straight run between turn centres
-const TAIL = 44; // how far the terminals run past the turn centres
-const BEAD = 62; // bead radius
-const GAP = 17; // clear space around the bead
-
-function glyph({ scale = 1, paper = C.paper, coral = C.coral, id = "g" } = {}) {
-  const cx = 512;
-  const cy = 512;
-  const y1 = cy - 2 * R;
-  const y3 = cy + 2 * R;
-  const xl = cx - HALF;
-  const xr = cx + HALF;
-  const d = [
-    `M${xr + TAIL} ${y1}`,
-    `H${xl}`,
-    `A${R} ${R} 0 0 0 ${xl} ${cy}`,
-    `H${xr}`,
-    `A${R} ${R} 0 0 1 ${xr} ${y3}`,
-    `H${xl - TAIL}`,
-  ].join("");
-  const t = `translate(512 512) scale(${scale}) translate(-512 -512)`;
-  return `
-    <mask id="${id}-cut" maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024">
-      <rect width="1024" height="1024" fill="#fff"/>
-      <circle cx="${cx}" cy="${cy}" r="${BEAD + GAP}" fill="#000"/>
-    </mask>
-    <g transform="${t}">
-      <path d="${d}" fill="none" stroke="${paper}" stroke-width="${W}" stroke-linecap="round" stroke-linejoin="round" mask="url(#${id}-cut)"/>
-      <circle cx="${cx}" cy="${cy}" r="${BEAD}" fill="${coral}"/>
-    </g>`;
-}
-
-const defsBg = (id = "bg") => `
-  <linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1">
-    <stop offset="0" stop-color="${C.hi}"/><stop offset="1" stop-color="${C.lo}"/>
-  </linearGradient>
-  <radialGradient id="${id}-hl" cx="0.2" cy="0.1" r="0.8">
-    <stop offset="0" stop-color="#fff" stop-opacity="0.18"/><stop offset="1" stop-color="#fff" stop-opacity="0"/>
-  </radialGradient>`;
-
-/** shape: "rounded" (any-purpose), "full" (maskable / iOS), "circle" (legacy round) */
-function iconSvg({ shape = "rounded", scale = 1 } = {}) {
-  const bg =
-    shape === "rounded"
-      ? `<rect width="1024" height="1024" rx="232" fill="url(#bg)"/><rect width="1024" height="1024" rx="232" fill="url(#bg-hl)"/>`
-      : shape === "circle"
-        ? `<circle cx="512" cy="512" r="512" fill="url(#bg)"/><circle cx="512" cy="512" r="512" fill="url(#bg-hl)"/>`
-        : `<rect width="1024" height="1024" fill="url(#bg)"/><rect width="1024" height="1024" fill="url(#bg-hl)"/>`;
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><defs>${defsBg()}</defs>${bg}${glyph({ scale })}</svg>`;
-}
-
-/** Android adaptive layers live on a 108dp canvas; only the central 66dp is safe. */
-const ADAPTIVE_SCALE = 0.7;
-const foregroundSvg = () =>
-  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">${glyph({ scale: ADAPTIVE_SCALE, id: "fg" })}</svg>`;
-const backgroundSvg = () =>
-  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><defs>${defsBg()}</defs><rect width="1024" height="1024" fill="url(#bg)"/><rect width="1024" height="1024" fill="url(#bg-hl)"/></svg>`;
-const monochromeSvg = () =>
-  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">${glyph({ scale: ADAPTIVE_SCALE, paper: "#fff", coral: "#fff", id: "mo" })}</svg>`;
-
-/* -------------------------------------------------------------- render */
+const DENSITIES = [
+  ["mdpi", 1],
+  ["hdpi", 1.5],
+  ["xhdpi", 2],
+  ["xxhdpi", 3],
+  ["xxxhdpi", 4],
+];
 
 const CHROME = [
   "C:/Program Files/Google/Chrome/Application/chrome.exe",
@@ -101,11 +54,100 @@ const CHROME = [
   "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe",
 ].find((p) => existsSync(p));
 
+async function dataUri(filename) {
+  const buf = await readFile(path.join(RENDERS, filename));
+  return `data:image/png;base64,${buf.toString("base64")}`;
+}
+
+function fullBleedBgSvg(mode) {
+  if (mode === "dark") {
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+      <defs>
+        <linearGradient id="bg-dark" x1="0.5" y1="0" x2="0.5" y2="1">
+          <stop offset="0" stop-color="#050505"/>
+          <stop offset="1" stop-color="#161617"/>
+        </linearGradient>
+        <radialGradient id="glow-dark" cx="0.5" cy="0.16" r="0.72">
+          <stop offset="0" stop-color="#ffffff" stop-opacity="0.09"/>
+          <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+        </radialGradient>
+      </defs>
+      <rect width="1024" height="1024" fill="url(#bg-dark)"/>
+      <rect width="1024" height="1024" fill="url(#glow-dark)"/>
+    </svg>`;
+  }
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+    <defs>
+      <linearGradient id="bg-light" x1="0.5" y1="0" x2="0.5" y2="1">
+        <stop offset="0" stop-color="#EAEAEA"/>
+        <stop offset="1" stop-color="#D4D4D4"/>
+      </linearGradient>
+      <radialGradient id="glow-light" cx="0.5" cy="0.14" r="0.75">
+        <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.55"/>
+        <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+      </radialGradient>
+    </defs>
+    <rect width="1024" height="1024" fill="url(#bg-light)"/>
+    <rect width="1024" height="1024" fill="url(#glow-light)"/>
+  </svg>`;
+}
+
+function compositeBareOnFullBleedSvg(mode, bareUri, scale = 0.88, circle = false) {
+  const size = Math.round(1024 * scale);
+  const offset = ((1024 - size) / 2).toFixed(2);
+  const clipOpen = circle
+    ? `<clipPath id="circle-clip"><circle cx="512" cy="512" r="512"/></clipPath><g clip-path="url(#circle-clip)">`
+    : `<g>`;
+  const innerBg = fullBleedBgSvg(mode)
+    .replace(/^<svg[^>]*>/, "")
+    .replace(/<\/svg>\s*$/, "");
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+    ${clipOpen}
+      ${innerBg}
+      <image href="${bareUri}" x="${offset}" y="${offset}" width="${size}" height="${size}"/>
+    </g>
+  </svg>`;
+}
+
+function adaptiveForegroundSvg(bareUri, scale = ADAPTIVE_SCALE) {
+  const size = (1024 * scale).toFixed(2);
+  const offset = ((1024 - 1024 * scale) / 2).toFixed(2);
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+    <image href="${bareUri}" x="${offset}" y="${offset}" width="${size}" height="${size}"/>
+  </svg>`;
+}
+
+function scaledBadgeSvg(badgeUri, scale = 1) {
+  const size = (1024 * scale).toFixed(2);
+  const offset = ((1024 - 1024 * scale) / 2).toFixed(2);
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+    <image href="${badgeUri}" x="${offset}" y="${offset}" width="${size}" height="${size}"/>
+  </svg>`;
+}
+
+async function dualSchemeFaviconSvg() {
+  const light64 = await dataUri(`${LIGHT_PREFIX}-badge-64.png`);
+  const dark64 = await dataUri(`${DARK_PREFIX}-badge-64.png`);
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <style>
+    .dark { display: none; }
+    @media (prefers-color-scheme: dark) {
+      .light { display: none; }
+      .dark { display: inline; }
+    }
+  </style>
+  <image class="light" href="${light64}" width="64" height="64"/>
+  <image class="dark" href="${dark64}" width="64" height="64"/>
+</svg>
+`;
+}
+
 async function withBrowser(fn) {
+  if (!CHROME) throw new Error("Chrome or Edge executable not found for icon rasterization");
   const browser = await puppeteer.launch({
     executablePath: CHROME,
     headless: true,
-    userDataDir: path.join(os.tmpdir(), "stu-icons-profile"),
+    userDataDir: path.join(os.tmpdir(), `stu-truth-bell-icons-${process.pid}`),
     args: ["--no-sandbox", "--disable-gpu"],
   });
   try {
@@ -119,48 +161,141 @@ async function withBrowser(fn) {
 async function png(page, svg, w, h, file) {
   await page.setViewport({ width: w, height: h, deviceScaleFactor: 1 });
   await page.setContent(
-    `<!doctype html><html><body style="margin:0;background:transparent">${svg.replace("<svg ", `<svg width="${w}" height="${h}" `)}</body></html>`,
+    `<!doctype html><html><body style="margin:0;background:transparent;overflow:hidden">${svg.replace(
+      "<svg ",
+      `<svg width="${w}" height="${h}" style="display:block" `,
+    )}</body></html>`,
+    { waitUntil: "load" },
   );
   await mkdir(path.dirname(file), { recursive: true });
-  await page.screenshot({ path: file, omitBackground: true, clip: { x: 0, y: 0, width: w, height: h } });
+  await page.screenshot({
+    path: file,
+    omitBackground: true,
+    clip: { x: 0, y: 0, width: w, height: h },
+  });
 }
 
-const DENSITIES = [
-  ["mdpi", 1],
-  ["hdpi", 1.5],
-  ["xhdpi", 2],
-  ["xxhdpi", 3],
-  ["xxxhdpi", 4],
-];
-
 async function web(page) {
-  await writeFile(path.join(PUBLIC, "icon.svg"), iconSvg({ shape: "rounded" }));
-  await png(page, iconSvg({ shape: "rounded" }), 192, 192, path.join(PUBLIC, "icon-192.png"));
-  await png(page, iconSvg({ shape: "rounded" }), 512, 512, path.join(PUBLIC, "icon-512.png"));
-  await png(page, iconSvg({ shape: "rounded" }), 32, 32, path.join(PUBLIC, "favicon-32.png"));
-  // maskable: the platform crops to a circle of 80% diameter at worst
-  await png(page, iconSvg({ shape: "full", scale: 0.8 }), 512, 512, path.join(PUBLIC, "icon-maskable-512.png"));
-  await png(page, iconSvg({ shape: "full", scale: 0.92 }), 180, 180, path.join(PUBLIC, "apple-touch-icon.png"));
-  console.log("web icons → public/");
+  await mkdir(PUBLIC, { recursive: true });
+
+  // Exact WebGL master copies for crisp multi-DPI UI & PWA badges
+  for (const size of [64, 128, 256]) {
+    await copyFile(
+      path.join(RENDERS, `${LIGHT_PREFIX}-badge-${size}.png`),
+      path.join(PUBLIC, `truth-bell-light-${size}.png`),
+    );
+    await copyFile(
+      path.join(RENDERS, `${DARK_PREFIX}-badge-${size}.png`),
+      path.join(PUBLIC, `truth-bell-dark-${size}.png`),
+    );
+  }
+
+  await copyFile(
+    path.join(RENDERS, `${LIGHT_PREFIX}-badge-32.png`),
+    path.join(PUBLIC, "favicon-light-32.png"),
+  );
+  await copyFile(
+    path.join(RENDERS, `${DARK_PREFIX}-badge-32.png`),
+    path.join(PUBLIC, "favicon-dark-32.png"),
+  );
+  await copyFile(
+    path.join(RENDERS, `${LIGHT_PREFIX}-badge-32.png`),
+    path.join(PUBLIC, "favicon-32.png"),
+  );
+  await copyFile(
+    path.join(RENDERS, `${LIGHT_PREFIX}-badge-192.png`),
+    path.join(PUBLIC, "icon-192.png"),
+  );
+  await copyFile(
+    path.join(RENDERS, `${DARK_PREFIX}-badge-192.png`),
+    path.join(PUBLIC, "icon-192-dark.png"),
+  );
+  await copyFile(
+    path.join(RENDERS, `${LIGHT_PREFIX}-badge-512.png`),
+    path.join(PUBLIC, "icon-512.png"),
+  );
+  await copyFile(
+    path.join(RENDERS, `${DARK_PREFIX}-badge-512.png`),
+    path.join(PUBLIC, "icon-512-dark.png"),
+  );
+
+  await writeFile(path.join(PUBLIC, "icon.svg"), await dualSchemeFaviconSvg());
+
+  // Full-bleed opaque icons for iOS Home Screen (180x180) and PWA maskable (512x512)
+  const lightBare1024 = await dataUri(`${LIGHT_PREFIX}-bare-1024.png`);
+  await png(
+    page,
+    compositeBareOnFullBleedSvg("light", lightBare1024, 0.9, false),
+    180,
+    180,
+    path.join(PUBLIC, "apple-touch-icon.png"),
+  );
+  await png(
+    page,
+    compositeBareOnFullBleedSvg("light", lightBare1024, 0.78, false),
+    512,
+    512,
+    path.join(PUBLIC, "icon-maskable-512.png"),
+  );
+
+  console.log("web Truth Bell icons → public/");
 }
 
 async function android(page) {
-  if (!existsSync(ANDROID_RES)) throw new Error("android/ project not found; run `npx cap add android` first");
-  for (const [name, k] of DENSITIES) {
-    const dir = path.join(ANDROID_RES, `mipmap-${name}`);
-    const legacy = Math.round(48 * k);
-    const layer = Math.round(108 * k);
-    await png(page, iconSvg({ shape: "rounded", scale: 0.94 }), legacy, legacy, path.join(dir, "ic_launcher.png"));
-    await png(page, iconSvg({ shape: "circle", scale: 0.86 }), legacy, legacy, path.join(dir, "ic_launcher_round.png"));
-    await png(page, foregroundSvg(), layer, layer, path.join(dir, "ic_launcher_foreground.png"));
-    await png(page, backgroundSvg(), layer, layer, path.join(dir, "ic_launcher_background.png"));
-    await png(page, monochromeSvg(), layer, layer, path.join(dir, "ic_launcher_monochrome.png"));
+  if (!existsSync(ANDROID_RES)) {
+    throw new Error("android/ project not found; run `npx cap add android` first");
   }
+
+  const lightBadge1024 = await dataUri(`${LIGHT_PREFIX}-badge-1024.png`);
+  const darkBadge1024 = await dataUri(`${DARK_PREFIX}-badge-1024.png`);
+  const lightBare1024 = await dataUri(`${LIGHT_PREFIX}-bare-1024.png`);
+  const darkBare1024 = await dataUri(`${DARK_PREFIX}-bare-1024.png`);
+
+  const variants = [
+    { mode: "light", qualifier: "", badgeUri: lightBadge1024, bareUri: lightBare1024 },
+    { mode: "dark", qualifier: "-night", badgeUri: darkBadge1024, bareUri: darkBare1024 },
+  ];
+
+  for (const v of variants) {
+    for (const [name, k] of DENSITIES) {
+      const dir = path.join(ANDROID_RES, `mipmap${v.qualifier}-${name}`);
+      const legacy = Math.round(48 * k);
+      const layer = Math.round(108 * k);
+      await png(
+        page,
+        scaledBadgeSvg(v.badgeUri, 0.94),
+        legacy,
+        legacy,
+        path.join(dir, "ic_launcher.png"),
+      );
+      await png(
+        page,
+        compositeBareOnFullBleedSvg(v.mode, v.bareUri, 0.84, true),
+        legacy,
+        legacy,
+        path.join(dir, "ic_launcher_round.png"),
+      );
+      await png(
+        page,
+        adaptiveForegroundSvg(v.bareUri, ADAPTIVE_SCALE),
+        layer,
+        layer,
+        path.join(dir, "ic_launcher_foreground.png"),
+      );
+      await png(
+        page,
+        fullBleedBgSvg(v.mode),
+        layer,
+        layer,
+        path.join(dir, "ic_launcher_background.png"),
+      );
+    }
+  }
+
   const adaptive = `<?xml version="1.0" encoding="utf-8"?>
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
     <background android:drawable="@mipmap/ic_launcher_background" />
     <foreground android:drawable="@mipmap/ic_launcher_foreground" />
-    <monochrome android:drawable="@mipmap/ic_launcher_monochrome" />
 </adaptive-icon>
 `;
   const any = path.join(ANDROID_RES, "mipmap-anydpi-v26");
@@ -168,39 +303,75 @@ async function android(page) {
   await writeFile(path.join(any, "ic_launcher.xml"), adaptive);
   await writeFile(path.join(any, "ic_launcher_round.xml"), adaptive);
 
-  // pre-Android-12 launch screen: drawable/splash.xml centres this mark on
-  // the theme's paper colour, so one bitmap serves every screen and theme
-  await png(page, iconSvg({ shape: "rounded" }), 448, 448, path.join(ANDROID_RES, "drawable-nodpi", "splash_mark.png"));
-  console.log("android launcher + splash mark → android/app/src/main/res/");
+  // Pre-Android-12 splash marks (light default + dark -night)
+  const nodpiLight = path.join(ANDROID_RES, "drawable-nodpi");
+  const nodpiDark = path.join(ANDROID_RES, "drawable-night-nodpi");
+  await mkdir(nodpiLight, { recursive: true });
+  await mkdir(nodpiDark, { recursive: true });
+
+  await png(
+    page,
+    scaledBadgeSvg(lightBadge1024, 1),
+    448,
+    448,
+    path.join(nodpiLight, "splash_mark.png"),
+  );
+  await png(
+    page,
+    scaledBadgeSvg(darkBadge1024, 1),
+    448,
+    448,
+    path.join(nodpiDark, "splash_mark.png"),
+  );
+
+  // In-App Compose NativeLogo master Badge PNGs (256px crisp for 64dp @3x/4x)
+  await copyFile(
+    path.join(RENDERS, `${LIGHT_PREFIX}-badge-256.png`),
+    path.join(nodpiLight, "truth_bell_badge_light.png"),
+  );
+  await copyFile(
+    path.join(RENDERS, `${DARK_PREFIX}-badge-256.png`),
+    path.join(nodpiLight, "truth_bell_badge_dark.png"),
+  );
+
+  console.log("android launcher (light + -night) + splash + native badge → android/app/src/main/res/");
 }
 
 async function sheet(page) {
+  const lightBadge = await dataUri(`${LIGHT_PREFIX}-badge-512.png`);
+  const darkBadge = await dataUri(`${DARK_PREFIX}-badge-512.png`);
+  const lightBare = await dataUri(`${LIGHT_PREFIX}-bare-512.png`);
+  const darkBare = await dataUri(`${DARK_PREFIX}-bare-512.png`);
   const masks = [
     ["圆形", "50%"],
-    ["圆角方", "22%"],
+    ["圆角方", "22.5%"],
     ["水滴", "50% 50% 50% 18%"],
   ];
   const tile = (inner, size, radius) =>
-    `<div style="width:${size}px;height:${size}px;border-radius:${radius};overflow:hidden;position:relative;box-shadow:0 2px 8px rgba(0,0,0,.25)">${inner}</div>`;
-  const layered = (size) =>
-    `<div style="position:absolute;inset:0">${backgroundSvg().replace("<svg ", `<svg width="${size}" height="${size}" `)}</div><div style="position:absolute;inset:0">${foregroundSvg().replace("<svg ", `<svg width="${size}" height="${size}" `)}</div>`;
-  const html = `<!doctype html><html><body style="margin:0;padding:28px;background:#f4ecec;font:13px system-ui;color:#333">
-    <div style="display:flex;gap:28px;align-items:flex-end">
-      ${iconSvg().replace("<svg ", '<svg width="240" height="240" ')}
-      ${[96, 64, 48, 32, 20, 16].map((s) => iconSvg().replace("<svg ", `<svg width="${s}" height="${s}" `)).join("")}
+    `<div style="width:${size}px;height:${size}px;border-radius:${radius};overflow:hidden;position:relative;box-shadow:0 4px 14px rgba(0,0,0,.18)">${inner}</div>`;
+  const layered = (mode, bareUri, size) =>
+    `<div style="position:absolute;inset:0">${fullBleedBgSvg(mode).replace("<svg ", `<svg width="${size}" height="${size}" `)}</div><div style="position:absolute;inset:0">${adaptiveForegroundSvg(bareUri).replace("<svg ", `<svg width="${size}" height="${size}" `)}</div>`;
+
+  const html = `<!doctype html><html><body style="margin:0;padding:32px;background:#f7f7f8;font:13px system-ui,sans-serif;color:#111">
+    <div style="display:flex;gap:32px;align-items:center;margin-bottom:24px">
+      <div><img src="${lightBadge}" width="180" height="180" style="display:block"/><div style="margin-top:8px;text-align:center;font-weight:600">霜瓷浅灰 Badge</div></div>
+      <div><img src="${darkBadge}" width="180" height="180" style="display:block"/><div style="margin-top:8px;text-align:center;font-weight:600">黑曜霜晶 Badge</div></div>
+      <div style="display:flex;gap:14px;align-items:flex-end">
+        ${[64, 48, 32, 24, 16].map((s) => `<img src="${lightBadge}" width="${s}" height="${s}"/>`).join("")}
+      </div>
+      <div style="display:flex;gap:14px;align-items:flex-end;background:#111317;padding:14px 18px;border-radius:16px">
+        ${[64, 48, 32, 24, 16].map((s) => `<img src="${darkBadge}" width="${s}" height="${s}"/>`).join("")}
+      </div>
     </div>
-    <p style="margin:22px 0 10px">Android 自适应图标（同一前景，不同启动器遮罩）</p>
-    <div style="display:flex;gap:28px;align-items:center">
-      ${masks.map(([name, r]) => `<div style="display:grid;gap:6px;justify-items:center">${tile(layered(132), 132, r)}<span>${name}</span></div>`).join("")}
-      <div style="display:grid;gap:6px;justify-items:center">${tile(`<div style="position:absolute;inset:0;background:#dfe7d6"></div><div style="position:absolute;inset:0;filter:brightness(0) saturate(100%) invert(26%) sepia(16%) saturate(800%) hue-rotate(60deg)">${monochromeSvg().replace("<svg ", '<svg width="132" height="132" ')}</div>`, 132, "50%")}<span>主题图标</span></div>
-    </div>
-    <div style="display:flex;gap:24px;margin-top:24px;padding:22px;border-radius:18px;background:#16181d;align-items:center">
-      ${[64, 48, 32].map((s) => iconSvg().replace("<svg ", `<svg width="${s}" height="${s}" `)).join("")}
-      <span style="color:#ccc">深色桌面</span>
+    <p style="margin:0 0 10px;font-weight:600">Android 自适应图标（浅色默认 + 深色 -night）</p>
+    <div style="display:flex;gap:24px;align-items:center">
+      ${masks.map(([n, r]) => `<div style="display:grid;gap:6px;justify-items:center">${tile(layered("light", lightBare, 116), 116, r)}<span>浅色·${n}</span></div>`).join("")}
+      ${masks.map(([n, r]) => `<div style="display:grid;gap:6px;justify-items:center">${tile(layered("dark", darkBare, 116), 116, r)}<span>深色·${n}</span></div>`).join("")}
     </div>
   </body></html>`;
-  await page.setViewport({ width: 900, height: 600, deviceScaleFactor: 1 });
-  await page.setContent(html);
+
+  await page.setViewport({ width: 980, height: 470, deviceScaleFactor: 2 });
+  await page.setContent(html, { waitUntil: "load" });
   const out = path.join(ROOT, "shots", "icon-sheet.png");
   await mkdir(path.dirname(out), { recursive: true });
   await page.screenshot({ path: out, fullPage: true });

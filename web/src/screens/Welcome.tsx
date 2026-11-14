@@ -4,6 +4,7 @@ import { IS_NATIVE, api, apiBase, errorText, needsServer, setApiBase, setToken, 
 import { saveSchool } from "../lib/school";
 import { onBack } from "../lib/native";
 import { Icon } from "../components/Icon";
+import { Logo } from "../components/Logo";
 
 
 import { Segmented } from "../components/Segmented";
@@ -180,6 +181,9 @@ function Account({
           返回
         </button>
       )}
+      <div style={{ marginBottom: 14 }}>
+        <Logo size={52} />
+      </div>
       <h1 className="welcome__title welcome__title--sm">{mode === "register" ? "创建助手账号" : "登录助手账号"}</h1>
       <p className="welcome__lead">这是助手自己的账号，换手机时用它找回设置。和学校账号分开。</p>
       {notice && (
