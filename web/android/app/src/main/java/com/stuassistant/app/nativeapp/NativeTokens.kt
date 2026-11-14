@@ -127,11 +127,12 @@ internal fun nativeCourseSwatch(hue: Int, dark: Boolean, palette: String): Nativ
     }
 }
 
-internal fun nativeLogoPalette(palette: String): NativeLogoPalette = when (normalizeNativePalette(palette)) {
-    "classic" -> NativeLogoPalette(Color(0xFF2A7AE0), Color(0xFF0B3586), Color(0xFFF9F6F1), Color(0xFFF5714E))
-    "phoenix" -> NativeLogoPalette(Color(0xFFF07A54), Color(0xFFB53B24), Color(0xFFFFF7F2), Color(0xFFFFCA7A))
-    "pine" -> NativeLogoPalette(Color(0xFF42A889), Color(0xFF1C6B54), Color(0xFFF4FBF7), Color(0xFFF58D62))
-    "lilac" -> NativeLogoPalette(Color(0xFF8B7BF0), Color(0xFF4E3CA3), Color(0xFFF8F5FF), Color(0xFFFF9887))
-    "latte" -> NativeLogoPalette(Color(0xFFC58B59), Color(0xFF7D4E29), Color(0xFFFCF7F0), Color(0xFFEB6F52))
-    else -> NativeLogoPalette(Color(0xFF9D8BF2), Color(0xFF6A55B0), Color(0xFFFFF7F4), Color(0xFFFF9D7E))
+internal fun nativeLogoPalette(palette: String): NativeLogoPalette {
+    normalizeNativePalette(palette)
+    return NativeLogoPalette(
+        hi = Color(0xFFEAEAEA),
+        lo = Color(0xFFD4D4D4),
+        paper = Color(0xFF161617),
+        bead = Color(0xFFFFFFFF),
+    )
 }

@@ -1,214 +1,386 @@
 /**
- * Package the approved L1 Clean Badge in icon-source/l1-clean-badge.
- * master.svg is the editable source; approved-512.png is the selected reference.
+ * Truth Bell L1 — Unified Web & Android (Light Porcelain + Dark Obsidian) icon pipeline.
  *
- *   node scripts/icons.mjs            web, PWA and Apple touch icons
- *   node scripts/icons.mjs --android  also Android launcher and splash resources
- *   node scripts/icons.mjs --sheet    desktop sizes and launcher masks for review
+ *   node scripts/icons.mjs            web icons (public/)
+ *   node scripts/icons.mjs --android  also Android launcher (default + -night) + splash + native badge
+ *   node scripts/icons.mjs --sheet    a review sheet in shots/icon-sheet.png
+ *
+ * Master assets live in:
+ *   ../docs/design-studies/truth-bell/arctic-l1-fade-monochrome-final/renders/
  */
 import { existsSync } from "node:fs";
-import { mkdir, readFile, writeFile, copyFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import puppeteer from "puppeteer-core";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const REPO = path.resolve(ROOT, "..");
+const RENDERS = path.join(
+  REPO,
+  "docs",
+  "design-studies",
+  "truth-bell",
+  "arctic-l1-fade-monochrome-final",
+  "renders",
+);
 const PUBLIC = path.join(ROOT, "public");
-const SOURCE = path.join(ROOT, "icon-source", "l1-clean-badge");
 const ANDROID_RES = path.join(ROOT, "android", "app", "src", "main", "res");
-const DENSITIES = [["mdpi", 1], ["hdpi", 1.5], ["xhdpi", 2], ["xxhdpi", 3], ["xxxhdpi", 4]];
+
+const LIGHT_PREFIX = "truth-bell-l1-light-porcelain";
+const DARK_PREFIX = "truth-bell-l1-dark-obsidian";
+
+/**
+ * Android Adaptive Icon safe scaling:
+ * Android masks out the central 72dp of the 108dp adaptive layer (66.67%).
+ * Scaling the 1024px Bare master to 0.65 places the entire Truth Bell obelisk
+ * and sweeping glass ribbon inside every squircle, circle, and teardrop mask
+ * with zero clipping while matching the Composer Badge proportions.
+ */
+const ADAPTIVE_SCALE = 0.65;
+
+const DENSITIES = [
+  ["mdpi", 1],
+  ["hdpi", 1.5],
+  ["xhdpi", 2],
+  ["xxhdpi", 3],
+  ["xxxhdpi", 4],
+];
 
 const CHROME = [
-  process.env.CHROME,
   "C:/Program Files/Google/Chrome/Application/chrome.exe",
   "C:/Program Files (x86)/Google/Chrome/Application/chrome.exe",
   "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe",
-  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-  "/usr/bin/google-chrome",
-  "/usr/bin/chromium",
-].find((candidate) => candidate && existsSync(candidate));
+].find((p) => existsSync(p));
 
-async function loadArtwork(page) {
-  const source = await readFile(path.join(SOURCE, "master.svg"), "utf8");
-  const approved = "data:image/png;base64," + (await readFile(path.join(SOURCE, "approved-512.png"))).toString("base64");
-  return page.evaluate(async ({ source, approved }) => {
-    const canvas = size => Object.assign(document.createElement("canvas"), { width: size, height: size });
-    const decode = async src => { const img = new Image(); img.src = src; await img.decode(); return img; };
-    const svg = (body, size = 1024) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}" width="${size}" height="${size}">${body}</svg>`;
-    const image = (href, size = 1024) => `<image href="${href}" width="${size}" height="${size}"/>`;
-    const serialize = node => new XMLSerializer().serializeToString(node);
-    const url = text => "data:image/svg+xml;charset=utf-8," + encodeURIComponent(text);
-    const master = new DOMParser().parseFromString(source, "image/svg+xml").documentElement;
-    if (master.localName !== "svg" || master.querySelector("parsererror")) throw Error("Invalid icon SVG");
-
-    // Check the selected PNG against the original vector, before writing assets.
-    const compare = canvas(512), cc = compare.getContext("2d", { willReadFrequently: true });
-    cc.drawImage(await decode(approved), 0, 0, 512, 512);
-    const expected = cc.getImageData(0, 0, 512, 512).data;
-    cc.clearRect(0, 0, 512, 512);
-    cc.drawImage(await decode(url(source)), 0, 0, 512, 512);
-    const actual = cc.getImageData(0, 0, 512, 512).data;
-    let difference = 0;
-    for (let i = 0; i < expected.length; i++) difference += Math.abs(expected[i] - actual[i]);
-    const meanDifference = difference / expected.length;
-    if (meanDifference > 1) throw Error(`Vector source differs from the approved image: ${meanDifference}`);
-
-    // Android/iOS own the final mask. Remove only the outer tile clip, leaving
-    // the original paths, composition, colors, rim and internal occlusion intact.
-    const fullRoot = master.cloneNode(true);
-    const tile = fullRoot.querySelector('g[clip-path="url(#l1-badge-sqClip)"]');
-    if (!tile) throw Error("L1 tile clip is missing");
-    tile.removeAttribute("clip-path");
-    const fullSvg = serialize(fullRoot);
-    const full = canvas(1024), fc = full.getContext("2d");
-    fc.drawImage(await decode(url(fullSvg)), 0, 0, 1024, 1024);
-
-    // Android shows the central 72dp of a 108dp layer. Edge-clamped overscan
-    // preserves the approved framing without transparent corners during motion.
-    // The color composition stays together to preserve the translucent overlap.
-    function overscan(source) {
-      const c = canvas(1536), ctx = c.getContext("2d");
-      const segments = [[0, 1, 0, 256], [0, 1024, 256, 1024], [1023, 1, 1280, 256]];
-      for (const [sx, sw, dx, dw] of segments) for (const [sy, sh, dy, dh] of segments)
-        ctx.drawImage(source, sx, sy, sw, sh, dx, dy, dw, dh);
-      return svg(image(c.toDataURL(), 1536), 1536);
-    }
-    const monoRoot = fullRoot.cloneNode(true);
-    for (const suffix of ["sky", "atmo", "vig", "rim"]) {
-      monoRoot.querySelectorAll(`[fill="url(#l1-badge-${suffix})"], [stroke="url(#l1-badge-${suffix})"]`).forEach(node => node.remove());
-    }
-    for (const node of monoRoot.querySelectorAll("path")) {
-      if (node.closest("defs")) continue;
-      if (node.getAttribute("fill") !== "none") node.setAttribute("fill", "#ffffff");
-      if (node.hasAttribute("stroke")) node.setAttribute("stroke", "#ffffff");
-      node.removeAttribute("fill-opacity"); node.removeAttribute("stroke-opacity");
-    }
-    const mono = canvas(1024), mc = mono.getContext("2d");
-    mc.drawImage(await decode(url(serialize(monoRoot))), 0, 0, 1024, 1024);
-    const background = master.querySelector("#l1-badge-sky stop").getAttribute("stop-color");
-    const fullImage = image(full.toDataURL());
-    return {
-      desktop: source, legacy: source, touch: fullSvg, maskable: fullSvg,
-      round: svg(`<defs><clipPath id="circle"><circle cx="512" cy="512" r="512"/></clipPath></defs><g clip-path="url(#circle)">${fullImage}</g>`),
-      foreground: overscan(full), themed: overscan(mono),
-      background: svg(`<rect width="1024" height="1024" fill="${background}"/>`),
-      sourceVerification: { meanChannelDifference: meanDifference, scale: "0–255" },
-    };
-  }, { source, approved });
+async function dataUri(filename) {
+  const buf = await readFile(path.join(RENDERS, filename));
+  return `data:image/png;base64,${buf.toString("base64")}`;
 }
 
-function imageUrl(svg) {
-  return "data:image/svg+xml;base64," + Buffer.from(svg).toString("base64");
-}
-
-function svgImage(svg, size) {
-  return `<img src="${imageUrl(svg)}" width="${size}" height="${size}" alt="">`;
-}
-
-async function png(page, svg, size, destination) {
-  await page.setViewport({ width: size, height: size, deviceScaleFactor: 1 });
-  await page.setContent(`<style>body{margin:0}img{display:block}</style>${svgImage(svg, size)}`);
-  await page.$eval("img", (img) => img.decode());
-  await mkdir(path.dirname(destination), { recursive: true });
-  await page.screenshot({ path: destination, omitBackground: true });
-}
-
-async function web(page, art) {
-  await png(page, art.desktop, 192, path.join(PUBLIC, "icon-192.png"));
-  await copyFile(path.join(SOURCE, "approved-512.png"), path.join(PUBLIC, "icon-512.png"));
-  await writeFile(path.join(PUBLIC, "icon.svg"), art.desktop + "\n");
-  await png(page, art.desktop, 32, path.join(PUBLIC, "favicon-32.png"));
-  await png(page, art.maskable, 512, path.join(PUBLIC, "icon-maskable-512.png"));
-  await png(page, art.touch, 180, path.join(PUBLIC, "apple-touch-icon.png"));
-  console.log("Web icons → public/");
-}
-
-async function android(page, art) {
-  if (!existsSync(ANDROID_RES)) throw new Error("Android resources directory is missing");
-  for (const [name, density] of DENSITIES) {
-    const dir = path.join(ANDROID_RES, `mipmap-${name}`);
-    const legacy = 48 * density;
-    const layer = 108 * density;
-    await png(page, art.legacy, legacy, path.join(dir, "ic_launcher.png"));
-    await png(page, art.round, legacy, path.join(dir, "ic_launcher_round.png"));
-    await png(page, art.foreground, layer, path.join(dir, "ic_launcher_foreground.png"));
-    await png(page, art.background, layer, path.join(dir, "ic_launcher_background.png"));
-    await png(page, art.themed, layer, path.join(dir, "ic_launcher_monochrome.png"));
+function fullBleedBgSvg(mode) {
+  if (mode === "dark") {
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+      <defs>
+        <linearGradient id="bg-dark" x1="0.5" y1="0" x2="0.5" y2="1">
+          <stop offset="0" stop-color="#050505"/>
+          <stop offset="1" stop-color="#161617"/>
+        </linearGradient>
+        <radialGradient id="glow-dark" cx="0.5" cy="0.16" r="0.72">
+          <stop offset="0" stop-color="#ffffff" stop-opacity="0.09"/>
+          <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+        </radialGradient>
+      </defs>
+      <rect width="1024" height="1024" fill="url(#bg-dark)"/>
+      <rect width="1024" height="1024" fill="url(#glow-dark)"/>
+    </svg>`;
   }
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+    <defs>
+      <linearGradient id="bg-light" x1="0.5" y1="0" x2="0.5" y2="1">
+        <stop offset="0" stop-color="#EAEAEA"/>
+        <stop offset="1" stop-color="#D4D4D4"/>
+      </linearGradient>
+      <radialGradient id="glow-light" cx="0.5" cy="0.14" r="0.75">
+        <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.55"/>
+        <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+      </radialGradient>
+    </defs>
+    <rect width="1024" height="1024" fill="url(#bg-light)"/>
+    <rect width="1024" height="1024" fill="url(#glow-light)"/>
+  </svg>`;
+}
+
+function compositeBareOnFullBleedSvg(mode, bareUri, scale = 0.88, circle = false) {
+  const size = Math.round(1024 * scale);
+  const offset = ((1024 - size) / 2).toFixed(2);
+  const clipOpen = circle
+    ? `<clipPath id="circle-clip"><circle cx="512" cy="512" r="512"/></clipPath><g clip-path="url(#circle-clip)">`
+    : `<g>`;
+  const innerBg = fullBleedBgSvg(mode)
+    .replace(/^<svg[^>]*>/, "")
+    .replace(/<\/svg>\s*$/, "");
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+    ${clipOpen}
+      ${innerBg}
+      <image href="${bareUri}" x="${offset}" y="${offset}" width="${size}" height="${size}"/>
+    </g>
+  </svg>`;
+}
+
+function adaptiveForegroundSvg(bareUri, scale = ADAPTIVE_SCALE) {
+  const size = (1024 * scale).toFixed(2);
+  const offset = ((1024 - 1024 * scale) / 2).toFixed(2);
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+    <image href="${bareUri}" x="${offset}" y="${offset}" width="${size}" height="${size}"/>
+  </svg>`;
+}
+
+function scaledBadgeSvg(badgeUri, scale = 1) {
+  const size = (1024 * scale).toFixed(2);
+  const offset = ((1024 - 1024 * scale) / 2).toFixed(2);
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+    <image href="${badgeUri}" x="${offset}" y="${offset}" width="${size}" height="${size}"/>
+  </svg>`;
+}
+
+async function dualSchemeFaviconSvg() {
+  const light64 = await dataUri(`${LIGHT_PREFIX}-badge-64.png`);
+  const dark64 = await dataUri(`${DARK_PREFIX}-badge-64.png`);
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <style>
+    .dark { display: none; }
+    @media (prefers-color-scheme: dark) {
+      .light { display: none; }
+      .dark { display: inline; }
+    }
+  </style>
+  <image class="light" href="${light64}" width="64" height="64"/>
+  <image class="dark" href="${dark64}" width="64" height="64"/>
+</svg>
+`;
+}
+
+async function withBrowser(fn) {
+  if (!CHROME) throw new Error("Chrome or Edge executable not found for icon rasterization");
+  const browser = await puppeteer.launch({
+    executablePath: CHROME,
+    headless: true,
+    userDataDir: path.join(os.tmpdir(), `stu-truth-bell-icons-${process.pid}`),
+    args: ["--no-sandbox", "--disable-gpu"],
+  });
+  try {
+    const page = await browser.newPage();
+    await fn(page);
+  } finally {
+    await browser.close();
+  }
+}
+
+async function png(page, svg, w, h, file) {
+  await page.setViewport({ width: w, height: h, deviceScaleFactor: 1 });
+  await page.setContent(
+    `<!doctype html><html><body style="margin:0;background:transparent;overflow:hidden">${svg.replace(
+      "<svg ",
+      `<svg width="${w}" height="${h}" style="display:block" `,
+    )}</body></html>`,
+    { waitUntil: "load" },
+  );
+  await mkdir(path.dirname(file), { recursive: true });
+  await page.screenshot({
+    path: file,
+    omitBackground: true,
+    clip: { x: 0, y: 0, width: w, height: h },
+  });
+}
+
+async function web(page) {
+  await mkdir(PUBLIC, { recursive: true });
+
+  // Exact WebGL master copies for crisp multi-DPI UI & PWA badges
+  for (const size of [64, 128, 256]) {
+    await copyFile(
+      path.join(RENDERS, `${LIGHT_PREFIX}-badge-${size}.png`),
+      path.join(PUBLIC, `truth-bell-light-${size}.png`),
+    );
+    await copyFile(
+      path.join(RENDERS, `${DARK_PREFIX}-badge-${size}.png`),
+      path.join(PUBLIC, `truth-bell-dark-${size}.png`),
+    );
+  }
+
+  await copyFile(
+    path.join(RENDERS, `${LIGHT_PREFIX}-badge-32.png`),
+    path.join(PUBLIC, "favicon-light-32.png"),
+  );
+  await copyFile(
+    path.join(RENDERS, `${DARK_PREFIX}-badge-32.png`),
+    path.join(PUBLIC, "favicon-dark-32.png"),
+  );
+  await copyFile(
+    path.join(RENDERS, `${LIGHT_PREFIX}-badge-32.png`),
+    path.join(PUBLIC, "favicon-32.png"),
+  );
+  await copyFile(
+    path.join(RENDERS, `${LIGHT_PREFIX}-badge-192.png`),
+    path.join(PUBLIC, "icon-192.png"),
+  );
+  await copyFile(
+    path.join(RENDERS, `${DARK_PREFIX}-badge-192.png`),
+    path.join(PUBLIC, "icon-192-dark.png"),
+  );
+  await copyFile(
+    path.join(RENDERS, `${LIGHT_PREFIX}-badge-512.png`),
+    path.join(PUBLIC, "icon-512.png"),
+  );
+  await copyFile(
+    path.join(RENDERS, `${DARK_PREFIX}-badge-512.png`),
+    path.join(PUBLIC, "icon-512-dark.png"),
+  );
+
+  await writeFile(path.join(PUBLIC, "icon.svg"), await dualSchemeFaviconSvg());
+
+  // Full-bleed opaque icons for iOS Home Screen (180x180) and PWA maskable (512x512)
+  const lightBare1024 = await dataUri(`${LIGHT_PREFIX}-bare-1024.png`);
+  await png(
+    page,
+    compositeBareOnFullBleedSvg("light", lightBare1024, 0.9, false),
+    180,
+    180,
+    path.join(PUBLIC, "apple-touch-icon.png"),
+  );
+  await png(
+    page,
+    compositeBareOnFullBleedSvg("light", lightBare1024, 0.78, false),
+    512,
+    512,
+    path.join(PUBLIC, "icon-maskable-512.png"),
+  );
+
+  console.log("web Truth Bell icons → public/");
+}
+
+async function android(page) {
+  if (!existsSync(ANDROID_RES)) {
+    throw new Error("android/ project not found; run `npx cap add android` first");
+  }
+
+  const lightBadge1024 = await dataUri(`${LIGHT_PREFIX}-badge-1024.png`);
+  const darkBadge1024 = await dataUri(`${DARK_PREFIX}-badge-1024.png`);
+  const lightBare1024 = await dataUri(`${LIGHT_PREFIX}-bare-1024.png`);
+  const darkBare1024 = await dataUri(`${DARK_PREFIX}-bare-1024.png`);
+
+  const variants = [
+    { mode: "light", qualifier: "", badgeUri: lightBadge1024, bareUri: lightBare1024 },
+    { mode: "dark", qualifier: "-night", badgeUri: darkBadge1024, bareUri: darkBare1024 },
+  ];
+
+  for (const v of variants) {
+    for (const [name, k] of DENSITIES) {
+      const dir = path.join(ANDROID_RES, `mipmap${v.qualifier}-${name}`);
+      const legacy = Math.round(48 * k);
+      const layer = Math.round(108 * k);
+      await png(
+        page,
+        scaledBadgeSvg(v.badgeUri, 0.94),
+        legacy,
+        legacy,
+        path.join(dir, "ic_launcher.png"),
+      );
+      await png(
+        page,
+        compositeBareOnFullBleedSvg(v.mode, v.bareUri, 0.84, true),
+        legacy,
+        legacy,
+        path.join(dir, "ic_launcher_round.png"),
+      );
+      await png(
+        page,
+        adaptiveForegroundSvg(v.bareUri, ADAPTIVE_SCALE),
+        layer,
+        layer,
+        path.join(dir, "ic_launcher_foreground.png"),
+      );
+      await png(
+        page,
+        fullBleedBgSvg(v.mode),
+        layer,
+        layer,
+        path.join(dir, "ic_launcher_background.png"),
+      );
+    }
+  }
+
   const adaptive = `<?xml version="1.0" encoding="utf-8"?>
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
     <background android:drawable="@mipmap/ic_launcher_background" />
     <foreground android:drawable="@mipmap/ic_launcher_foreground" />
-    <monochrome android:drawable="@mipmap/ic_launcher_monochrome" />
 </adaptive-icon>
 `;
   const any = path.join(ANDROID_RES, "mipmap-anydpi-v26");
   await mkdir(any, { recursive: true });
   await writeFile(path.join(any, "ic_launcher.xml"), adaptive);
   await writeFile(path.join(any, "ic_launcher_round.xml"), adaptive);
-  await png(page, art.desktop, 448, path.join(ANDROID_RES, "drawable-nodpi", "splash_mark.png"));
-  console.log("Android launcher and splash icons → android/app/src/main/res/");
+
+  // Pre-Android-12 splash marks (light default + dark -night)
+  const nodpiLight = path.join(ANDROID_RES, "drawable-nodpi");
+  const nodpiDark = path.join(ANDROID_RES, "drawable-night-nodpi");
+  await mkdir(nodpiLight, { recursive: true });
+  await mkdir(nodpiDark, { recursive: true });
+
+  await png(
+    page,
+    scaledBadgeSvg(lightBadge1024, 1),
+    448,
+    448,
+    path.join(nodpiLight, "splash_mark.png"),
+  );
+  await png(
+    page,
+    scaledBadgeSvg(darkBadge1024, 1),
+    448,
+    448,
+    path.join(nodpiDark, "splash_mark.png"),
+  );
+
+  // In-App Compose NativeLogo master Badge PNGs (256px crisp for 64dp @3x/4x)
+  await copyFile(
+    path.join(RENDERS, `${LIGHT_PREFIX}-badge-256.png`),
+    path.join(nodpiLight, "truth_bell_badge_light.png"),
+  );
+  await copyFile(
+    path.join(RENDERS, `${DARK_PREFIX}-badge-256.png`),
+    path.join(nodpiLight, "truth_bell_badge_dark.png"),
+  );
+
+  console.log("android launcher (light + -night) + splash + native badge → android/app/src/main/res/");
 }
 
-async function sheet(page, art) {
-  const sizes = [96, 64, 48, 32, 24, 16];
-  const masks = [["圆形", "50%"], ["圆角方形", "22%"], ["水滴形", "50% 50% 50% 18%"]];
-  const sample = (image, label) => `<figure>${image}<figcaption>${label}</figcaption></figure>`;
-  // Launchers mask the middle 72dp of a 108dp layer at rest.
-  const masked = (radius, themed = false) => {
-    const layers = themed
-      ? `<i style="background:#514366;mask:center / contain url('${imageUrl(art.themed)}') no-repeat"></i>`
-      : svgImage(art.background, 162) + svgImage(art.foreground, 162);
-    return `<div class="mask" style="border-radius:${radius}"><div class="layers">${layers}</div></div>`;
-  };
-  const html = `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><style>
-    *{box-sizing:border-box}body{margin:0;background:#f6f4f8;color:#352e43;font:16px "Segoe UI","Microsoft YaHei",sans-serif}
-    main{width:860px;padding:36px;display:grid;gap:28px}h1,h2,p,figure{margin:0}
-    header,section,.sizes,.masks{display:flex}header{gap:40px;align-items:center}
-    h1{font-size:36px;font-weight:650;letter-spacing:.04em}h2{font-weight:500;font-size:16px}
-    header p,figcaption{color:#665e74}header p{margin:3px 0 18px}
-    .sizes{align-items:flex-end;gap:16px}figure{display:grid;justify-items:center;gap:8px}img{display:block}
-    figcaption{font-size:13px}.sizes figcaption{font-family:ui-monospace,Consolas,monospace}
-    section{padding:22px 30px;background:#272332;color:#efeaf7;border-radius:22px;align-items:center;justify-content:space-between}
-    .masks{align-items:flex-start;gap:24px}.masks figcaption{color:#d3cadf}
-    .mask{width:108px;height:108px;background:#e0d8ec;overflow:hidden;position:relative}
-    .layers{position:absolute;width:150%;height:150%;left:-25%;top:-25%}
-    .layers img,.layers i{position:absolute;inset:0;width:100%;height:100%}
-  </style><main><header>${svgImage(art.desktop, 208)}<div><h1>真理钟</h1>
-    <p>STU 事项助手 · 桌面图标</p><div class="sizes">
-    ${sizes.map((size) => sample(svgImage(art.desktop, size), `${size}px`)).join("")}</div></div></header>
-    <section><h2>Android 桌面</h2><div class="masks">
-    ${masks.map(([label, radius]) => sample(masked(radius), label)).join("")}
-    ${sample(masked("50%", true), "系统主题色")}</div></section></main></html>`;
-  await page.setViewport({ width: 860, height: 460, deviceScaleFactor: 1 });
-  await page.setContent(html);
-  await page.evaluate(async () => {
-    await Promise.all(Array.from(document.images, (image) => image.decode()));
-    await document.fonts.ready;
-  });
+async function sheet(page) {
+  const lightBadge = await dataUri(`${LIGHT_PREFIX}-badge-512.png`);
+  const darkBadge = await dataUri(`${DARK_PREFIX}-badge-512.png`);
+  const lightBare = await dataUri(`${LIGHT_PREFIX}-bare-512.png`);
+  const darkBare = await dataUri(`${DARK_PREFIX}-bare-512.png`);
+  const masks = [
+    ["圆形", "50%"],
+    ["圆角方", "22.5%"],
+    ["水滴", "50% 50% 50% 18%"],
+  ];
+  const tile = (inner, size, radius) =>
+    `<div style="width:${size}px;height:${size}px;border-radius:${radius};overflow:hidden;position:relative;box-shadow:0 4px 14px rgba(0,0,0,.18)">${inner}</div>`;
+  const layered = (mode, bareUri, size) =>
+    `<div style="position:absolute;inset:0">${fullBleedBgSvg(mode).replace("<svg ", `<svg width="${size}" height="${size}" `)}</div><div style="position:absolute;inset:0">${adaptiveForegroundSvg(bareUri).replace("<svg ", `<svg width="${size}" height="${size}" `)}</div>`;
+
+  const html = `<!doctype html><html><body style="margin:0;padding:32px;background:#f7f7f8;font:13px system-ui,sans-serif;color:#111">
+    <div style="display:flex;gap:32px;align-items:center;margin-bottom:24px">
+      <div><img src="${lightBadge}" width="180" height="180" style="display:block"/><div style="margin-top:8px;text-align:center;font-weight:600">霜瓷浅灰 Badge</div></div>
+      <div><img src="${darkBadge}" width="180" height="180" style="display:block"/><div style="margin-top:8px;text-align:center;font-weight:600">黑曜霜晶 Badge</div></div>
+      <div style="display:flex;gap:14px;align-items:flex-end">
+        ${[64, 48, 32, 24, 16].map((s) => `<img src="${lightBadge}" width="${s}" height="${s}"/>`).join("")}
+      </div>
+      <div style="display:flex;gap:14px;align-items:flex-end;background:#111317;padding:14px 18px;border-radius:16px">
+        ${[64, 48, 32, 24, 16].map((s) => `<img src="${darkBadge}" width="${s}" height="${s}"/>`).join("")}
+      </div>
+    </div>
+    <p style="margin:0 0 10px;font-weight:600">Android 自适应图标（浅色默认 + 深色 -night）</p>
+    <div style="display:flex;gap:24px;align-items:center">
+      ${masks.map(([n, r]) => `<div style="display:grid;gap:6px;justify-items:center">${tile(layered("light", lightBare, 116), 116, r)}<span>浅色·${n}</span></div>`).join("")}
+      ${masks.map(([n, r]) => `<div style="display:grid;gap:6px;justify-items:center">${tile(layered("dark", darkBare, 116), 116, r)}<span>深色·${n}</span></div>`).join("")}
+    </div>
+  </body></html>`;
+
+  await page.setViewport({ width: 980, height: 470, deviceScaleFactor: 2 });
+  await page.setContent(html, { waitUntil: "load" });
   const out = path.join(ROOT, "shots", "icon-sheet.png");
   await mkdir(path.dirname(out), { recursive: true });
-  await (await page.$("main")).screenshot({ path: out });
-  console.log(`Icon preview → ${out}`);
+  await page.screenshot({ path: out, fullPage: true });
+  console.log(`review sheet → ${out}`);
 }
 
 const args = new Set(process.argv.slice(2));
-if (!CHROME) throw new Error("Set CHROME to the path of a Chrome or Chromium executable.");
-const browser = await puppeteer.launch({
-  executablePath: CHROME,
-  headless: true,
-  args: ["--no-sandbox", "--disable-gpu"],
+await withBrowser(async (page) => {
+  if (args.has("--sheet")) return sheet(page);
+  await web(page);
+  if (args.has("--android")) await android(page);
 });
-try {
-  const page = await browser.newPage();
-  const art = await loadArtwork(page);
-  console.log("Editable-source verification:", art.sourceVerification);
-  if (args.has("--sheet")) {
-    await sheet(page, art);
-  } else {
-    await web(page, art);
-    if (args.has("--android")) await android(page, art);
-  }
-} finally {
-  await browser.close();
-}

@@ -129,7 +129,7 @@ export function Landing({
           {...heroEntrance(0, 6, reduceMotion)}
         >
           <a className="ld-nav__brand" href="#top">
-            <Logo size={26} className="ld-nav__logo" />
+            <Logo size={26} tone="light" className="ld-nav__logo" />
             <span className="ld-nav__wordmark">STU 助手</span>
           </a>
 
@@ -326,7 +326,7 @@ export function Landing({
         <div className="ld-footer__inner">
           <div className="ld-footer__bar">
             <div className="ld-footer__brand">
-              <Logo size={22} className="ld-nav__logo" />
+              <Logo size={22} tone="light" className="ld-nav__logo" />
               <span>STU 助手</span>
               <span className="ld-footer__version">v{APP_VERSION_NAME}</span>
             </div>

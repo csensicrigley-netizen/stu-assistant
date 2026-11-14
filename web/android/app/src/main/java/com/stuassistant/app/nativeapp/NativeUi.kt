@@ -34,6 +34,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
@@ -320,41 +321,18 @@ fun NPage(
     }
 }
 
-/** Source path and colour recipes from Logo.tsx, unified across all campus palettes. */
+/** Truth Bell L1 Badge: automatically switches between Light Porcelain and Dark Obsidian. */
 @Composable
 fun NativeLogo(size: Int = 64) {
-    val spec = nativeLogoPalette(LocalNativePalette.current)
-    val path = remember {
-        androidx.compose.ui.graphics.vector.PathParser()
-            .parsePathString("M662 264H406A124 124 0 0 0 406 512H618A124 124 0 0 1 618 760H362")
-            .toPath()
-    }
-    val cut = remember {
-        androidx.compose.ui.graphics.Path().apply {
-            addRect(androidx.compose.ui.geometry.Rect(0f, 0f, 1024f, 1024f))
-            addOval(androidx.compose.ui.geometry.Rect(433f, 433f, 591f, 591f))
-            fillType = androidx.compose.ui.graphics.PathFillType.EvenOdd
-        }
-    }
-    val logoShape = RoundedRectangle((size * 232f / 1024f).dp)
-    Canvas(
-        Modifier
+    val dark = LocalLiquidGlassDarkTheme.current ?: isSystemInDarkTheme()
+    val resId = if (dark) R.drawable.truth_bell_badge_dark else R.drawable.truth_bell_badge_light
+    Image(
+        painter = painterResource(id = resId),
+        contentDescription = null,
+        modifier = Modifier
             .size(size.dp)
-            .shadow(6.dp, logoShape, ambientColor = spec.lo.copy(alpha = 0.25f), spotColor = spec.lo.copy(alpha = 0.28f))
-            .clip(logoShape)
             .clearAndSetSemantics {},
-    ) {
-        if (this.size.width <= 1f) return@Canvas
-        val s = this.size.width / 1024f
-        scale(s, s, pivot = Offset.Zero) {
-            drawRect(Brush.linearGradient(listOf(spec.hi, spec.lo), end = Offset(1024f, 1024f)), size = androidx.compose.ui.geometry.Size(1024f, 1024f))
-            drawRect(Brush.radialGradient(listOf(Color.White.copy(alpha = .24f), Color.Transparent), center = Offset(205f, 102f), radius = 819f), size = androidx.compose.ui.geometry.Size(1024f, 1024f))
-            clipPath(cut) {
-                drawPath(path, spec.paper, style = Stroke(100f, cap = androidx.compose.ui.graphics.StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
-            }
-            drawCircle(spec.bead, 62f, Offset(512f, 512f))
-        }
-    }
+    )
 }
 
 enum class NativeButtonHaptic(val press: String, val release: String) {

@@ -1,13 +1,14 @@
 {
   "channel": "product",
-  "versionName": "1.1.7",
-  "versionCode": 63,
+  "versionName": "1.1.8",
+  "versionCode": 64,
   "apk": "/download/stu-assistant.apk",
   "notes": [
-    "启用选定的 L1 Clean Badge 简化版真理钟图标，保留原造型、背景与渐变配色",
-    "同步安卓桌面、自适应图标、系统主题色图标与启动画面"
+    "焕新「汕大真理钟」液态玻璃应用图标，支持霜瓷浅灰与黑曜霜晶随系统深浅色自动切换",
+    "重构网页端主页为画廊式布局，升级 120Hz 弹簧微交互与丝滑动效",
+    "全端统一桌面图标、启动屏与登录页品牌视觉"
   ],
   "mandatory": false,
-  "releasedAt": "2026-11-14T12:20:05Z",
+  "releasedAt": "2026-11-14T22:15:00+08:00",
   "minSupported": "1.0.0"
 }

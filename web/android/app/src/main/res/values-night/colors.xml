@@ -2,4 +2,5 @@
 <resources>
     <!-- 樱粉深色的页面背景色，换算见 values/colors.xml 的注释 -->
     <color name="paper">#1F161E</color>
+    <color name="splash_icon_bg">#0E0E0F</color>
 </resources>
