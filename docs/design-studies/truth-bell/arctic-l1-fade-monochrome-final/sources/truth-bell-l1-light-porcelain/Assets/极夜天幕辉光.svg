@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 512 512"><defs>
+    <linearGradient id="baseGrad" gradientUnits="userSpaceOnUse" x1="256" y1="0" x2="256" y2="512">
+      <stop offset="0" stop-color="#EAEAEA"/>
+      <stop offset="1" stop-color="#D4D4D4"/>
+    </linearGradient>
+    <radialGradient id="atmo" gradientUnits="userSpaceOnUse" cx="250" cy="182" r="245">
+      <stop stop-color="#F4F4F4" stop-opacity=".46"/>
+      <stop offset=".55" stop-color="#CCCCCC" stop-opacity=".20"/>
+      <stop offset="1" stop-color="#CCCCCC" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="low" gradientUnits="userSpaceOnUse" cx="370" cy="438" r="270">
+      <stop stop-color="#B2B2B2" stop-opacity=".16"/>
+      <stop offset=".55" stop-color="#B2B2B2" stop-opacity=".04"/>
+      <stop offset="1" stop-color="#B2B2B2" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="vig" gradientUnits="userSpaceOnUse" cx="256" cy="230" r="355">
+      <stop offset=".54" stop-color="#8A8A8A" stop-opacity="0"/>
+      <stop offset="1" stop-color="#8A8A8A" stop-opacity=".24"/>
+    </radialGradient>
+    <linearGradient id="rim" gradientUnits="userSpaceOnUse" x1="50" y1="0" x2="456" y2="512">
+      <stop stop-color="#FFFFFF" stop-opacity=".36"/>
+      <stop offset=".45" stop-color="#949494" stop-opacity=".09"/>
+      <stop offset="1" stop-color="#F2F2F2" stop-opacity=".30"/>
+    </linearGradient></defs><rect width="512" height="512" fill="url(#atmo)"/><rect width="512" height="512" fill="url(#low)"/><rect width="512" height="512" fill="url(#vig)"/><path d="M203.76184504 1.5L308.23815496 1.5 C373.4 1.5 406 1.5 431.4 12.7 A132.2 132.2 0 0 1 499.3 80.6 C510.5 106 510.5 138.6 510.5 203.76184504 L510.5 308.23815496 C510.5 373.4 510.5 406 499.3 431.4 A132.2 132.2 0 0 1 431.4 499.3 C406 510.5 373.4 510.5 308.23815496 510.5 L203.76184504 510.5 C138.6 510.5 106 510.5 80.6 499.3 A132.2 132.2 0 0 1 12.7 431.4 C1.5 406 1.5 373.4 1.5 308.23815496 L1.5 203.76184504 C1.5 138.6 1.5 106 12.7 80.6 A132.2 132.2 0 0 1 80.6 12.7 C106 1.5 138.6 1.5 203.76184504 1.5Z" stroke="url(#rim)" stroke-width="1.0" fill="none"/></svg>
