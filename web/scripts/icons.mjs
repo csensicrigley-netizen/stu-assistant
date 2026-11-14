@@ -1,18 +1,20 @@
 /**
- * Rasterize the editable desktop icon in public/icon.svg.
+ * Package the approved Arctic Chrome Prism artwork in icon-source/truth-bell.
+ * Its editable Liquid Composer project is arctic-chrome-prism.icon.zip.
  *
  *   node scripts/icons.mjs            web, PWA and Apple touch icons
  *   node scripts/icons.mjs --android  also Android launcher and splash resources
  *   node scripts/icons.mjs --sheet    desktop sizes and launcher masks for review
  */
 import { existsSync } from "node:fs";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile, copyFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import puppeteer from "puppeteer-core";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PUBLIC = path.join(ROOT, "public");
+const SOURCE = path.join(ROOT, "icon-source", "truth-bell");
 const ANDROID_RES = path.join(ROOT, "android", "app", "src", "main", "res");
 const DENSITIES = [["mdpi", 1], ["hdpi", 1.5], ["xhdpi", 2], ["xxhdpi", 3], ["xxxhdpi", 4]];
 
@@ -27,45 +29,68 @@ const CHROME = [
 ].find((candidate) => candidate && existsSync(candidate));
 
 async function loadArtwork(page) {
-  const source = await readFile(path.join(PUBLIC, "icon.svg"), "utf8");
-  return page.evaluate((source) => {
-    const master = new DOMParser().parseFromString(source, "image/svg+xml").documentElement;
-    if (master.localName !== "svg") throw new Error("public/icon.svg is not valid SVG");
-    const box = master.viewBox.baseVal;
-    const cx = box.x + box.width / 2;
-    const cy = box.y + box.height / 2;
+  const images = Object.fromEntries(await Promise.all(
+    ["approved-1024", "approved-512", "reopened-512", "artwork-1024", "silhouette-1024"].map(async name =>
+      [name, "data:image/png;base64," + (await readFile(path.join(SOURCE, name + ".png"))).toString("base64")]),
+  ));
+  const { background } = JSON.parse(await readFile(path.join(SOURCE, "renderer.json"), "utf8"));
+  return page.evaluate(async ({ images, background }) => {
+    const canvas = size => Object.assign(document.createElement("canvas"), { width: size, height: size });
+    const decode = async src => { const img = new Image(); img.src = src; await img.decode(); return img; };
+    const svg = (body, size = 1024) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}" width="${size}" height="${size}">${body}</svg>`;
+    const image = (href, size = 1024) => `<image href="${href}" width="${size}" height="${size}"/>`;
+    const approved = await decode(images["approved-1024"]);
 
-    function variant({ shape, scale = 1, layer }) {
-      const svg = master.cloneNode(true);
-      const tile = svg.querySelector("#tile");
-      const mark = svg.querySelector("#mark");
-      if (shape === "full") tile.setAttribute("rx", "0");
-      if (shape === "circle") tile.setAttribute("rx", String(box.width / 2));
-      if (layer === "foreground" || layer === "themed") {
-        tile.remove();
-        mark.parentElement.removeAttribute("clip-path");
-      }
-      if (layer === "background") mark.remove();
-      if (layer === "themed") mark.setAttribute("href", "#themed-bell");
-      if (scale !== 1) {
-        mark.setAttribute("transform", `translate(${cx} ${cy}) scale(${scale}) translate(${-cx} ${-cy})`);
-      }
-      return new XMLSerializer().serializeToString(svg);
+    // Verify that the editable project really corresponds to the chosen preview.
+    const compare = canvas(512), cc = compare.getContext("2d", { willReadFrequently: true });
+    cc.drawImage(await decode(images["approved-512"]), 0, 0);
+    const expected = cc.getImageData(0, 0, 512, 512).data;
+    cc.clearRect(0, 0, 512, 512);
+    cc.drawImage(await decode(images["reopened-512"]), 0, 0);
+    const actual = cc.getImageData(0, 0, 512, 512).data;
+    let difference = 0;
+    for (let i = 0; i < expected.length; i++) difference += Math.abs(expected[i] - actual[i]);
+    const meanDifference = difference / expected.length;
+    if (meanDifference > 1) throw Error(`Editable project differs from the approved image: ${meanDifference}`);
+
+    const full = canvas(1024), fc = full.getContext("2d");
+    const gradient = fc.createLinearGradient(0, 0, 0, 1024);
+    gradient.addColorStop(0, background.colors[0]); gradient.addColorStop(1, background.colors[1]);
+    fc.fillStyle = gradient; fc.fillRect(0, 0, 1024, 1024);
+    fc.drawImage(await decode(images["artwork-1024"]), 0, 0);
+    // Preserve the approved rim and every interior pixel; only extend transparent
+    // corners for masks imposed by Android/iOS instead of baking a second mask.
+    fc.drawImage(approved, 0, 0);
+
+    // Android shows the central 72dp of a 108dp layer. Edge-clamped overscan
+    // preserves the approved framing without transparent corners during motion.
+    // Refraction is baked with the original sky/column beneath the glass so the
+    // OS cannot separate its optical backdrop and change the selected appearance.
+    function overscan(source) {
+      const c = canvas(1536), ctx = c.getContext("2d");
+      const segments = [[0, 1, 0, 256], [0, 1024, 256, 1024], [1023, 1, 1280, 256]];
+      for (const [sx, sw, dx, dw] of segments) for (const [sy, sh, dy, dh] of segments)
+        ctx.drawImage(source, sx, sy, sw, sh, dx, dy, dw, dh);
+      return svg(image(c.toDataURL(), 1536), 1536);
     }
-
-    // The full adaptive layers are 108dp. The landmark fits the central 66dp circle.
-    const adaptiveScale = .62;
+    const mono = canvas(1024), mc = mono.getContext("2d", { willReadFrequently: true });
+    mc.drawImage(await decode(images["silhouette-1024"]), 0, 0);
+    const pixels = mc.getImageData(0, 0, 1024, 1024);
+    for (let i = 0; i < pixels.data.length; i += 4) {
+      pixels.data[i] = pixels.data[i + 1] = pixels.data[i + 2] = 255;
+      pixels.data[i + 3] = Math.round(Math.max(0, Math.min(1, (pixels.data[i + 3] - 70) / 100)) * 255);
+    }
+    mc.putImageData(pixels, 0, 0);
+    const desktop = svg(image(images["approved-1024"]));
+    const fullImage = image(full.toDataURL());
     return {
-      desktop: source,
-      touch: variant({ shape: "full", scale: .96 }),
-      maskable: variant({ shape: "full", scale: .79 }),
-      legacy: variant({ scale: .96 }),
-      round: variant({ shape: "circle", scale: .89 }),
-      foreground: variant({ layer: "foreground", scale: adaptiveScale }),
-      themed: variant({ layer: "themed", scale: adaptiveScale }),
-      background: variant({ layer: "background", shape: "full" }),
+      desktop, legacy: desktop, touch: svg(fullImage), maskable: svg(fullImage),
+      round: svg(`<defs><clipPath id="circle"><circle cx="512" cy="512" r="512"/></clipPath></defs><g clip-path="url(#circle)">${fullImage}</g>`),
+      foreground: overscan(full), themed: overscan(mono),
+      background: svg(`<rect width="1024" height="1024" fill="${background.colors[0]}"/>`),
+      sourceVerification: { meanChannelDifference: meanDifference, scale: "0–255" },
     };
-  }, source);
+  }, { images, background });
 }
 
 function imageUrl(svg) {
@@ -86,7 +111,8 @@ async function png(page, svg, size, destination) {
 
 async function web(page, art) {
   await png(page, art.desktop, 192, path.join(PUBLIC, "icon-192.png"));
-  await png(page, art.desktop, 512, path.join(PUBLIC, "icon-512.png"));
+  await copyFile(path.join(SOURCE, "approved-512.png"), path.join(PUBLIC, "icon-512.png"));
+  await writeFile(path.join(PUBLIC, "icon.svg"), art.desktop + "\n");
   await png(page, art.desktop, 32, path.join(PUBLIC, "favicon-32.png"));
   await png(page, art.maskable, 512, path.join(PUBLIC, "icon-maskable-512.png"));
   await png(page, art.touch, 180, path.join(PUBLIC, "apple-touch-icon.png"));
@@ -172,6 +198,7 @@ const browser = await puppeteer.launch({
 try {
   const page = await browser.newPage();
   const art = await loadArtwork(page);
+  console.log("Editable-source verification:", art.sourceVerification);
   if (args.has("--sheet")) {
     await sheet(page, art);
   } else {

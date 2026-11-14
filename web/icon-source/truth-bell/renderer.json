@@ -1,0 +1,236 @@
+{
+  "upstream": "https://github.com/frontedu/liquid-composer",
+  "commit": "4edfb44c27bab264f4ab2d762aaaed78938de44e",
+  "renderer": {
+    "mode": "swiftshader",
+    "gpu": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)"
+  },
+  "background": {
+    "colors": [
+      "#070d1d",
+      "#152b52"
+    ]
+  },
+  "layers": [
+    {
+      "type": "layer",
+      "id": "tsi3yzu",
+      "name": "柱身 · 后段遮挡",
+      "visible": true,
+      "opacity": 100,
+      "blendMode": "normal",
+      "file": "柱身 · 后段遮挡.svg",
+      "layout": {
+        "x": 0,
+        "y": 0,
+        "scale": 100
+      },
+      "fill": {
+        "type": "none"
+      },
+      "liquidGlass": {
+        "enabled": false,
+        "specular": true,
+        "specularIntensity": 100,
+        "refraction": {
+          "enabled": false
+        },
+        "blur": {
+          "enabled": false,
+          "value": 50
+        },
+        "translucency": {
+          "enabled": true,
+          "value": 50
+        },
+        "shadow": {
+          "enabled": true,
+          "value": 50,
+          "type": "neutral"
+        },
+        "aberration": 0,
+        "effects": {
+          "refraction": 50,
+          "bevel": 1.25,
+          "frostiness": 0
+        }
+      }
+    },
+    {
+      "type": "layer",
+      "id": "on92cti",
+      "name": "单一连续玻璃宽带",
+      "visible": true,
+      "opacity": 100,
+      "blendMode": "normal",
+      "file": "单一连续玻璃宽带.svg",
+      "layout": {
+        "x": -11.133,
+        "y": 9.082,
+        "scale": 107.422
+      },
+      "fill": {
+        "type": "none"
+      },
+      "liquidGlass": {
+        "enabled": true,
+        "specular": "inside",
+        "specularIntensity": 100,
+        "refraction": {
+          "enabled": true
+        },
+        "blur": {
+          "enabled": false,
+          "value": 50
+        },
+        "translucency": {
+          "enabled": true,
+          "value": 64
+        },
+        "shadow": {
+          "enabled": true,
+          "value": 28,
+          "type": "neutral"
+        },
+        "aberration": 0,
+        "effects": {
+          "refraction": -8,
+          "bevel": 2.8,
+          "frostiness": 0
+        }
+      }
+    },
+    {
+      "type": "layer",
+      "id": "fessprg",
+      "name": "玻璃结构 · 连续薄截面",
+      "visible": true,
+      "opacity": 100,
+      "blendMode": "normal",
+      "file": "玻璃结构 · 连续薄截面.svg",
+      "layout": {
+        "x": -11.133,
+        "y": 9.082,
+        "scale": 107.422
+      },
+      "fill": {
+        "type": "none"
+      },
+      "liquidGlass": {
+        "enabled": false,
+        "specular": true,
+        "specularIntensity": 100,
+        "refraction": {
+          "enabled": false
+        },
+        "blur": {
+          "enabled": false,
+          "value": 50
+        },
+        "translucency": {
+          "enabled": true,
+          "value": 50
+        },
+        "shadow": {
+          "enabled": true,
+          "value": 50,
+          "type": "neutral"
+        },
+        "aberration": 0,
+        "effects": {
+          "refraction": 50,
+          "bevel": 1.25,
+          "frostiness": 0
+        }
+      }
+    },
+    {
+      "type": "layer",
+      "id": "feo8uo4",
+      "name": "柱身 · 仰视与散布灯条",
+      "visible": true,
+      "opacity": 100,
+      "blendMode": "normal",
+      "file": "柱身 · 仰视与散布灯条.svg",
+      "layout": {
+        "x": 0,
+        "y": 0,
+        "scale": 100
+      },
+      "fill": {
+        "type": "none"
+      },
+      "liquidGlass": {
+        "enabled": false,
+        "specular": true,
+        "specularIntensity": 100,
+        "refraction": {
+          "enabled": false
+        },
+        "blur": {
+          "enabled": false,
+          "value": 50
+        },
+        "translucency": {
+          "enabled": true,
+          "value": 50
+        },
+        "shadow": {
+          "enabled": true,
+          "value": 50,
+          "type": "neutral"
+        },
+        "aberration": 0,
+        "effects": {
+          "refraction": 50,
+          "bevel": 1.25,
+          "frostiness": 0
+        }
+      }
+    },
+    {
+      "type": "layer",
+      "id": "92mdzac",
+      "name": "星空 · 散布星光",
+      "visible": true,
+      "opacity": 100,
+      "blendMode": "normal",
+      "file": "星空 · 散布星光.svg",
+      "layout": {
+        "x": 0,
+        "y": 0,
+        "scale": 100
+      },
+      "fill": {
+        "type": "none"
+      },
+      "liquidGlass": {
+        "enabled": false,
+        "specular": true,
+        "specularIntensity": 100,
+        "refraction": {
+          "enabled": false
+        },
+        "blur": {
+          "enabled": false,
+          "value": 50
+        },
+        "translucency": {
+          "enabled": true,
+          "value": 50
+        },
+        "shadow": {
+          "enabled": true,
+          "value": 50,
+          "type": "neutral"
+        },
+        "aberration": 0,
+        "effects": {
+          "refraction": 50,
+          "bevel": 1.25,
+          "frostiness": 0
+        }
+      }
+    }
+  ]
+}

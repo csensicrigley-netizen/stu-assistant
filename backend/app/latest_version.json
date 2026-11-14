@@ -1,14 +1,13 @@
 {
   "channel": "product",
-  "versionName": "1.1.5",
-  "versionCode": 61,
+  "versionName": "1.1.6",
+  "versionCode": 62,
   "apk": "/download/stu-assistant.apk",
   "notes": [
-    "统一「课表」与「事项」顶部液态玻璃切换栏及内嵌快速归位胶囊样式",
-    "将「医学院教务账号自动同步」与「手动导入课表」移至「我的 · 数据来源」栏目",
-    "精简「校园 · 充电桩」设备卡片与底部冗余说明，保持全端体验一致"
+    "启用 Arctic Chrome Prism 真理钟图标，保留定稿的星空、石柱及液态玻璃配色",
+    "同步安卓桌面、自适应图标、系统主题色图标与启动画面"
   ],
   "mandatory": false,
-  "releasedAt": "2026-11-12T05:36:00Z",
+  "releasedAt": "2026-11-14T00:00:00Z",
   "minSupported": "1.0.0"
 }
