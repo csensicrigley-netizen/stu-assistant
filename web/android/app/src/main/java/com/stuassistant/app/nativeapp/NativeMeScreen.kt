@@ -53,7 +53,6 @@ fun NativeMeScreen(
     onConnect: () -> Unit,
     onSignOut: () -> Unit,
     onNavigate: (String) -> Unit = {},
-    onAnnouncementPreview: (() -> Unit)? = null,
 ) {
     val c = LocalNativeColors.current
     val dark = LocalLiquidGlassDarkTheme.current == true
@@ -100,9 +99,6 @@ fun NativeMeScreen(
     }
 
     NPage("我的", "账号 · 外观 · 关于") {
-        if (onAnnouncementPreview != null) {
-            NButton("预览首页消息", onAnnouncementPreview, modifier = Modifier.fillMaxWidth(), haptic = NativeButtonHaptic.Navigation)
-        }
         if (!signedIn) {
             NCard {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {

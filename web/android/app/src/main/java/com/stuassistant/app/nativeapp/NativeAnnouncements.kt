@@ -207,29 +207,6 @@ internal fun NativeAnnouncementContent(message: NativeAnnouncement, onDismiss: (
     } else NativeAnnouncementButton("知道了", onDismiss, primary = true, haptic = NativeButtonHaptic.Utility)
 }
 
-/** Verification APK only: explicit preview, no remote request or read receipt. */
-@Composable
-fun NativeAnnouncementPreview(onDismiss: () -> Unit) {
-    val context = LocalContext.current
-    if (context.packageName != "com.stuassistant.app.haptics") return
-    val message = remember(context) {
-        context.assets.open("announcement-preview.json").bufferedReader().use {
-            NativeAnnouncementRules.parse(JSONObject(it.readText()), "").first()
-        }
-    }
-    val afterExit = remember { mutableStateOf<(() -> Unit)?>(null) }
-    NDialog(message.title, onDismiss, onExited = {
-        afterExit.value?.invoke()
-        afterExit.value = null
-    }) {
-        NativeAnnouncementContent(message, onDismiss, onAction = {
-            afterExit.value = { message.actionUrl?.let { openAnnouncementLink(context, it) } }
-            onDismiss()
-        })
-    }
-}
-
-
 @Composable
 private fun NativeAnnouncementButton(label: String, onClick: () -> Unit, primary: Boolean, haptic: NativeButtonHaptic) {
     val colors = LocalNativeColors.current

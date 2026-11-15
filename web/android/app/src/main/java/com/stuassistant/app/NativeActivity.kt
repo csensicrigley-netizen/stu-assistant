@@ -76,7 +76,6 @@ class NativeActivity:ComponentActivity() {
     LaunchedEffect(s.theme,s.palette,dark) { NativeLaunchAppearance.sync(activity,s.theme,s.palette,dark) }
     val reduced=remember(resumeEpoch) {Settings.Global.getFloat(context.contentResolver,Settings.Global.ANIMATOR_DURATION_SCALE,1f)==0f}
     var route by rememberSaveable {mutableStateOf("today")}
-    var announcementPreview by remember { mutableStateOf(false) }
     var calendarOpen by rememberSaveable {mutableStateOf(false)}
     var campusView by rememberSaveable {mutableStateOf("notices")}
     var connect by rememberSaveable {mutableStateOf(false)}
@@ -98,7 +97,6 @@ class NativeActivity:ComponentActivity() {
     val bottom=with(density){WindowInsets.navigationBars.getBottom(this).toDp().value}
     val ime=WindowInsets.ime.getBottom(density)>0
     val showBottomNavigation=ready&&!needsWelcome&&!connect&&(!ime||calendarOpen)
-    val scope=rememberCoroutineScope()
     LaunchedEffect(s.hapticStrength) {if(s.hapticStrength==0)feedback.cancel()}
     BackHandler {activity.moveTaskToBack(true)}
     BackHandler(enabled=!needsWelcome&&!connect&&route!="today"&&sheets.entries.isEmpty()) {route=if(route=="import"||route=="medical")"me"else"today"}
@@ -142,11 +140,7 @@ class NativeActivity:ComponentActivity() {
                         snapshot.route=="week"->NativeWeekScreen(store,s,navigate,onConnect)
                         snapshot.route.startsWith("items")->NativeCalendarItemsScreen(store,s,onConnect)
                         snapshot.route.startsWith("campus")->NativeCampusScreen(store,s,snapshot.campusView,onConnect,{campusView=it})
-                        snapshot.route=="me"->NativeMeScreen(store,s,onConnect,{connect=false;route="today"},navigate,
-                            onAnnouncementPreview = if (context.packageName == "com.stuassistant.app.haptics") {{
-                                route="today"
-                                scope.launch { delay(400); announcementPreview=true }
-                            }} else null)
+                        snapshot.route=="me"->NativeMeScreen(store,s,onConnect,{connect=false;route="today"},navigate)
                         snapshot.route=="medical"->NativeMedicalScreen(store,s,navigate)
                         snapshot.route=="import"->NativeImportScreen(store,s,navigate)
                         else->NativeTodayScreen(store,s,navigate,onConnect)
@@ -172,8 +166,7 @@ class NativeActivity:ComponentActivity() {
                 }
             }
             if(ready) NativeUpdatePrompt(store,combined,Modifier.align(Alignment.BottomCenter).padding(start=12.dp,end=12.dp,bottom=(104+bottom).dp).nativeSheetBackground(sheets))
-            NativeHomeAnnouncement(store,ready&&!needsWelcome&&!connect&&route=="today"&&!ime&&!calendarOpen&&!announcementPreview,sheets.entries.isEmpty())
-            if (announcementPreview && route=="today") NativeAnnouncementPreview { announcementPreview=false }
+            NativeHomeAnnouncement(store,ready&&!needsWelcome&&!connect&&route=="today"&&!ime&&!calendarOpen,sheets.entries.isEmpty())
             NativeSheetHost(sheets,combined)
             AnimatedVisibility(calendarOpen&&s.token!=null&&!s.preview, enter=slideInVertically(tween(420)){ -it/12 }+fadeIn(tween(220)), exit=slideOutVertically(tween(260)){ -it/12 }+fadeOut(tween(220))) {
                 CompositionLocalProvider(LocalNativeBackdrop provides base) {
