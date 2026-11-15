@@ -16,6 +16,7 @@ const ImportScreen = lazy(() => import("./screens/Import").then((m) => ({ defaul
 const MedBindScreen = lazy(() => import("./screens/MedBind").then((m) => ({ default: m.MedBindScreen })));
 import { Welcome, type Step } from "./screens/Welcome";
 import { UpdateBanner } from "./components/UpdateBanner";
+import { AnnouncementPopup } from "./components/AnnouncementPopup";
 import { useTheme } from "./lib/useTheme";
 import { AUTH_LOST, getToken, setToken } from "./lib/api";
 import { pageVariants } from "./lib/motion";
@@ -267,6 +268,7 @@ function Shell({ onSignOut, onConnect }: { onSignOut: () => void; onConnect: () 
           </motion.main>
         </AnimatePresence>
         <TabBar current={tab} onChange={go} badges={badges} />
+        <AnnouncementPopup active={tab === "today"} />
       </div>
     </ShellCtx.Provider>
   );

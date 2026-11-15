@@ -48,6 +48,7 @@ fun LiquidButton(
     surfaceColor: Color = Color.Unspecified,
     enabled: Boolean = true,
     interactionSource: MutableInteractionSource? = null,
+    shape: androidx.compose.ui.graphics.Shape = Capsule(),
     content: @Composable RowScope.() -> Unit
 ) {
     val animationScope = rememberCoroutineScope()
@@ -64,7 +65,7 @@ fun LiquidButton(
         modifier
             .drawBackdrop(
                 backdrop = backdrop,
-                shape = { Capsule() },
+                shape = { shape },
                 effects = {
                     vibrancy()
                     blur(2f.dp.toPx())

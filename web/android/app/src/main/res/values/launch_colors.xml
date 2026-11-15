@@ -1,0 +1,21 @@
+<resources>
+    <color name="launch_sweet_light">#FFF0F1</color>
+    <color name="launch_sweet_dark">#1F161E</color>
+    <color name="launch_sweet_system">@color/launch_sweet_light</color>
+    <color name="launch_classic_light">#F9F6F1</color>
+    <color name="launch_classic_dark">#0B0E14</color>
+    <color name="launch_classic_system">@color/launch_classic_light</color>
+    <color name="launch_phoenix_light">#FFF3EB</color>
+    <color name="launch_phoenix_dark">#1F1410</color>
+    <color name="launch_phoenix_system">@color/launch_phoenix_light</color>
+    <color name="launch_pine_light">#F0F8F2</color>
+    <color name="launch_pine_dark">#0D1812</color>
+    <color name="launch_pine_system">@color/launch_pine_light</color>
+    <color name="launch_lilac_light">#F6F3FE</color>
+    <color name="launch_lilac_dark">#16141F</color>
+    <color name="launch_lilac_system">@color/launch_lilac_light</color>
+    <color name="launch_latte_light">#FAF4EA</color>
+    <color name="launch_latte_dark">#1C150F</color>
+    <color name="launch_latte_system">@color/launch_latte_light</color>
+    <bool name="launch_light_bars">true</bool>
+</resources>

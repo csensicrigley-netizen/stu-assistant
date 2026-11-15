@@ -19,6 +19,7 @@ from pydantic import BaseModel, Field, field_validator
 from . import auth as authlib
 from . import demo
 from . import version as versionlib
+from .announcements import router as announcements_router
 from .bind import BINDABLE, bind_manager
 from .collectors import CODE_MAINTENANCE, CODE_NEED_INPUT, CODE_OK
 from .config import settings
@@ -118,6 +119,7 @@ def current_user(authorization: str = Header(default="")) -> str:
 
 # 实时活动推送（Huawei / OPPO 实况窗）。注册在 /v1 通配 404 之前，路由才不会被兜住。
 app.include_router(build_router(current_user))
+app.include_router(announcements_router)
 
 
 @app.get("/v1/webvpn/state")

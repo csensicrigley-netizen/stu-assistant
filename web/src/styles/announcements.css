@@ -1,0 +1,117 @@
+/* A floating frosted message using the app's six palettes and light/dark tokens. */
+.announcement {
+  --announcement-action: color-mix(in oklch, var(--sea) 88%, black);
+  width: min(420px, calc(100vw - 40px - var(--safe-l) - var(--safe-r)));
+  max-width: none;
+  max-height: calc(100dvh - 48px - var(--safe-t) - var(--safe-b));
+  margin: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 36px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  color: var(--ink);
+  background: transparent;
+  box-shadow: 0 28px 90px -24px #0005;
+  scrollbar-width: thin;
+  will-change: transform, opacity;
+}
+.announcement::backdrop {
+  background: color-mix(in oklch, var(--scrim) 68%, transparent);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  animation: announcement-scrim-in 320ms cubic-bezier(.2,0,0,1) both;
+}
+.announcement[data-closing]::backdrop { animation: announcement-scrim-out 260ms cubic-bezier(.4,0,1,1) both; }
+.announcement[data-closing] .announcement__panel { pointer-events: none; }
+.announcement__panel {
+  position: relative;
+  min-width: 0;
+  padding: 20px;
+  overflow: hidden;
+  border: 1px solid color-mix(in oklch, var(--surface) 80%, var(--line));
+  border-radius: inherit;
+  background:
+    linear-gradient(145deg, color-mix(in oklch, var(--surface) 98%, transparent), color-mix(in oklch, var(--surface) 94%, transparent));
+  box-shadow: inset 0 1px 0 color-mix(in oklch, white 65%, transparent), inset 0 -1px 0 color-mix(in oklch, var(--sea) 9%, transparent);
+  backdrop-filter: blur(32px) saturate(1.1);
+  -webkit-backdrop-filter: blur(32px) saturate(1.1);
+}
+.announcement__close {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  min-width: 64px;
+  min-height: 48px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: inset 0 1px 0 #fff4, 0 8px 26px #0001;
+  color: var(--ink);
+  font-size: var(--fs-15);
+  font-weight: 600;
+  transition: transform 160ms var(--ease-out), background 160ms;
+}
+.announcement__effect {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  left: 50%;
+  width: min(280px, 100%);
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.announcement__close:active { transform: scale(.9); }
+.announcement__header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 16px; }
+.announcement__hero { position: relative; margin-bottom: 16px; }
+.announcement__image {
+  overflow: hidden;
+  border-radius: 16px;
+  background: var(--surface-2);
+}
+.announcement__image img { width: 100%; max-height: 240px; aspect-ratio: 16 / 10; object-fit: cover; }
+.announcement__emblem {
+  position: relative;
+  display: grid;
+  place-items: center;
+  height: 124px;
+  border-radius: 16px;
+  background: radial-gradient(ellipse, color-mix(in oklch, var(--sea) 17%, transparent), color-mix(in oklch, var(--sea) 2.5%, transparent));
+}
+.announcement__stars { position: absolute; inset: 0; width: 100%; height: 100%; fill: none; stroke: var(--sea); stroke-width: 1.5; stroke-linejoin: round; opacity: .65; }
+.announcement__eyebrow { margin: 0; color: var(--ink-2); font-size: var(--fs-13); font-weight: 600; }
+.announcement__title { margin: 0; color: var(--ink); font-size: clamp(25px, 6.7vw, 30px); font-weight: 650; letter-spacing: -.045em; line-height: 1.35; overflow-wrap: anywhere; text-wrap: pretty; }
+.announcement__body { margin-top: 16px; color: var(--ink-2); font-size: var(--fs-15); line-height: 1.85; white-space: pre-line; overflow-wrap: anywhere; }
+.announcement__actions { display: grid; gap: 16px; margin-top: 16px; }
+.announcement__primary, .announcement__secondary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 12px 20px;
+  border-radius: 16px;
+  font-size: var(--fs-15);
+  font-weight: 600;
+  text-align: center;
+  overflow-wrap: anywhere;
+  transition: transform 180ms var(--ease-jelly), filter 180ms;
+}
+.announcement__primary { color: var(--sea-ink); background: var(--announcement-action); box-shadow: inset 0 1px 0 #fff3; }
+[data-theme="dark"] .announcement { --announcement-action: var(--sea); }
+.announcement__secondary { color: var(--ink); background: var(--surface); box-shadow: inset 0 1px 0 #fff4, 0 8px 26px #0001; }
+.announcement__primary:active, .announcement__secondary:active { transform: scale(.97); }
+@media (hover: hover) {
+  .announcement__primary:hover { filter: brightness(1.08); transform: translateY(-1px); }
+  .announcement__secondary:hover, .announcement__close:hover { background: var(--surface-2); }
+}
+@media (max-width: 359px) {
+  .announcement { width: calc(100vw - 24px - var(--safe-l) - var(--safe-r)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .announcement::backdrop, .announcement[data-closing]::backdrop { animation-duration: 140ms; }
+  .announcement *, .announcement *:hover, .announcement *:active { transition: none; transform: none; }
+}
+@keyframes announcement-scrim-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes announcement-scrim-out { from { opacity: 1; } to { opacity: 0; } }

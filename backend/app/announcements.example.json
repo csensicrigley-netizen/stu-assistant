@@ -1,0 +1,32 @@
+{
+  "enabled": true,
+  "announcements": [
+    {
+      "id": "github-star",
+      "revision": 1,
+      "eyebrow": "开发者来信",
+      "title": "给小助手一颗 Star",
+      "body": "如果小助手帮到了你，欢迎来 GitHub 点亮一颗 Star。\n也欢迎提交 Issue 反馈问题、分享想法，或贡献 PR，一起让它变得更好。",
+      "image_url": null,
+      "image_alt": "",
+      "action_label": "去 GitHub 点亮 Star",
+      "action_url": "https://github.com/csensicrigley-netizen/stu-assistant",
+      "display": "once",
+      "priority": 0,
+      "enabled": true,
+      "platforms": [
+        "android",
+        "web"
+      ],
+      "starts_at": null,
+      "ends_at": null,
+      "effects": [
+        "star-struck",
+        "heart-on-fire",
+        "folded-hands",
+        "party-popper",
+        "keycap-one-6"
+      ]
+    }
+  ]
+}

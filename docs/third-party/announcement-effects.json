@@ -1,0 +1,52 @@
+{
+  "gallery": "https://ilyhalight.github.io/telegram-emoji-effects/",
+  "revision": "7b68fd20784d297a812f1345db48f28e3934b6e1",
+  "notice": "Original animations are created by Telegram. The source repository requests compliance with Telegram's terms; it does not grant a separate license to the original artwork.",
+  "effects": [
+    {
+      "id": "star-struck",
+      "code": "U+1F929",
+      "variant": 0,
+      "source": "https://raw.githubusercontent.com/ilyhalight/telegram-emoji-effects/7b68fd20784d297a812f1345db48f28e3934b6e1/tgs/U+1F929/0.tgs",
+      "sha256": "eb35a9eeff17c434b6cd58bdb3f66313a1fca3a777d6cb3b3840191ce0f2aed7",
+      "durationMs": 3000,
+      "bytes": 674952
+    },
+    {
+      "id": "heart-on-fire",
+      "code": "U+2764_U+200D_U+1F525",
+      "variant": 0,
+      "source": "https://raw.githubusercontent.com/ilyhalight/telegram-emoji-effects/7b68fd20784d297a812f1345db48f28e3934b6e1/tgs/U+2764_U+200D_U+1F525/0.tgs",
+      "sha256": "955bd2e718c3a92c5c6ebfe6ab278475590e11151f70fcc7e67d335c9de7fe5e",
+      "durationMs": 3000,
+      "bytes": 313202
+    },
+    {
+      "id": "folded-hands",
+      "code": "U+1F64F",
+      "variant": 0,
+      "source": "https://raw.githubusercontent.com/ilyhalight/telegram-emoji-effects/7b68fd20784d297a812f1345db48f28e3934b6e1/tgs/U+1F64F/0.tgs",
+      "sha256": "8558562b39917c4e60dc4c743a4a4cb8b29eaba8d65b13792f192dcfeda73ac6",
+      "durationMs": 2517,
+      "bytes": 747876
+    },
+    {
+      "id": "party-popper",
+      "code": "U+1F389",
+      "variant": 0,
+      "source": "https://raw.githubusercontent.com/ilyhalight/telegram-emoji-effects/7b68fd20784d297a812f1345db48f28e3934b6e1/tgs/U+1F389/0.tgs",
+      "sha256": "cccdf8bbd04a48e348b6d049d3186c7a1caa7576d62b5bcdde857a7503e76bff",
+      "durationMs": 3000,
+      "bytes": 170295
+    },
+    {
+      "id": "keycap-one-6",
+      "code": "U+31_U+20E3",
+      "variant": 6,
+      "source": "https://raw.githubusercontent.com/ilyhalight/telegram-emoji-effects/7b68fd20784d297a812f1345db48f28e3934b6e1/tgs/U+31_U+20E3/6.tgs",
+      "sha256": "a11c9fc11c165c80e7b1c0eb7a1decf68c8cec9345396ad7ec391a6ac12a28a5",
+      "durationMs": 3000,
+      "bytes": 1044667
+    }
+  ]
+}

@@ -54,6 +54,10 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.FrameRateCategory
+import androidx.compose.ui.preferredFrameRate
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
@@ -97,6 +101,8 @@ private class NativeSheetEntry(
     val dismiss: MutableState<() -> Unit>,
     val content: MutableState<@Composable ColumnScope.() -> Unit>,
     val parent: NativeSheetEntry?,
+    val centered: Boolean = false,
+    val exited: MutableState<() -> Unit> = mutableStateOf({}),
 ) {
     val focus = FocusRequester()
     var containsFocus = false
@@ -204,6 +210,31 @@ fun NSheet(
     }
 }
 
+/** Centered dialog using the same retained modal stack and parent lifetime. */
+@Composable
+fun NDialog(
+    title: String,
+    onDismiss: () -> Unit,
+    onExited: () -> Unit = {},
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val controller = LocalNativeSheets.current
+    val parent = LocalNativeSheetParent.current
+    val entry = remember(controller, parent) {
+        NativeSheetEntry(mutableStateOf(title), mutableStateOf(onDismiss), mutableStateOf(content), parent, centered = true)
+    }
+    SideEffect {
+        entry.title.value = title
+        entry.dismiss.value = onDismiss
+        entry.content.value = content
+        entry.exited.value = onExited
+    }
+    DisposableEffect(controller, entry) {
+        controller.add(entry)
+        onDispose { controller.release(entry) }
+    }
+}
+
 @Composable
 fun NativeSheetHost(controller: NativeSheetController, backdrop: Backdrop) {
     val entries = controller.entries.filterIsInstance<NativeSheetEntry>()
@@ -235,8 +266,114 @@ fun NativeSheetHost(controller: NativeSheetController, backdrop: Backdrop) {
 
     // Keep underlying content composed: it may itself register the next NSheet in the stack.
     entries.forEach { entry ->
-        key(entry) { NativeSheetLayer(entry, entry === top && entry.requested, backdrop,
-            { controller.requestDismiss(entry) }, { controller.finishRemoval(entry) }) }
+        key(entry) {
+            if (entry.centered) NativeDialogLayer(entry, entry === top && entry.requested, backdrop, controller)
+            else NativeSheetLayer(entry, entry === top && entry.requested, backdrop,
+                { controller.requestDismiss(entry) }, { controller.finishRemoval(entry) })
+        }
+    }
+}
+
+@Composable
+private fun NativeDialogLayer(
+    entry: NativeSheetEntry,
+    active: Boolean,
+    backdrop: Backdrop,
+    controller: NativeSheetController,
+) {
+    val focusManager = LocalFocusManager.current
+    val reducedMotion = LocalLiquidGlassReducedMotion.current
+    val onDismiss by rememberUpdatedState { controller.requestDismiss(entry) }
+    val motion = remember { NativeDialogMotion() }
+    LaunchedEffect(entry.requested, reducedMotion) {
+        if (!entry.requested) {
+            motion.exit(reducedMotion)
+            controller.finishRemoval(entry)
+            entry.exited.value()
+        } else motion.enter(reducedMotion)
+    }
+    Box(
+        Modifier.fillMaxSize().then(if (active) Modifier else Modifier.clearAndSetSemantics {})
+            .preferredFrameRate(if (motion.isRunning) FrameRateCategory.High else FrameRateCategory.Default)
+            .pointerInput(active) {
+                if (!active) awaitPointerEventScope {
+                    while (true) awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() }
+                }
+            },
+    ) {
+        Box(
+            Modifier.fillMaxSize()
+                .drawBehind { drawRect(Color.Black.copy(alpha = .32f * motion.scrim.value)) }
+                .focusProperties { canFocus = false }
+                .clearAndSetSemantics {}
+                .clickable(
+                    enabled = true,
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = { if (active) onDismiss() },
+                ),
+        )
+        BoxWithConstraints(
+            Modifier.fillMaxSize().safeDrawingPadding().imePadding().padding(horizontal = 24.dp, vertical = 20.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            CompositionLocalProvider(LocalNativeBackdrop provides backdrop, LocalNativeSheetParent provides entry) {
+                LiquidDialogSurface(
+                    backdrop,
+                    modifier = Modifier.widthIn(max = 380.dp).fillMaxWidth().heightIn(max = maxHeight)
+                        .graphicsLayer {
+                            alpha = motion.opacity.value
+                            scaleX = if (reducedMotion) 1f else .92f + .08f * motion.arrival.value - .035f * motion.departure.value
+                            scaleY = scaleX
+                            translationY = if (reducedMotion) 0f else (28f * (1f - motion.arrival.value) + 12f * motion.departure.value).dp.toPx()
+                        }
+                        .focusProperties {
+                            onEnter = { if (!active) cancelFocusChange() }
+                            onExit = { if (active) cancelFocusChange() }
+                        }
+                        .focusRequester(entry.focus)
+                        .onFocusChanged { entry.containsFocus = it.hasFocus }
+                        .focusRestorer()
+                        .onPreviewKeyEvent { event ->
+                            if (!active) false else when (event.key) {
+                                Key.Escape -> {
+                                    if (event.type == KeyEventType.KeyDown) onDismiss()
+                                    true
+                                }
+                                Key.Tab -> {
+                                    if (event.type == KeyEventType.KeyDown) {
+                                        val direction = if (event.isShiftPressed) FocusDirection.Previous else FocusDirection.Next
+                                        if (!focusManager.moveFocus(direction)) {
+                                            focusManager.clearFocus(force = true)
+                                            entry.focus.requestFocus(direction)
+                                        }
+                                    }
+                                    true
+                                }
+                                else -> false
+                            }
+                        }
+                        .focusGroup()
+                        .semantics {
+                            dialog()
+                            paneTitle = entry.title.value
+                            isTraversalGroup = true
+                            dismiss { if (active) { onDismiss(); true } else false }
+                        }
+                        .pointerInput(active) { detectTapGestures(onTap = {}) },
+                    shape = RoundedRectangle(36.dp),
+                    frosted = true,
+                ) {
+                    Column(
+                        Modifier.fillMaxWidth().weight(1f, fill = false)
+                            .verticalScroll(rememberScrollState()).padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
+                        entry.content.value(this)
+                    }
+                }
+            }
+        }
     }
 }
 

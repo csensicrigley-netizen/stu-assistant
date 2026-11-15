@@ -14,7 +14,7 @@ exports.harness = ({ native = false, timeoutMs = 25 } = {}) => {
   const state = { fetch: async () => { throw new Error('Unexpected HTTP'); } };
   const cache = new Map();
   const context = vm.createContext({
-    Headers, Response, AbortController, CustomEvent, URLSearchParams, atob,
+    Headers, Response, AbortController, CustomEvent, URL, URLSearchParams, atob,
     location: { search: '' },
     localStorage: {
       getItem: key => storage.get(key) ?? null,

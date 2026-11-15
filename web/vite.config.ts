@@ -9,6 +9,7 @@ const NATIVE = process.env.STU_TARGET === "android";
 export default defineConfig({
   // relative base: the same dist works at a domain root, a sub-path, and on device
   base: "./",
+  optimizeDeps: { include: ["lottie-web/build/player/lottie_light"] },
   plugins: [
     react(),
     VitePWA({
@@ -71,7 +72,9 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id: string) {
+          if (id.includes("commonjsHelpers")) return "vendor";
           if (!id.includes("node_modules")) return undefined;
+          if (id.includes("lottie-web")) return "announcement-player";
           if (id.includes("motion") || id.includes("framer-motion")) return "vendor-motion";
           if (id.includes("react") || id.includes("scheduler")) return "vendor-react";
           return "vendor";

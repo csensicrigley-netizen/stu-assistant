@@ -303,7 +303,7 @@ async function android(page) {
   await writeFile(path.join(any, "ic_launcher.xml"), adaptive);
   await writeFile(path.join(any, "ic_launcher_round.xml"), adaptive);
 
-  // Pre-Android-12 splash marks (light default + dark -night)
+  // System-theme splash marks plus explicit variants for the app's saved theme.
   const nodpiLight = path.join(ANDROID_RES, "drawable-nodpi");
   const nodpiDark = path.join(ANDROID_RES, "drawable-night-nodpi");
   await mkdir(nodpiLight, { recursive: true });
@@ -323,6 +323,8 @@ async function android(page) {
     448,
     path.join(nodpiDark, "splash_mark.png"),
   );
+  await copyFile(path.join(nodpiLight, "splash_mark.png"), path.join(nodpiLight, "splash_mark_light.png"));
+  await copyFile(path.join(nodpiDark, "splash_mark.png"), path.join(nodpiLight, "splash_mark_dark.png"));
 
   // In-App Compose NativeLogo master Badge PNGs (256px crisp for 64dp @3x/4x)
   await copyFile(

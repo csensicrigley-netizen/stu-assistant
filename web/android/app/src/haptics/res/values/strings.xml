@@ -1,5 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">STU助手（本机测试）</string>
-    <string name="title_activity_main">STU助手（本机测试）</string>
+    <string name="app_name">STU 事项助手 · 测试</string>
+    <string name="title_activity_main">STU 事项助手 · 测试</string>
 </resources>

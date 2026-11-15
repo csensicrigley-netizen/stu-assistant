@@ -157,6 +157,7 @@ dependencies {
     implementation 'androidx.compose.foundation:foundation:1.12.0'
     implementation 'io.github.kyant0:backdrop:2.0.1'
     implementation 'io.github.kyant0:shapes:1.2.1'
+    implementation 'com.airbnb.android:lottie-compose:6.7.1'
     implementation 'com.google.zxing:core:3.5.3'
     implementation files('libs/richtap-2.0.4-lite.aar')
     implementation fileTree(include: ['*.jar'], dir: 'libs')

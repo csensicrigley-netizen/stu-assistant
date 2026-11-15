@@ -90,6 +90,10 @@ Copy-Item "$root\backend\requirements.txt", "$root\backend\constraints.txt" "$st
 Copy-Item "$root\backend\wheels\stu_mcp-0.7.3-py3-none-any.whl", "$root\backend\wheels\SHA256SUMS" "$stage\backend\wheels\"
 Copy-Item -Recurse "$web\dist" "$stage\web"
 Copy-Item "$root\deploy\install.sh", "$root\deploy\stu-assistant.service", "$root\deploy\README.md" "$stage\deploy\"
+Copy-Item -LiteralPath "$root\docs\首页消息配置.md" -Destination "$stage\deploy\首页消息配置.md"
+Copy-Item -LiteralPath "$root\docs\首页消息-服务器维护者操作手册.md" -Destination "$stage\deploy\首页消息-服务器维护者操作手册.md"
+New-Item -ItemType Directory -Force "$stage\deploy\third-party" | Out-Null
+Copy-Item -LiteralPath "$root\docs\third-party\announcement-effects.json" -Destination "$stage\deploy\third-party\announcement-effects.json"
 
 # 服务器端版本登记：跟这次打的包严格一致，旧客户端靠它知道自己该更新了
 # （$notes 已经在 1.5/4 那一步读好，这里直接复用，别再读一遍文件。）

@@ -38,8 +38,14 @@ class NativeActivity:ComponentActivity() {
     private var ready by mutableStateOf(false)
     private var resumeEpoch by mutableIntStateOf(0)
     override fun onCreate(savedInstanceState:Bundle?) {
-        installSplashScreen()
+        NativeLaunchAppearance.prepare(this)
+        val splash = installSplashScreen()
         super.onCreate(savedInstanceState)
+        splash.setKeepOnScreenCondition { !ready }
+        splash.setOnExitAnimationListener { screen ->
+            if (Settings.Global.getFloat(contentResolver,Settings.Global.ANIMATOR_DURATION_SCALE,1f)==0f) screen.remove()
+            else screen.view.animate().alpha(0f).setDuration(140).withEndAction { screen.remove() }.start()
+        }
         enableEdgeToEdge()
         window.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
         store=NativeStore(applicationContext);feedback=NativeFeedback(this)
@@ -67,8 +73,10 @@ class NativeActivity:ComponentActivity() {
     val context=androidx.compose.ui.platform.LocalContext.current
     val activity=context as ComponentActivity
     SideEffect {WindowCompat.getInsetsController(activity.window,activity.window.decorView).apply {isAppearanceLightStatusBars=!dark;isAppearanceLightNavigationBars=!dark}}
+    LaunchedEffect(s.theme,s.palette,dark) { NativeLaunchAppearance.sync(activity,s.theme,s.palette,dark) }
     val reduced=remember(resumeEpoch) {Settings.Global.getFloat(context.contentResolver,Settings.Global.ANIMATOR_DURATION_SCALE,1f)==0f}
     var route by rememberSaveable {mutableStateOf("today")}
+    var announcementPreview by remember { mutableStateOf(false) }
     var calendarOpen by rememberSaveable {mutableStateOf(false)}
     var campusView by rememberSaveable {mutableStateOf("notices")}
     var connect by rememberSaveable {mutableStateOf(false)}
@@ -126,7 +134,7 @@ class NativeActivity:ComponentActivity() {
             )
             Box(Modifier.fillMaxSize().layerBackdrop(page).nativeSheetBackground(sheets)
                 .then(if(calendarOpen) Modifier.clearAndSetSemantics {} else Modifier)) {
-                if(!ready) NPage("STU 事项助手"){NLoading()}
+                if(!ready) Box(Modifier.fillMaxSize(),contentAlignment=Alignment.Center){NativeLogo(80)}
                 else if(needsWelcome||connect) NativeWelcomeScreen(store,s,start=gateStart,onDone={connect=false;store.reloadAfterMutation()},onCancel=if(gateCancelable){{connect=false}}else null)
                 else NativePageTransition(NativePageRoute(route,campusView),reduced) { snapshot ->
                     when {
@@ -134,7 +142,11 @@ class NativeActivity:ComponentActivity() {
                         snapshot.route=="week"->NativeWeekScreen(store,s,navigate,onConnect)
                         snapshot.route.startsWith("items")->NativeCalendarItemsScreen(store,s,onConnect)
                         snapshot.route.startsWith("campus")->NativeCampusScreen(store,s,snapshot.campusView,onConnect,{campusView=it})
-                        snapshot.route=="me"->NativeMeScreen(store,s,onConnect,{connect=false;route="today"},navigate)
+                        snapshot.route=="me"->NativeMeScreen(store,s,onConnect,{connect=false;route="today"},navigate,
+                            onAnnouncementPreview = if (context.packageName == "com.stuassistant.app.haptics") {{
+                                route="today"
+                                scope.launch { delay(400); announcementPreview=true }
+                            }} else null)
                         snapshot.route=="medical"->NativeMedicalScreen(store,s,navigate)
                         snapshot.route=="import"->NativeImportScreen(store,s,navigate)
                         else->NativeTodayScreen(store,s,navigate,onConnect)
@@ -159,7 +171,9 @@ class NativeActivity:ComponentActivity() {
                     }
                 }
             }
-            if(ready) NativeUpdatePrompt(store,combined,Modifier.align(Alignment.BottomCenter).padding(start=12.dp,end=12.dp,bottom=(104+bottom).dp))
+            if(ready) NativeUpdatePrompt(store,combined,Modifier.align(Alignment.BottomCenter).padding(start=12.dp,end=12.dp,bottom=(104+bottom).dp).nativeSheetBackground(sheets))
+            NativeHomeAnnouncement(store,ready&&!needsWelcome&&!connect&&route=="today"&&!ime&&!calendarOpen&&!announcementPreview,sheets.entries.isEmpty())
+            if (announcementPreview && route=="today") NativeAnnouncementPreview { announcementPreview=false }
             NativeSheetHost(sheets,combined)
             AnimatedVisibility(calendarOpen&&s.token!=null&&!s.preview, enter=slideInVertically(tween(420)){ -it/12 }+fadeIn(tween(220)), exit=slideOutVertically(tween(260)){ -it/12 }+fadeOut(tween(220))) {
                 CompositionLocalProvider(LocalNativeBackdrop provides base) {

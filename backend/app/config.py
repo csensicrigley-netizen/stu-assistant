@@ -47,6 +47,11 @@ class Settings:
                                  if os.environ.get("STU_APP_WEB_DIR") else None)
     cors_origins: tuple[str, ...] = field(default_factory=_origins)
 
+    # Hot-loaded home message JSON; keep outside the release directory so an
+    # upgrade never overwrites operator content. None uses root/announcements.json.
+    announcements_file: Path | None = field(default_factory=lambda: Path(os.environ["STU_APP_ANNOUNCEMENTS_FILE"])
+                                          if os.environ.get("STU_APP_ANNOUNCEMENTS_FILE") else None)
+
     # Throttling (PLAN.md §七)
     sync_min_interval: int = 600          # 每租户每源最小间隔 10 分钟
     global_jw_concurrency: int = 3        # 全局教务并发

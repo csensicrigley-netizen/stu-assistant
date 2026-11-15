@@ -31,12 +31,16 @@ fun LiquidDialogSurface(
     backdrop: Backdrop,
     modifier: Modifier = Modifier,
     shape: RoundedRectangularShape = RoundedRectangle(48.dp),
+    frosted: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val isLightTheme = !(LocalLiquidGlassDarkTheme.current ?: isSystemInDarkTheme())
-    val containerColor =
-        if (isLightTheme) Color(0xFFFAFAFA).copy(0.6f)
-        else Color(0xFF121212).copy(0.4f)
+    val containerColor = when {
+        frosted && isLightTheme -> Color(0xFFFAFAFA).copy(0.90f)
+        frosted -> Color(0xFF242228).copy(0.94f)
+        isLightTheme -> Color(0xFFFAFAFA).copy(0.6f)
+        else -> Color(0xFF121212).copy(0.4f)
+    }
 
     Column(
         modifier.drawBackdrop(
@@ -44,10 +48,10 @@ fun LiquidDialogSurface(
             shape = { shape },
             effects = {
                 colorControls(
-                    brightness = if (isLightTheme) 0.2f else 0f,
-                    saturation = 1.5f,
+                    brightness = if (isLightTheme) (if (frosted) 0.05f else 0.2f) else 0f,
+                    saturation = if (frosted) 1.1f else 1.5f,
                 )
-                blur(if (isLightTheme) 16f.dp.toPx() else 8f.dp.toPx())
+                blur((if (frosted) 28f else if (isLightTheme) 16f else 8f).dp.toPx())
                 lens(24f.dp.toPx(), 48f.dp.toPx(), depthEffect = true)
             },
             highlight = { Highlight.Plain },

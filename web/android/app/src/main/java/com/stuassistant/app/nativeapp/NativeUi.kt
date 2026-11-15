@@ -398,6 +398,7 @@ internal fun NativeGlassButton(
     enabled: Boolean = true,
     haptic: NativeButtonHaptic,
     surfaceColor: Color,
+    shape: Shape = Capsule(),
     content: @Composable RowScope.() -> Unit,
 ) {
     val source = remember { MutableInteractionSource() }
@@ -409,6 +410,7 @@ internal fun NativeGlassButton(
         enabled = enabled,
         interactionSource = source,
         surfaceColor = surfaceColor,
+        shape = shape,
         content = content,
     )
 }
