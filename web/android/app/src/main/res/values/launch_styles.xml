@@ -1,5 +1,9 @@
 <resources>
-    <style name="AppTheme.Launch.Sweet.System" parent="AppTheme.NoActionBarLaunch">
+    <!-- Dark navigation icons are only available from Android 8.1. -->
+    <style name="AppTheme.LaunchBars.System" parent="AppTheme.NoActionBarLaunch" />
+    <style name="AppTheme.LaunchBars.Light" parent="AppTheme.NoActionBarLaunch" />
+    <style name="AppTheme.LaunchBars.Dark" parent="AppTheme.NoActionBarLaunch" />
+    <style name="AppTheme.Launch.Sweet.System" parent="AppTheme.LaunchBars.System">
         <item name="windowSplashScreenBackground">@color/launch_sweet_system</item>
         <item name="windowSplashScreenAnimatedIcon">@drawable/launch_icon</item>
         <item name="android:windowBackground">@color/launch_sweet_system</item>
@@ -7,9 +11,8 @@
         <item name="android:statusBarColor">@color/launch_sweet_system</item>
         <item name="android:navigationBarColor">@color/launch_sweet_system</item>
         <item name="android:windowLightStatusBar">@bool/launch_light_bars</item>
-        <item name="android:windowLightNavigationBar">@bool/launch_light_bars</item>
     </style>
-    <style name="AppTheme.Launch.Sweet.Light" parent="AppTheme.NoActionBarLaunch">
+    <style name="AppTheme.Launch.Sweet.Light" parent="AppTheme.LaunchBars.Light">
         <item name="windowSplashScreenBackground">@color/launch_sweet_light</item>
         <item name="windowSplashScreenAnimatedIcon">@drawable/launch_icon_light</item>
         <item name="android:windowBackground">@color/launch_sweet_light</item>
@@ -17,9 +20,8 @@
         <item name="android:statusBarColor">@color/launch_sweet_light</item>
         <item name="android:navigationBarColor">@color/launch_sweet_light</item>
         <item name="android:windowLightStatusBar">true</item>
-        <item name="android:windowLightNavigationBar">true</item>
     </style>
-    <style name="AppTheme.Launch.Sweet.Dark" parent="AppTheme.NoActionBarLaunch">
+    <style name="AppTheme.Launch.Sweet.Dark" parent="AppTheme.LaunchBars.Dark">
         <item name="windowSplashScreenBackground">@color/launch_sweet_dark</item>
         <item name="windowSplashScreenAnimatedIcon">@drawable/launch_icon_dark</item>
         <item name="android:windowBackground">@color/launch_sweet_dark</item>
@@ -27,9 +29,8 @@
         <item name="android:statusBarColor">@color/launch_sweet_dark</item>
         <item name="android:navigationBarColor">@color/launch_sweet_dark</item>
         <item name="android:windowLightStatusBar">false</item>
-        <item name="android:windowLightNavigationBar">false</item>
     </style>
-    <style name="AppTheme.Launch.Classic.System" parent="AppTheme.NoActionBarLaunch">
+    <style name="AppTheme.Launch.Classic.System" parent="AppTheme.LaunchBars.System">
         <item name="windowSplashScreenBackground">@color/launch_classic_system</item>
         <item name="windowSplashScreenAnimatedIcon">@drawable/launch_icon</item>
         <item name="android:windowBackground">@color/launch_classic_system</item>
@@ -37,9 +38,8 @@
         <item name="android:statusBarColor">@color/launch_classic_system</item>
         <item name="android:navigationBarColor">@color/launch_classic_system</item>
         <item name="android:windowLightStatusBar">@bool/launch_light_bars</item>
-        <item name="android:windowLightNavigationBar">@bool/launch_light_bars</item>
     </style>
-    <style name="AppTheme.Launch.Classic.Light" parent="AppTheme.NoActionBarLaunch">
+    <style name="AppTheme.Launch.Classic.Light" parent="AppTheme.LaunchBars.Light">
         <item name="windowSplashScreenBackground">@color/launch_classic_light</item>
         <item name="windowSplashScreenAnimatedIcon">@drawable/launch_icon_light</item>
         <item name="android:windowBackground">@color/launch_classic_light</item>
@@ -47,9 +47,8 @@
         <item name="android:statusBarColor">@color/launch_classic_light</item>
         <item name="android:navigationBarColor">@color/launch_classic_light</item>
         <item name="android:windowLightStatusBar">true</item>
-        <item name="android:windowLightNavigationBar">true</item>
     </style>
-    <style name="AppTheme.Launch.Classic.Dark" parent="AppTheme.NoActionBarLaunch">
+    <style name="AppTheme.Launch.Classic.Dark" parent="AppTheme.LaunchBars.Dark">
         <item name="windowSplashScreenBackground">@color/launch_classic_dark</item>
         <item name="windowSplashScreenAnimatedIcon">@drawable/launch_icon_dark</item>
         <item name="android:windowBackground">@color/launch_classic_dark</item>
@@ -57,9 +56,8 @@
         <item name="android:statusBarColor">@color/launch_classic_dark</item>
         <item name="android:navigationBarColor">@color/launch_classic_dark</item>
         <item name="android:windowLightStatusBar">false</item>
-        <item name="android:windowLightNavigationBar">false</item>
     </style>
-    <style name="AppTheme.Launch.Phoenix.System" parent="AppTheme.NoActionBarLaunch">
+    <style name="AppTheme.Launch.Phoenix.System" parent="AppTheme.LaunchBars.System">
         <item name="windowSplashScreenBackground">@color/launch_phoenix_system</item>
         <item name="windowSplashScreenAnimatedIcon">@drawable/launch_icon</item>
         <item name="android:windowBackground">@color/launch_phoenix_system</item>
@@ -67,9 +65,8 @@
         <item name="android:statusBarColor">@color/launch_phoenix_system</item>
         <item name="android:navigationBarColor">@color/launch_phoenix_system</item>
         <item name="android:windowLightStatusBar">@bool/launch_light_bars</item>
-        <item name="android:windowLightNavigationBar">@bool/launch_light_bars</item>
     </style>
-    <style name="AppTheme.Launch.Phoenix.Light" parent="AppTheme.NoActionBarLaunch">
+    <style name="AppTheme.Launch.Phoenix.Light" parent="AppTheme.LaunchBars.Light">
         <item name="windowSplashScreenBackground">@color/launch_phoenix_light</item>
         <item name="windowSplashScreenAnimatedIcon">@drawable/launch_icon_light</item>
         <item name="android:windowBackground">@color/launch_phoenix_light</item>
@@ -77,9 +74,8 @@
         <item name="android:statusBarColor">@color/launch_phoenix_light</item>
         <item name="android:navigationBarColor">@color/launch_phoenix_light</item>
         <item name="android:windowLightStatusBar">true</item>
-        <item name="android:windowLightNavigationBar">true</item>
     </style>
-    <style name="AppTheme.Launch.Phoenix.Dark" parent="AppTheme.NoActionBarLaunch">
+    <style name="AppTheme.Launch.Phoenix.Dark" parent="AppTheme.LaunchBars.Dark">
         <item name="windowSplashScreenBackground">@color/launch_phoenix_dark</item>
         <item name="windowSplashScreenAnimatedIcon">@drawable/launch_icon_dark</item>
         <item name="android:windowBackground">@color/launch_phoenix_dark</item>
@@ -87,9 +83,8 @@
         <item name="android:statusBarColor">@color/launch_phoenix_dark</item>
         <item name="android:navigationBarColor">@color/launch_phoenix_dark</item>
         <item name="android:windowLightStatusBar">false</item>
-        <item name="android:windowLightNavigationBar">false</item>
     </style>
-    <style name="AppTheme.Launch.Pine.System" parent="AppTheme.NoActionBarLaunch">
+    <style name="AppTheme.Launch.Pine.System" parent="AppTheme.LaunchBars.System">
         <item name="windowSplashScreenBackground">@color/launch_pine_system</item>
         <item name="windowSplashScreenAnimatedIcon">@drawable/launch_icon</item>
         <item name="android:windowBackground">@color/launch_pine_system</item>
@@ -97,9 +92,8 @@
         <item name="android:statusBarColor">@color/launch_pine_system</item>
         <item name="android:navigationBarColor">@color/launch_pine_system</item>
         <item name="android:windowLightStatusBar">@bool/launch_light_bars</item>
-        <item name="android:windowLightNavigationBar">@bool/launch_light_bars</item>
     </style>
-    <style name="AppTheme.Launch.Pine.Light" parent="AppTheme.NoActionBarLaunch">
+    <style name="AppTheme.Launch.Pine.Light" parent="AppTheme.LaunchBars.Light">
         <item name="windowSplashScreenBackground">@color/launch_pine_light</item>
         <item name="windowSplashScreenAnimatedIcon">@drawable/launch_icon_light</item>
         <item name="android:windowBackground">@color/launch_pine_light</item>
@@ -107,9 +101,8 @@
         <item name="android:statusBarColor">@color/launch_pine_light</item>
         <item name="android:navigationBarColor">@color/launch_pine_light</item>
         <item name="android:windowLightStatusBar">true</item>
-        <item name="android:windowLightNavigationBar">true</item>
     </style>
-    <style name="AppTheme.Launch.Pine.Dark" parent="AppTheme.NoActionBarLaunch">
+    <style name="AppTheme.Launch.Pine.Dark" parent="AppTheme.LaunchBars.Dark">
         <item name="windowSplashScreenBackground">@color/launch_pine_dark</item>
         <item name="windowSplashScreenAnimatedIcon">@drawable/launch_icon_dark</item>
         <item name="android:windowBackground">@color/launch_pine_dark</item>
@@ -117,9 +110,8 @@
         <item name="android:statusBarColor">@color/launch_pine_dark</item>
         <item name="android:navigationBarColor">@color/launch_pine_dark</item>
         <item name="android:windowLightStatusBar">false</item>
-        <item name="android:windowLightNavigationBar">false</item>
     </style>
-    <style name="AppTheme.Launch.Lilac.System" parent="AppTheme.NoActionBarLaunch">
+    <style name="AppTheme.Launch.Lilac.System" parent="AppTheme.LaunchBars.System">
         <item name="windowSplashScreenBackground">@color/launch_lilac_system</item>
         <item name="windowSplashScreenAnimatedIcon">@drawable/launch_icon</item>
         <item name="android:windowBackground">@color/launch_lilac_system</item>
@@ -127,9 +119,8 @@
         <item name="android:statusBarColor">@color/launch_lilac_system</item>
         <item name="android:navigationBarColor">@color/launch_lilac_system</item>
         <item name="android:windowLightStatusBar">@bool/launch_light_bars</item>
-        <item name="android:windowLightNavigationBar">@bool/launch_light_bars</item>
     </style>
-    <style name="AppTheme.Launch.Lilac.Light" parent="AppTheme.NoActionBarLaunch">
+    <style name="AppTheme.Launch.Lilac.Light" parent="AppTheme.LaunchBars.Light">
         <item name="windowSplashScreenBackground">@color/launch_lilac_light</item>
         <item name="windowSplashScreenAnimatedIcon">@drawable/launch_icon_light</item>
         <item name="android:windowBackground">@color/launch_lilac_light</item>
@@ -137,9 +128,8 @@
         <item name="android:statusBarColor">@color/launch_lilac_light</item>
         <item name="android:navigationBarColor">@color/launch_lilac_light</item>
         <item name="android:windowLightStatusBar">true</item>
-        <item name="android:windowLightNavigationBar">true</item>
     </style>
-    <style name="AppTheme.Launch.Lilac.Dark" parent="AppTheme.NoActionBarLaunch">
+    <style name="AppTheme.Launch.Lilac.Dark" parent="AppTheme.LaunchBars.Dark">
         <item name="windowSplashScreenBackground">@color/launch_lilac_dark</item>
         <item name="windowSplashScreenAnimatedIcon">@drawable/launch_icon_dark</item>
         <item name="android:windowBackground">@color/launch_lilac_dark</item>
@@ -147,9 +137,8 @@
         <item name="android:statusBarColor">@color/launch_lilac_dark</item>
         <item name="android:navigationBarColor">@color/launch_lilac_dark</item>
         <item name="android:windowLightStatusBar">false</item>
-        <item name="android:windowLightNavigationBar">false</item>
     </style>
-    <style name="AppTheme.Launch.Latte.System" parent="AppTheme.NoActionBarLaunch">
+    <style name="AppTheme.Launch.Latte.System" parent="AppTheme.LaunchBars.System">
         <item name="windowSplashScreenBackground">@color/launch_latte_system</item>
         <item name="windowSplashScreenAnimatedIcon">@drawable/launch_icon</item>
         <item name="android:windowBackground">@color/launch_latte_system</item>
@@ -157,9 +146,8 @@
         <item name="android:statusBarColor">@color/launch_latte_system</item>
         <item name="android:navigationBarColor">@color/launch_latte_system</item>
         <item name="android:windowLightStatusBar">@bool/launch_light_bars</item>
-        <item name="android:windowLightNavigationBar">@bool/launch_light_bars</item>
     </style>
-    <style name="AppTheme.Launch.Latte.Light" parent="AppTheme.NoActionBarLaunch">
+    <style name="AppTheme.Launch.Latte.Light" parent="AppTheme.LaunchBars.Light">
         <item name="windowSplashScreenBackground">@color/launch_latte_light</item>
         <item name="windowSplashScreenAnimatedIcon">@drawable/launch_icon_light</item>
         <item name="android:windowBackground">@color/launch_latte_light</item>
@@ -167,9 +155,8 @@
         <item name="android:statusBarColor">@color/launch_latte_light</item>
         <item name="android:navigationBarColor">@color/launch_latte_light</item>
         <item name="android:windowLightStatusBar">true</item>
-        <item name="android:windowLightNavigationBar">true</item>
     </style>
-    <style name="AppTheme.Launch.Latte.Dark" parent="AppTheme.NoActionBarLaunch">
+    <style name="AppTheme.Launch.Latte.Dark" parent="AppTheme.LaunchBars.Dark">
         <item name="windowSplashScreenBackground">@color/launch_latte_dark</item>
         <item name="windowSplashScreenAnimatedIcon">@drawable/launch_icon_dark</item>
         <item name="android:windowBackground">@color/launch_latte_dark</item>
@@ -177,6 +164,5 @@
         <item name="android:statusBarColor">@color/launch_latte_dark</item>
         <item name="android:navigationBarColor">@color/launch_latte_dark</item>
         <item name="android:windowLightStatusBar">false</item>
-        <item name="android:windowLightNavigationBar">false</item>
     </style>
 </resources>
