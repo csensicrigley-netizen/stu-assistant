@@ -23,17 +23,37 @@ test('effects accept only bundled IDs, default off, and deduplicate remote value
   assert.equal(JSON.stringify(parse('https://example.test/remote.json')), '[]');
 });
 
-test('receipts isolate servers/accounts, revisions, and suppress all further messages this opening', () => {
+test('presentation consumes the opening but does not permanently hide a legacy once message', () => {
   const h = load();
   const first = item();
   assert.equal(h.a.announcementEligible(first, 'server-a/user-a'), true);
   h.a.markAnnouncementShown(first, 'server-a/user-a');
   assert.equal(h.a.announcementEligible(item({ id: 'another', display: 'always' }), 'server-a/user-a'), false);
   const next = reopen(h);
+  assert.equal(next.a.announcementEligible(first, 'server-a/user-a'), true);
+});
+
+test('explicit opt-out persists across openings and isolates servers/accounts/revisions', () => {
+  const h = load();
+  const first = item();
+  h.a.markAnnouncementShown(first, 'server-a/user-a');
+  h.a.dismissAnnouncementPermanently(first, 'server-a/user-a');
+  const next = reopen(h);
   assert.equal(next.a.announcementEligible(first, 'server-a/user-a'), false);
+  assert.equal(next.a.announcementEligible(item({ display: 'always' }), 'server-a/user-a'), false);
+  assert.equal(next.a.announcementEligible(item({ display: 'daily' }), 'server-a/user-a', new Date('2099-01-01')), false);
   assert.equal(next.a.announcementEligible(item({ revision: 2 }), 'server-a/user-a'), true);
   assert.equal(next.a.announcementEligible(first, 'server-a/user-b'), true);
   assert.equal(next.a.announcementEligible(first, 'server-b/user-a'), true);
+});
+
+test('legacy shown receipts are not opt-outs and explicit choices survive bounded presentation history', () => {
+  const h = load();
+  h.storage.set('stu.announcements.v1:legacy', JSON.stringify({ '["github-star",1]': '2026-11-15' }));
+  assert.equal(h.a.announcementEligible(item(), 'legacy'), true);
+  h.a.dismissAnnouncementPermanently(item(), 'legacy');
+  for (let i = 0; i < 220; i++) h.a.markAnnouncementShown(item({ id: `other-${i}` }), 'legacy');
+  assert.equal(reopen(h).a.announcementEligible(item(), 'legacy'), false);
 });
 
 test('daily changes at Shanghai midnight; always may display again next opening', () => {

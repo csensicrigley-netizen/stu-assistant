@@ -8,10 +8,26 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.FrameRateCategory
+import androidx.compose.ui.preferredFrameRate
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.*
@@ -20,9 +36,11 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.kyant.shapes.RoundedRectangle
+import com.stuassistant.app.glass.LocalLiquidGlassReducedMotion
 import kotlinx.coroutines.*
 import org.json.JSONObject
 import java.net.HttpURLConnection
@@ -82,9 +100,8 @@ internal object NativeAnnouncementRules {
         MessageDigest.getInstance("SHA-256").digest("$server\n$account\n${item.id}\n${item.revision}".toByteArray(Charsets.UTF_8))
             .joinToString("") { "%02x".format(it) }
 
-    fun eligible(display: String, lastShown: Long, now: Long): Boolean = when (display) {
-        "always" -> true
-        "once" -> lastShown <= 0
+    fun eligible(display: String, lastShown: Long, now: Long, optedOut: Boolean = false): Boolean = !optedOut && when (display) {
+        "always", "once" -> true // Legacy presentation receipts are not a user opt-out.
         "daily" -> lastShown <= 0 || day(lastShown) != day(now)
         else -> false
     }
@@ -133,7 +150,8 @@ fun NativeHomeAnnouncement(store: NativeStore, homeReady: Boolean, modalFree: Bo
             currentCoroutineContext().ensureActive()
             val now = System.currentTimeMillis()
             val next = NativeAnnouncementRules.parse(result, state.server).firstOrNull {
-                NativeAnnouncementRules.eligible(it.display, prefs.getLong(NativeAnnouncementRules.receiptKey(state.server, account, it), 0), now)
+                val key = NativeAnnouncementRules.receiptKey(state.server, account, it)
+                NativeAnnouncementRules.eligible(it.display, prefs.getLong(key, 0), now, prefs.getBoolean("dismissed:$key", false))
             }
             checked = true
             if (next != null) {
@@ -150,19 +168,32 @@ fun NativeHomeAnnouncement(store: NativeStore, homeReady: Boolean, modalFree: Bo
         withFrameNanos { }
         prefs.edit().putLong(NativeAnnouncementRules.receiptKey(state.server, account, message), System.currentTimeMillis()).apply()
     }
-    NDialog(message.title, onDismiss = { shown = null }, onExited = {
+    val dismissMessage: (Boolean) -> Unit = { dontRemind ->
+        if (dontRemind) prefs.edit().putBoolean("dismissed:${NativeAnnouncementRules.receiptKey(state.server, account, message)}", true).apply()
+        shown = null
+    }
+    NativeAnnouncementDialog(message, onDismiss = dismissMessage, onExited = {
         afterExit.value?.invoke()
         afterExit.value = null
-    }) {
-        NativeAnnouncementContent(message, onDismiss = { shown = null }, onAction = {
-            afterExit.value = { message.actionUrl?.let { openAnnouncementLink(context, it) } }
-            shown = null
-        })
+    }, onAction = { dontRemind ->
+        afterExit.value = { message.actionUrl?.let { openAnnouncementLink(context, it) } }
+        dismissMessage(dontRemind)
+    })
+}
+
+@Composable
+internal fun NativeAnnouncementDialog(message: NativeAnnouncement, onDismiss: (Boolean) -> Unit,
+    onAction: (Boolean) -> Unit, onExited: () -> Unit = {}) {
+    var dontRemind by remember(message.id, message.revision) { mutableStateOf(false) }
+    NDialog(message.title, onDismiss = { onDismiss(dontRemind) }, onExited = onExited) {
+        NativeAnnouncementContent(message, { onDismiss(dontRemind) }, { onAction(dontRemind) },
+            dontRemind, { dontRemind = it })
     }
 }
 
 @Composable
-internal fun NativeAnnouncementContent(message: NativeAnnouncement, onDismiss: () -> Unit, onAction: () -> Unit) {
+internal fun NativeAnnouncementContent(message: NativeAnnouncement, onDismiss: () -> Unit, onAction: () -> Unit,
+    dontRemind: Boolean, onDontRemindChange: (Boolean) -> Unit) {
     val colors = LocalNativeColors.current
     val effect = remember(message.id, message.revision, message.effects) { message.effects.randomOrNull() }
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
@@ -203,18 +234,75 @@ internal fun NativeAnnouncementContent(message: NativeAnnouncement, onDismiss: (
     if (message.body.isNotBlank()) NText(message.body, 15, muted = true)
     if (message.actionUrl != null) {
         NativeAnnouncementButton(message.actionLabel + " ↗", onAction, primary = true, haptic = NativeButtonHaptic.Navigation)
-        NativeAnnouncementButton("下次再说", onDismiss, primary = false, haptic = NativeButtonHaptic.Utility)
-    } else NativeAnnouncementButton("知道了", onDismiss, primary = true, haptic = NativeButtonHaptic.Utility)
+        NativeAnnouncementButton(if (dontRemind) "关闭" else "下次再说", onDismiss, primary = false, haptic = NativeButtonHaptic.Utility)
+    } else NativeAnnouncementButton(if (dontRemind) "关闭" else "知道了", onDismiss, primary = true, haptic = NativeButtonHaptic.Utility)
+    NativeAnnouncementReminder(dontRemind, onDontRemindChange)
+}
+
+/** The whole row is the accessible target; the small glass box is decorative. */
+@Composable
+private fun NativeAnnouncementReminder(checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    val colors = LocalNativeColors.current
+    val reduced = LocalLiquidGlassReducedMotion.current
+    val tick = nHapticFeedback("toggle")
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val focused by interaction.collectIsFocusedAsState()
+    val selection by animateFloatAsState(if (checked) 1f else 0f,
+        tween(if (reduced) 0 else 220, easing = CubicBezierEasing(.2f, 0f, 0f, 1f)), label = "reminder-selection")
+    val pressure by animateFloatAsState(if (pressed) 1f else 0f,
+        if (reduced) snap() else spring(dampingRatio = .82f, stiffness = 620f), label = "reminder-pressure")
+    val changing = kotlin.math.abs(selection - if (checked) 1f else 0f) > .001f ||
+        kotlin.math.abs(pressure - if (pressed) 1f else 0f) > .001f
+    Row(Modifier.fillMaxWidth().heightIn(min = 48.dp)
+        .preferredFrameRate(if (changing) FrameRateCategory.High else FrameRateCategory.Default)
+        .graphicsLayer { scaleX = if (reduced) 1f else 1f - .015f * pressure; scaleY = scaleX }
+        .clip(RoundedRectangle(12.dp))
+        .background(colors.brand.copy(alpha = .045f * pressure.coerceIn(0f, 1f)))
+        .then(if (focused) Modifier.border(1.5.dp, colors.brand, RoundedRectangle(12.dp)) else Modifier)
+        .toggleable(checked, interactionSource = interaction, indication = null, role = Role.Checkbox,
+            onValueChange = { tick(); onCheckedChange(it) })
+        .padding(horizontal = 8.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(9.dp, Alignment.CenterHorizontally),
+        verticalAlignment = Alignment.CenterVertically) {
+        val shape = RoundedRectangle(6.dp)
+        Box(Modifier.size(22.dp).graphicsLayer {
+            scaleX = if (reduced) 1f else 1f - .085f * pressure; scaleY = scaleX
+            this.shape = shape; shadowElevation = 2.dp.toPx() * selection
+        }.clip(shape)
+            .background(lerp(colors.surface.copy(alpha = .9f), colors.brand, selection))
+            .background(Brush.verticalGradient(listOf(Color.White.copy(alpha = .18f), Color.Transparent)))
+            .border(1.dp, lerp(colors.muted.copy(alpha = .8f), colors.brand, selection), shape)) {
+            Canvas(Modifier.fillMaxSize().padding(4.dp).clearAndSetSemantics {}) {
+                val check = Path().apply {
+                    moveTo(size.width * .06f, size.height * .5f)
+                    lineTo(size.width * .38f, size.height * .8f)
+                    lineTo(size.width * .94f, size.height * .16f)
+                }
+                val measure = PathMeasure().apply { setPath(check, false) }
+                val revealed = Path()
+                measure.getSegment(0f, measure.length * selection, revealed, true)
+                drawPath(revealed, colors.onBrand.copy(alpha = selection),
+                    style = Stroke(1.8.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
+            }
+        }
+        NText("不再提醒这条消息", 13, muted = true)
+    }
 }
 
 @Composable
 private fun NativeAnnouncementButton(label: String, onClick: () -> Unit, primary: Boolean, haptic: NativeButtonHaptic) {
     val colors = LocalNativeColors.current
+    val reduced = LocalLiquidGlassReducedMotion.current
     NativeGlassButton(onClick, modifier = Modifier.fillMaxWidth(), haptic = haptic,
         surfaceColor = if(primary) colors.brand else colors.surface.copy(alpha = .94f), shape = RoundedRectangle(16.dp)) {
-        androidx.compose.foundation.text.BasicText(label,
-            style = androidx.compose.ui.text.TextStyle(color = if(primary) colors.onBrand else colors.ink, fontSize = 16.sp, lineHeight = 22.sp,
-                fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, fontFamily = NativeFontFamily))
+        AnimatedContent(label, transitionSpec = {
+            fadeIn(tween(if (reduced) 0 else 160)) togetherWith fadeOut(tween(if (reduced) 0 else 100))
+        }, label = "announcement-button-label") { text ->
+            androidx.compose.foundation.text.BasicText(text,
+                style = androidx.compose.ui.text.TextStyle(color = if(primary) colors.onBrand else colors.ink, fontSize = 16.sp, lineHeight = 22.sp,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, fontFamily = NativeFontFamily))
+        }
     }
 }
 

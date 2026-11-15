@@ -6,7 +6,7 @@ import { Logo } from "./Logo";
 import { AnnouncementEffect, prepareAnnouncementEffect, type PreparedAnnouncementEffect } from "./AnnouncementEffect";
 import { onBack } from "../lib/native";
 import {
-  announcementEligible, currentAnnouncementScope, fetchAnnouncements, markAnnouncementShown, resetAnnouncementOpening, type Announcement,
+  announcementEligible, currentAnnouncementScope, fetchAnnouncements, markAnnouncementShown, dismissAnnouncementPermanently, resetAnnouncementOpening, type Announcement,
 } from "../lib/announcements";
 import "../styles/announcements.css";
 
@@ -74,8 +74,16 @@ function AnnouncementDialog({ message, scope, effect, onClose }: { message: Anno
   const reduced = useReducedMotion();
   const present = useIsPresent();
   const closing = useRef(false);
-  const dismiss = () => { if (!closing.current) { closing.current = true; close.current(); } };
+  const [dontRemind, setDontRemind] = useState(false);
+  const dontRemindRef = useRef(false);
+  const dismiss = () => {
+    if (closing.current) return;
+    closing.current = true;
+    if (dontRemindRef.current) dismissAnnouncementPermanently(message, scope);
+    close.current();
+  };
   const [imageFailed, setImageFailed] = useState(false);
+  const dismissLabel = dontRemind ? "关闭" : message.action_url ? "下次再说" : "知道了";
 
   useEffect(() => {
     const element = dialog.current;
@@ -139,8 +147,23 @@ function AnnouncementDialog({ message, scope, effect, onClose }: { message: Anno
                 {message.action_label || "了解更多"}<Icon name="external" size={18} />
               </a>
             )}
-            <button type="button" className={message.action_url ? "announcement__secondary" : "announcement__primary"} onClick={dismiss}>{message.action_url ? "下次再说" : "知道了"}</button>
+            <button type="button" className={message.action_url ? "announcement__secondary" : "announcement__primary"} onClick={dismiss} aria-label={dismissLabel}>
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.span key={dismissLabel} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                  transition={{ duration: reduced ? 0 : .12 }}>{dismissLabel}</motion.span>
+              </AnimatePresence>
+            </button>
           </div>
+          <label className="announcement__reminder">
+            <input type="checkbox" checked={dontRemind} onChange={(event) => {
+              dontRemindRef.current = event.target.checked;
+              setDontRemind(event.target.checked);
+            }} />
+            <span className="announcement__check" aria-hidden="true">
+              <svg viewBox="0 0 20 20" fill="none"><path d="m4.5 10 3.8 3.6 7.2-7.2" pathLength="1" /></svg>
+            </span>
+            <span>不再提醒这条消息</span>
+          </label>
         </div>
       </div>
     </motion.dialog>, document.body,

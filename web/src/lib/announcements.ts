@@ -75,23 +75,37 @@ function receipts(scope: string): Receipts {
 
 export function announcementEligible(item: Announcement, scope: string, now = new Date()): boolean {
   if (shownThisOpening.has(scope)) return false;
-  const receipt = receipts(scope)[receiptId(item)];
-  if (item.display === "always") return true;
-  return item.display === "daily" ? receipt !== announcementDay(now) : !receipt;
+  const stored = receipts(scope);
+  if (stored[`dismissed:${receiptId(item)}`]) return false;
+  // Legacy "once" means a single presentation only in old clients. A recorded
+  // presentation is not consent to hide a message in the opt-out UI.
+  return item.display !== "daily" || stored[receiptId(item)] !== announcementDay(now);
 }
 
-/** Record only once the dialog is actually mounted, including a close via Back. */
-export function markAnnouncementShown(item: Announcement, scope: string, now = new Date()): void {
-  shownThisOpening.add(scope);
-  const updated = { ...receipts(scope), [receiptId(item)]: announcementDay(now) };
-  // Bound local storage growth while keeping recent campaign receipts.
-  const bounded = Object.fromEntries(Object.entries(updated).slice(-200));
+function saveReceipt(scope: string, key: string, value: string): void {
+  const updated = Object.entries({ ...receipts(scope), [key]: value });
+  // Bound presentation history without evicting explicit user opt-outs.
+  const bounded = Object.fromEntries([
+    ...updated.filter(([id]) => id.startsWith("dismissed:")),
+    ...updated.filter(([id]) => !id.startsWith("dismissed:")).slice(-200),
+  ]);
   memoryReceipts.set(scope, bounded);
   try {
     localStorage.setItem(RECEIPT_PREFIX + scope, JSON.stringify(bounded));
   } catch {
     // In-memory receipts still suppress repeats during this opening.
   }
+}
+
+/** Viewing only consumes this opening / today's frequency, never the opt-out. */
+export function markAnnouncementShown(item: Announcement, scope: string, now = new Date()): void {
+  shownThisOpening.add(scope);
+  saveReceipt(scope, receiptId(item), announcementDay(now));
+}
+
+/** Call on dismissal only after the user explicitly checked the option. */
+export function dismissAnnouncementPermanently(item: Announcement, scope: string, now = new Date()): void {
+  saveReceipt(scope, `dismissed:${receiptId(item)}`, announcementDay(now));
 }
 
 export function safeAnnouncementLink(value: unknown): string | null {
