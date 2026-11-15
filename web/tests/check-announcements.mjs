@@ -27,11 +27,19 @@ async function pageFor({ theme = "light", palette = "sweet", width = 390, item =
   await page.setViewport({ width, height: 844, deviceScaleFactor: 1 });
   await page.evaluateOnNewDocument(() => {
     window.announcementFrames = [];
+    let effectElement;
+    let effectRevision = 0;
     const observe = () => {
       const element = document.querySelector('dialog.announcement[open]');
+      const effect = document.querySelector('.announcement__effect');
+      if (effect && effect !== effectElement) {
+        effectElement = effect;
+        new MutationObserver(() => { effectRevision++; }).observe(effect, { subtree: true, attributes: true, childList: true });
+      }
       if (element && window.announcementFrames.length < 150) {
         const style = getComputedStyle(element);
-        window.announcementFrames.push({ opacity: Number(style.opacity), transform: style.transform });
+        window.announcementFrames.push({ opacity: Number(style.opacity), transform: style.transform,
+          effectRevision, effectVisible: !!effect?.querySelector('svg') && getComputedStyle(effect).visibility === 'visible' });
       }
       requestAnimationFrame(observe);
     };
@@ -45,7 +53,8 @@ async function pageFor({ theme = "light", palette = "sweet", width = 390, item =
     } else if (request.url().startsWith("https://images.invalid/")) void request.respond({ status: 404 });
     else void request.continue();
   });
-  await page.goto(`${base}/?preview=1&theme=${theme}&palette=${palette}&tab=${tab}`, { waitUntil: "networkidle2" });
+  await page.goto(`${base}/?preview=1&theme=${theme}&palette=${palette}&tab=${tab}`, { waitUntil: "domcontentloaded" });
+  await page.waitForSelector('.tabbar');
   return page;
 }
 
@@ -118,6 +127,20 @@ try {
   await animated.waitForSelector('.announcement__effect', { hidden: true, timeout: 6_000 });
   await delay(500);
   assert.equal(await animated.$('.announcement__effect'), null, "one-shot effect does not restart");
+
+  for (const effect of message.effects) {
+    const simultaneous = await pageFor({ item: { ...message, effects: [effect] } });
+    await simultaneous.waitForSelector('dialog.announcement[open]');
+    await delay(650);
+    const frames = await simultaneous.evaluate(() => window.announcementFrames);
+    const entering = frames.filter((frame) => frame.opacity > 0 && frame.effectVisible &&
+      frame.transform !== 'none' && frame.transform !== 'matrix(1, 0, 0, 1, 0, 0)');
+    assert(new Set(entering.map((frame) => frame.effectRevision)).size >= 3,
+      `${effect} must advance alongside the card, not freeze at frame zero until entrance completes`);
+    await simultaneous.click('.announcement__close');
+    await simultaneous.waitForSelector('dialog.announcement', { hidden: true });
+    console.log(`PASS ${effect}: effect frames advance during card entrance`);
+  }
 
   const reduced = await pageFor({ reduced: true, item: { ...message, effects: ["star-struck"] } });
   await reduced.waitForSelector('dialog.announcement[open]');

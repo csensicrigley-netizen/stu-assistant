@@ -1,6 +1,7 @@
 package com.stuassistant.app.nativeapp
 
 import androidx.compose.runtime.BroadcastFrameClock
+import androidx.compose.runtime.withFrameNanos
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.airbnb.lottie.LottieCompositionFactory
@@ -84,6 +85,48 @@ class NativeAnnouncementMotionInstrumentedTest {
             }
         }
         save("lottie-clock-report.txt", report.toString())
+    }
+
+    @Test fun everyEffectAdvancesDuringCardEntranceAt60_120_144Hz() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        for (effect in NativeAnnouncementRules.effectIds) {
+            val composition = requireNotNull(LottieCompositionFactory.fromAssetSync(context, "announcement-effects/$effect.json").value)
+            for (hz in listOf(60, 120, 144)) {
+                val motion = NativeDialogMotion()
+                val playback = NativeAnnouncementPlayback()
+                val overlapping = mutableListOf<Float>()
+                clocked(hz, {
+                    if (motion.arrival.value > 0f && motion.arrival.value < 1f && playback.progress.floatValue > 0f) {
+                        overlapping += playback.progress.floatValue
+                    }
+                    playback.progress.floatValue
+                }) {
+                    launch { motion.enter(false) }
+                    while (motion.startedAtNanos.value == null) withFrameNanos { }
+                    playback.play(composition.duration, motion.startedAtNanos.value)
+                }
+                assertTrue("$effect / $hz Hz must play while the card is entering", overlapping.distinct().size > hz / 3)
+                assertTrue("$effect / $hz Hz must advance through the entrance", overlapping.last() * composition.duration > 500)
+            }
+        }
+    }
+
+    @Test fun lateCompositionJoinsThePresentationTimelineInsteadOfRestartingFrameZero() {
+        for (hz in listOf(60, 120, 144)) {
+            val playback = NativeAnnouncementPlayback()
+            var firstProgress = 0f
+            val result = clocked(hz, {
+                if (firstProgress == 0f && playback.progress.floatValue > 0f) firstProgress = playback.progress.floatValue
+                playback.progress.floatValue
+            }) {
+                val started = withFrameNanos { it }
+                // Simulate parsing/loading after the card already started entering.
+                repeat(hz / 5) { withFrameNanos { } }
+                playback.play(1000f, started)
+            }
+            assertTrue("$hz Hz must catch up on its first rendered frame", firstProgress in .19f.. .25f)
+            assertTrue("$hz Hz must finish with the original timeline", result.milliseconds in 1000.0..1060.0)
+        }
     }
 
     private fun save(name: String, text: String) {

@@ -1,9 +1,9 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useIsPresent, useReducedMotion } from "motion/react";
 import { Icon } from "./Icon";
 import { Logo } from "./Logo";
-import { AnnouncementEffect } from "./AnnouncementEffect";
+import { AnnouncementEffect, prepareAnnouncementEffect, type PreparedAnnouncementEffect } from "./AnnouncementEffect";
 import { onBack } from "../lib/native";
 import {
   announcementEligible, currentAnnouncementScope, fetchAnnouncements, markAnnouncementShown, resetAnnouncementOpening, type Announcement,
@@ -12,7 +12,8 @@ import "../styles/announcements.css";
 
 /** Lives alongside the shell so switching tabs cannot restart the opening check. */
 export function AnnouncementPopup({ active }: { active: boolean }) {
-  const [message, setMessage] = useState<{ item: Announcement; scope: string } | null>(null);
+  const [message, setMessage] = useState<{ item: Announcement; scope: string; effect: PreparedAnnouncementEffect | null } | null>(null);
+  const reduced = useReducedMotion();
   const scope = currentAnnouncementScope();
   const [opening, setOpening] = useState(0);
   const currentMessage = useRef(message);
@@ -37,12 +38,15 @@ export function AnnouncementPopup({ active }: { active: boolean }) {
     let deadline = 0;
     const timer = window.setTimeout(() => {
       deadline = window.setTimeout(() => controller.abort(), 5_000);
-      void fetchAnnouncements(controller.signal).then((items) => {
+      void fetchAnnouncements(controller.signal).then(async (items) => {
         if (disposed || controller.signal.aborted || currentAnnouncementScope() !== scope) return;
         const selected = items.find((item) => announcementEligible(item, scope));
+        if (!selected) return;
+        const effect = reduced ? null : await prepareAnnouncementEffect(selected.effects, controller.signal);
+        if (disposed || controller.signal.aborted || currentAnnouncementScope() !== scope) return;
         // A user already opening a course or form should keep that interaction.
         if (selected && document.visibilityState === "visible" && !document.querySelector('[role="dialog"],dialog[open]')) {
-          setMessage({ item: selected, scope });
+          setMessage({ item: selected, scope, effect });
         }
       }).catch(() => undefined).finally(() => window.clearTimeout(deadline));
     }, 650);
@@ -52,14 +56,16 @@ export function AnnouncementPopup({ active }: { active: boolean }) {
       window.clearTimeout(timer);
       window.clearTimeout(deadline);
     };
-  }, [active, scope, opening]);
+  }, [active, scope, opening, reduced]);
 
   return <AnimatePresence>{active && message?.scope === scope && (
-    <AnnouncementDialog key={`${scope}:${message.item.id}:${message.item.revision}`} message={message.item} scope={scope} onClose={() => setMessage(null)} />
+    <AnnouncementDialog key={`${scope}:${message.item.id}:${message.item.revision}`} message={message.item} scope={scope} effect={message.effect} onClose={() => setMessage(null)} />
   )}</AnimatePresence>;
 }
 
-function AnnouncementDialog({ message, scope, onClose }: { message: Announcement; scope: string; onClose: () => void }) {
+function AnnouncementDialog({ message, scope, effect, onClose }: { message: Announcement; scope: string; effect: PreparedAnnouncementEffect | null; onClose: () => void }) {
+  const [startedAt, setStartedAt] = useState<number | null>(() => effect ? null : performance.now());
+  const begin = useCallback(() => setStartedAt((current) => current ?? performance.now()), []);
   const dialog = useRef<HTMLDialogElement>(null);
   const close = useRef(onClose);
   close.current = onClose;
@@ -99,7 +105,7 @@ function AnnouncementDialog({ message, scope, onClose }: { message: Announcement
       onCancel={(event) => { event.preventDefault(); dismiss(); }}
       onClick={(event) => { if (event.target === event.currentTarget) dismiss(); }}
       initial={reduced ? { opacity: 0 } : { opacity: 0, y: 28, scale: 0.92 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
+      animate={startedAt === null ? (reduced ? { opacity: 0 } : { opacity: 0, y: 28, scale: .92 }) : { opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: reduced ? 0 : 12, scale: reduced ? 1 : 0.965,
         transition: { duration: reduced ? .14 : .26, ease: [.4, 0, 1, 1], opacity: { duration: reduced ? .14 : .24 } } }}
       transition={{ duration: reduced ? .14 : .56, ease: [.16, 1, .3, 1], opacity: { duration: reduced ? .14 : .26, ease: [.2, 0, 0, 1] } }}
@@ -122,7 +128,7 @@ function AnnouncementDialog({ message, scope, onClose }: { message: Announcement
             </svg>
           </div>
         )}
-          {present && <AnnouncementEffect key={`${message.id}/${message.revision}`} effects={message.effects} />}
+          {present && <AnnouncementEffect key={`${message.id}/${message.revision}`} prepared={effect} startedAt={startedAt} onReady={begin} />}
         </div>
         <div className="announcement__content">
           <h2 className="announcement__title" id={title}>{message.title}</h2>
