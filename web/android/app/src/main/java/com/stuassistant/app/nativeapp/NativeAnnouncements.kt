@@ -187,13 +187,13 @@ internal fun NativeAnnouncementDialog(message: NativeAnnouncement, onDismiss: (B
     var dontRemind by remember(message.id, message.revision) { mutableStateOf(false) }
     NDialog(message.title, onDismiss = { onDismiss(dontRemind) }, onExited = onExited) {
         NativeAnnouncementContent(message, { onDismiss(dontRemind) }, { onAction(dontRemind) },
-            dontRemind, { dontRemind = it })
+            dontRemind, { dontRemind = !dontRemind })
     }
 }
 
 @Composable
 internal fun NativeAnnouncementContent(message: NativeAnnouncement, onDismiss: () -> Unit, onAction: () -> Unit,
-    dontRemind: Boolean, onDontRemindChange: (Boolean) -> Unit) {
+    dontRemind: Boolean, onToggleReminder: () -> Unit) {
     val colors = LocalNativeColors.current
     val effect = remember(message.id, message.revision, message.effects) { message.effects.randomOrNull() }
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
@@ -236,12 +236,12 @@ internal fun NativeAnnouncementContent(message: NativeAnnouncement, onDismiss: (
         NativeAnnouncementButton(message.actionLabel + " ↗", onAction, primary = true, haptic = NativeButtonHaptic.Navigation)
         NativeAnnouncementButton(if (dontRemind) "关闭" else "下次再说", onDismiss, primary = false, haptic = NativeButtonHaptic.Utility)
     } else NativeAnnouncementButton(if (dontRemind) "关闭" else "知道了", onDismiss, primary = true, haptic = NativeButtonHaptic.Utility)
-    NativeAnnouncementReminder(dontRemind, onDontRemindChange)
+    NativeAnnouncementReminder(dontRemind, onToggleReminder)
 }
 
 /** The whole row is the accessible target; the small glass box is decorative. */
 @Composable
-private fun NativeAnnouncementReminder(checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+private fun NativeAnnouncementReminder(checked: Boolean, onToggle: () -> Unit) {
     val colors = LocalNativeColors.current
     val reduced = LocalLiquidGlassReducedMotion.current
     val tick = nHapticFeedback("toggle")
@@ -261,7 +261,9 @@ private fun NativeAnnouncementReminder(checked: Boolean, onCheckedChange: (Boole
         .background(colors.brand.copy(alpha = .045f * pressure.coerceIn(0f, 1f)))
         .then(if (focused) Modifier.border(1.5.dp, colors.brand, RoundedRectangle(12.dp)) else Modifier)
         .toggleable(checked, interactionSource = interaction, indication = null, role = Role.Checkbox,
-            onValueChange = { tick(); onCheckedChange(it) })
+            // Toggle the owner's live state; the drawn value can lag a frame
+            // behind rapid input while the retained dialog content recomposes.
+            onValueChange = { tick(); onToggle() })
         .padding(horizontal = 8.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(9.dp, Alignment.CenterHorizontally),
         verticalAlignment = Alignment.CenterVertically) {
