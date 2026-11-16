@@ -1,0 +1,9 @@
+compositions/** text eol=lf
+presets/** text eol=lf
+*.md text eol=lf
+*.json text eol=lf
+*.html text eol=lf
+renders/*.mp4 binary
+renders/*.webp binary
+assets/*.png binary
+assets/**/*.woff2 binary

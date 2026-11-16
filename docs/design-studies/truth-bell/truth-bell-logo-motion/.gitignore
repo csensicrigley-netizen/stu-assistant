@@ -1,0 +1,8 @@
+node_modules/
+.hyperframes/
+.thumbnails/
+.hf-tmp/
+.hf-render-tmp.html
+renders/*.hf-transaction-*
+renders/truth-bell-logo-motion_*.mp4
+renders/truth-bell-logo-motion_*.meta.json
