@@ -317,7 +317,8 @@ private fun NativeDialogLayer(
             Modifier.fillMaxSize().safeDrawingPadding().imePadding().padding(horizontal = 24.dp, vertical = 20.dp),
             contentAlignment = Alignment.Center,
         ) {
-            CompositionLocalProvider(LocalNativeBackdrop provides backdrop, LocalNativeSheetParent provides entry) {
+            CompositionLocalProvider(LocalNativeBackdrop provides backdrop, LocalNativeSheetParent provides entry,
+                LocalNativeDialogStart provides motion.startedAtNanos) {
                 LiquidDialogSurface(
                     backdrop,
                     modifier = Modifier.widthIn(max = 380.dp).fillMaxWidth().heightIn(max = maxHeight)

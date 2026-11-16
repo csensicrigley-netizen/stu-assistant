@@ -53,7 +53,7 @@ class Announcement(BaseModel):
     image_alt: str = Field(default="", max_length=240)
     action_label: str = Field(default="了解更多", min_length=1, max_length=32)
     action_url: str | None = Field(default=None, max_length=2048)
-    display: Literal["once", "daily", "always"] = "once"
+    display: Literal["once", "daily", "always"] = "always"
     priority: int = Field(default=0, ge=-10000, le=10000, strict=True)
     effects: list[AnnouncementEffect] = Field(default_factory=list, max_length=5)
     enabled: bool = Field(default=True, strict=True)

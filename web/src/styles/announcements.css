@@ -63,6 +63,62 @@
   pointer-events: none;
 }
 .announcement__close:active { transform: scale(.9); }
+.announcement__reminder {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-height: 48px;
+  padding: 8px;
+  margin-top: 8px;
+  border-radius: 12px;
+  color: var(--ink-2);
+  font-size: var(--fs-13);
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color 160ms ease, transform 240ms cubic-bezier(.2,.8,.2,1);
+}
+.announcement__reminder input { position: absolute; width: 1px; height: 1px; opacity: 0; clip-path: inset(50%); margin: 0; }
+.announcement__check {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border: 1px solid color-mix(in oklch, var(--ink-2) 80%, var(--surface));
+  border-radius: 6px;
+  background-color: color-mix(in oklch, var(--surface) 90%, transparent);
+  background-image: linear-gradient(#ffffff2e, transparent);
+  color: var(--sea-ink);
+  box-shadow: inset 0 1px 0 #ffffff30;
+  transition: background-color 220ms cubic-bezier(.2,0,0,1), border-color 220ms ease,
+    box-shadow 220ms ease, transform 240ms cubic-bezier(.2,.8,.2,1);
+}
+.announcement__check svg { width: 18px; height: 18px; }
+.announcement__check path {
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  opacity: 0;
+  transition: stroke-dashoffset 220ms cubic-bezier(.2,0,0,1), opacity 160ms ease;
+}
+.announcement__reminder input:checked + .announcement__check {
+  background-color: var(--sea);
+  border-color: var(--sea);
+  box-shadow: inset 0 1px 0 #ffffff30, 0 2px 6px color-mix(in oklch, var(--sea) 20%, transparent);
+}
+.announcement__reminder input:checked + .announcement__check path { stroke-dashoffset: 0; opacity: 1; }
+.announcement__reminder:active { transform: scale(.985); background-color: color-mix(in oklch, var(--sea) 5%, transparent); }
+.announcement__reminder:active .announcement__check { transform: scale(.9); }
+.announcement__reminder:has(input:focus-visible) { outline: 2px solid var(--sea); outline-offset: 2px; }
+@media (hover: hover) {
+  .announcement__reminder:hover { background-color: color-mix(in oklch, var(--sea) 4%, transparent); }
+}
 .announcement__header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 16px; }
 .announcement__hero { position: relative; margin-bottom: 16px; }
 .announcement__image {

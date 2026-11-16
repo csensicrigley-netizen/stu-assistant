@@ -1,9 +1,9 @@
 package com.stuassistant.app.nativeapp
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.tween
-import kotlin.math.roundToInt
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.MotionDurationScale
+import kotlin.coroutines.coroutineContext
 
 /**
  * Compose integrates elapsed nanoseconds against the total duration. Lottie 6.7.1's
@@ -11,8 +11,18 @@ import kotlin.math.roundToInt
  * 120/144Hz. Supply continuous progress directly to its vector renderer instead.
  */
 internal class NativeAnnouncementPlayback {
-    val progress = Animatable(0f)
-    suspend fun play(durationMs: Float) {
-        progress.animateTo(1f, tween(durationMs.roundToInt().coerceAtLeast(1), easing = LinearEasing))
+    val progress = mutableFloatStateOf(0f)
+    suspend fun play(durationMs: Float, startedAtNanos: Long? = null) {
+        val scale = coroutineContext[MotionDurationScale]?.scaleFactor ?: 1f
+        if (scale <= 0f) { progress.floatValue = 1f; return }
+        val durationNanos = durationMs.coerceAtLeast(1f).toDouble() * 1_000_000 * scale
+        val start = startedAtNanos ?: withFrameNanos { it }
+        do {
+            withFrameNanos { frame ->
+                // A composition loaded after presentation catches up to the same
+                // timeline instead of holding frame zero and starting a late burst.
+                progress.floatValue = ((frame - start) / durationNanos).toFloat().coerceIn(0f, 1f)
+            }
+        } while (progress.floatValue < 1f)
     }
 }

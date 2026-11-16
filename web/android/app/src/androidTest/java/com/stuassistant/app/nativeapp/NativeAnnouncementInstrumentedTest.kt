@@ -38,6 +38,7 @@ import com.stuassistant.app.glass.LocalLiquidGlassDarkTheme
 import com.stuassistant.app.glass.LocalLiquidGlassReducedMotion
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.io.File
@@ -82,6 +83,7 @@ class NativeAnnouncementInstrumentedTest {
         awaitClosed(fixture)
         assertEquals(1, fixture.dismissals.get())
         assertEquals(0, fixture.actions.get())
+        assertFalse("Ordinary closing must not opt out", fixture.optedOut.get())
         assertNotNull(awaitNode("快到期"))
     }
 
@@ -93,6 +95,7 @@ class NativeAnnouncementInstrumentedTest {
         awaitClosed(fixture)
         assertEquals(1, fixture.actions.get())
         assertEquals(0, fixture.dismissals.get())
+        assertFalse("Opening GitHub alone must not opt out", fixture.optedOut.get())
     }
 
     @Test fun systemBackDismissesTheModalWithoutInvokingItsAction() {
@@ -102,6 +105,37 @@ class NativeAnnouncementInstrumentedTest {
         awaitClosed(fixture)
         assertEquals(1, fixture.dismissals.get())
         assertEquals(0, fixture.actions.get())
+        assertFalse("System Back alone must not opt out", fixture.optedOut.get())
+    }
+
+    @Test fun checkedOptionIsAppliedBySystemBackAndResetsOnTheNextMessage() {
+        val fixture = showDialog(dark = false)
+        tap("不再提醒这条消息")
+        instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
+        awaitClosed(fixture)
+        assertTrue(fixture.optedOut.get())
+        val next = showDialog(dark = false, content = message.copy(revision = 2))
+        tap("下次再说")
+        awaitClosed(next)
+        assertFalse("New message revisions must default to unchecked", next.optedOut.get())
+    }
+
+    @Test fun uncheckingBeforeCloseKeepsRemindersEnabled() {
+        val fixture = showDialog(dark = true)
+        tap("不再提醒这条消息")
+        tap("不再提醒这条消息")
+        tap("下次再说")
+        awaitClosed(fixture)
+        assertFalse(fixture.optedOut.get())
+    }
+
+    @Test fun primaryActionHonorsAnExplicitCheckedOptOut() {
+        val fixture = showDialog(dark = true)
+        tap("不再提醒这条消息")
+        tap(message.actionLabel + " ↗")
+        awaitClosed(fixture)
+        assertTrue(fixture.optedOut.get())
+        assertEquals(1, fixture.actions.get())
     }
 
     @Test fun textOnlyMessagesHaveAnAcknowledgementActionAndNoExternalCta() {
@@ -124,7 +158,11 @@ class NativeAnnouncementInstrumentedTest {
             assertEffectFramesChange(effect)
             SystemClock.sleep(InstrumentationRegistry.getArguments().getString("effectPreviewMs")?.toLongOrNull() ?: 0L)
             tap("关闭")
-            awaitClosed(fixture)
+            try { awaitClosed(fixture) }
+            catch (error: AssertionError) {
+                assertRenderedFrame("effect-$effect-close-failure.png")
+                throw AssertionError("$effect close: dismissals=${fixture.dismissals.get()}, actions=${fixture.actions.get()}", error)
+            }
             assertEquals(1, fixture.dismissals.get())
             assertEquals(0, fixture.actions.get())
         }
@@ -185,6 +223,7 @@ class NativeAnnouncementInstrumentedTest {
         val dismissals = AtomicInteger()
         val actions = AtomicInteger()
         val exits = AtomicInteger()
+        val optedOut = AtomicBoolean(false)
         val presented = CountDownLatch(1)
     }
 
@@ -232,18 +271,15 @@ class NativeAnnouncementInstrumentedTest {
                                 "today",listOf(com.stuassistant.app.GlassNavigationTab("today","今天"),com.stuassistant.app.GlassNavigationTab("week","课表"),com.stuassistant.app.GlassNavigationTab("items","事项"),com.stuassistant.app.GlassNavigationTab("campus","校园"),com.stuassistant.app.GlassNavigationTab("me","我的")),
                                 dark,"sweet",0,24f,true),combined) {}
                         }
-                        if (fixture.shown.value) NDialog(content.title, onDismiss = {
+                        if (fixture.shown.value) NativeAnnouncementDialog(content, onDismiss = { dontRemind ->
+                            fixture.optedOut.set(dontRemind)
                             fixture.dismissals.incrementAndGet()
                             fixture.shown.value = false
-                        }, onExited = { fixture.exits.incrementAndGet() }) {
-                            NativeAnnouncementContent(content, onDismiss = {
-                                fixture.dismissals.incrementAndGet()
-                                fixture.shown.value = false
-                            }, onAction = {
-                                fixture.actions.incrementAndGet()
-                                fixture.shown.value = false
-                            })
-                        }
+                        }, onExited = { fixture.exits.incrementAndGet() }, onAction = { dontRemind ->
+                            fixture.optedOut.set(dontRemind)
+                            fixture.actions.incrementAndGet()
+                            fixture.shown.value = false
+                        })
                         NativeSheetHost(fixture.controller, combined)
                     }
                 }
@@ -293,11 +329,14 @@ class NativeAnnouncementInstrumentedTest {
 
     private fun findNode(label: String): AccessibilityNodeInfo? {
         val root = instrumentation.uiAutomation.rootInActiveWindow ?: return null
+        // setContent replaces the fixture in the same Activity; discard cached
+        // nodes before using their bounds for real pointer delivery.
+        if (!root.refresh()) return null
         val pending = ArrayDeque<AccessibilityNodeInfo>()
         pending.add(root)
         while (pending.isNotEmpty()) {
             val node = pending.removeFirst()
-            if (node.text?.toString() == label || node.contentDescription?.toString() == label) return node
+            if ((node.text?.toString() == label || node.contentDescription?.toString() == label) && node.refresh()) return node
             repeat(node.childCount) { index -> node.getChild(index)?.let(pending::addLast) }
         }
         return null
@@ -305,6 +344,8 @@ class NativeAnnouncementInstrumentedTest {
 
     private fun tap(label: String) {
         val bounds = Rect().also { awaitNode(label).getBoundsInScreen(it) }
+        File(instrumentation.targetContext.getExternalFilesDir(null), "announcement-taps.txt")
+            .appendText("${SystemClock.uptimeMillis()} $label: $bounds\n")
         assertFalse("Interactive element has no bounds: $label", bounds.isEmpty)
         val downTime = SystemClock.uptimeMillis()
         for (action in listOf(MotionEvent.ACTION_DOWN, MotionEvent.ACTION_UP)) {
