@@ -185,6 +185,7 @@
         : (wordmarkMode === "below" ? 510.0 : 596.0);
       const alphaBg = vars.alphaBg === true || vars.alphaBg === "true";
       const lensClip = vars.lensClip === true || vars.lensClip === "true";
+      const camMaxZoom = Number(vars.camMaxZoom) > 0 ? Number(vars.camMaxZoom) : (lensClip ? 1.0 : 1.50);
       const isStageDefault = Math.abs(canvasW - 1920) < 1 && Math.abs(canvasH - 1080) < 1;
 
       rootEl.dataset.width = String(canvasW);
@@ -1294,8 +1295,10 @@
 
         const camSample = sampleCamCurve(t / 3.32);
         const baseScale = settledScale;
-        const heroScalePx = baseScale * lerp(1.50, 1.0, camSample.u);
-        const focus512 = [lerp(258.0, 256.0, camSample.u), lerp(198.0, 256.0, camSample.u)];
+        const zoomRatio = clamp01((camMaxZoom - 1.0) / 0.50);
+        const heroScalePx = baseScale * lerp(camMaxZoom, 1.0, camSample.u);
+        const focusStart = [lerp(256.0, 258.0, zoomRatio), lerp(256.0, 198.0, zoomRatio)];
+        const focus512 = [lerp(focusStart[0], 256.0, camSample.u), lerp(focusStart[1], 256.0, camSample.u)];
 
         let centerX = canvasW * 0.5;
         let centerY = canvasH * 0.5;

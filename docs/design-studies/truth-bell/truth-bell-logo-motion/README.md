@@ -10,20 +10,20 @@
 
 | 文件 | 实测规格 | 体积 | 用途与选型建议 |
 | --- | --- | --- | --- |
-| [`renders/truth-bell-obsidian-s1-badge-512-alpha.webp`](renders/truth-bell-obsidian-s1-badge-512-alpha.webp) | `512×512` RGBA Animated WebP、`232` 动画帧（尾帧去重）、`3999 ms`（`60fps` 时基）、RIFF `ANIM loop=1` | `2,903,040` 字节（约 `2.77 MiB`） | **透明背景 UI 叠加层**：圆角外侧全透明无杂边，适合叠放在浅色或深色页面、弹窗、卡片或品牌徽章位置；播放 1 次后停在定稿最后一帧。 |
-| [`renders/truth-bell-obsidian-s1-square-badge-1024-60fps.mp4`](renders/truth-bell-obsidian-s1-square-badge-1024-60fps.mp4) | `1024×1024`、`H.264 High@L4.0 (avc1)`、`yuv420p`、`bt709`、`has_b_frames=0`、`60fps`、`240` 帧、`4.00s`、`moov` 已前置 | `2,417,833` 字节（约 `2.31 MiB`） | **紧致满画幅高清角标**：图标铺满整个 `1024×1024` 画幅，适合由前端 CSS 或 Compose `clip(...)` 自行控制外层圆角的深色卡片与启动视效。 |
-| [`renders/truth-bell-obsidian-s1-square-stage-1024-60fps.mp4`](renders/truth-bell-obsidian-s1-square-stage-1024-60fps.mp4) | `1024×1024`、`H.264 High@L4.0 (avc1)`、`yuv420p`、`bt709`、`has_b_frames=0`、`60fps`、`240` 帧、`4.00s`、`moov` 已前置 | `2,081,510` 字节（约 `1.99 MiB`） | **暗黑工作室舞台版**：图标最终居中收敛为 `784×784`，四周平滑融入 `#121419 → #050507` 径向暗场，适合开屏（Splash）、引导页与关于页独立展示。 |
+| [`renders/truth-bell-obsidian-s1-badge-512-alpha.webp`](renders/truth-bell-obsidian-s1-badge-512-alpha.webp) | `512×512` RGBA Animated WebP、`232` 动画帧（尾帧去重）、`3999 ms`（`60fps` 时基）、RIFF `ANIM loop=1` | `2,253,914` 字节（约 `2.15 MiB`） | **透明背景 UI 叠加层**：圆角外侧全透明无杂边，`1.00×` 内景构图全程不越界、无边框遮挡，适合叠放在浅色或深色页面、弹窗、卡片或品牌徽章位置；播放 1 次后停在定稿最后一帧。 |
+| [`renders/truth-bell-obsidian-s1-square-badge-1024-60fps.mp4`](renders/truth-bell-obsidian-s1-square-badge-1024-60fps.mp4) | `1024×1024`、`H.264 High@L4.0 (avc1)`、`yuv420p`、`bt709`、`has_b_frames=0`、`60fps`、`240` 帧、`4.00s`、`moov` 已前置 | `1,633,663` 字节（约 `1.56 MiB`） | **紧致满画幅高清角标**：图标铺满整个 `1024×1024` 画幅且全程 `1.00×` 构图无裁切遮挡，适合由前端 CSS 或 Compose `clip(...)` 自行控制外层圆角的深色卡片与启动视效。 |
+| [`renders/truth-bell-obsidian-s1-square-stage-1024-60fps.mp4`](renders/truth-bell-obsidian-s1-square-stage-1024-60fps.mp4) | `1024×1024`、`H.264 High@L4.0 (avc1)`、`yuv420p`、`bt709`、`has_b_frames=0`、`60fps`、`240` 帧、`4.00s`、`moov` 已前置 | `1,893,718` 字节（约 `1.81 MiB`） | **暗黑工作室舞台版**：从 `1.18×` 安全视距平滑回落，图标最终居中收敛为 `784×784`，外围平滑融入 `#121419 → #050507` 径向暗场，全周期无外框裁切，适合开屏（Splash）、引导页与关于页独立展示。 |
 | [`renders/truth-bell-obsidian-s1-60fps.mp4`](renders/truth-bell-obsidian-s1-60fps.mp4) | `1920×1080`、`H.264 High@L4.2 (avc1)`、`yuv420p`、`bt709`、`has_b_frames=0`、`60fps`、`330` 帧、`5.50s` | `1,898,730` 字节（约 `1.81 MiB`） | **16:9 宽屏展示母片**：用于大屏演示、发布介绍视频与设计评审，包含 `1.62s` 末帧静置停留。 |
 
 ## 工程目录与源码用途
 
 - [`index.html`](index.html)：`1920×1080`、`5.5s` 主工程入口，挂载核心合成 [`compositions/truth-bell-hero.html`](compositions/truth-bell-hero.html)。
-- [`compositions/truth-bell-hero.html`](compositions/truth-bell-hero.html)：核心 WebGL2 多通道着色器与动画曲线实现；支持通过变量切换 `canvasWidth`、`canvasHeight`、`settledScale`、`clipDuration`、`alphaBg`、`lensClip`，并在结尾 `settleBlend` 段平滑过渡到定稿母图。
+- [`compositions/truth-bell-hero.html`](compositions/truth-bell-hero.html)：核心 WebGL2 多通道着色器与动画曲线实现；支持通过变量切换 `canvasWidth`、`canvasHeight`、`settledScale`、`clipDuration`、`alphaBg`、`lensClip`、`camMaxZoom`（固定圆角 `lensClip` 预设默认锁定 `1.00×` 以免内景放大撞边），并在结尾 `settleBlend` 段平滑过渡到定稿母图。
 - [`compositions/truth-bell-hero.motion.json`](compositions/truth-bell-hero.motion.json)：HyperFrames 运动质量校验断言（`appearsBy`、`staysInFrame`、`keepsMoving`）。
 - [`presets/`](presets/)：端侧预渲染专用尺寸预设（置于子目录中以避免触发根目录多主合成告警）：
-  - [`presets/embed-square-alpha-512.html`](presets/embed-square-alpha-512.html)：`512×512` 透明圆角徽标参数（用于导出 PNG 序列再转 Animated WebP）。
+  - [`presets/embed-square-alpha-512.html`](presets/embed-square-alpha-512.html)：`512×512` 透明圆角徽标参数（用于导出 `png-sequence` 再转 Animated WebP）。
   - [`presets/embed-square-badge-1024.html`](presets/embed-square-badge-1024.html)：`1024×1024` 紧致满画幅参数。
-  - [`presets/embed-square-stage-1024.html`](presets/embed-square-stage-1024.html)：`1024×1024` 暗黑舞台参数（`settledScale = 784`）。
+  - [`presets/embed-square-stage-1024.html`](presets/embed-square-stage-1024.html)：`1024×1024` 暗黑舞台参数（`settledScale = 784`、`camMaxZoom = 1.18`）。
 - [`assets/`](assets/)：终帧 1:1 锁定使用的官方 `1024px` 定稿参考图（源自 [`../arctic-l1-fade-monochrome-final/`](../arctic-l1-fade-monochrome-final/)）及字体文件。
 - [`SPEC.md`](SPEC.md) / [`REVIEW.md`](REVIEW.md)：动效规格说明与 `1920×1080` 主版本视觉/检查记录。
 - [`hyperframes.json`](hyperframes.json) / [`package.json`](package.json) / [`AGENTS.md`](AGENTS.md) / [`CLAUDE.md`](CLAUDE.md)：HyperFrames CLI 工程配置与标准脚手架说明。
@@ -36,7 +36,7 @@
 - **Web / iOS Safari / Capacitor PWA（React 19 + Vite）**
   - `Animated WebP` 直接用 `<img src="..." alt="..." />` 即可单次播放并定格于终帧。
   - `MP4` 使用 `<video muted playsInline autoPlay preload="auto" poster="..." />`（iOS Safari 自动播放要求必须带 `muted` 与 `playsInline`；文件 `moov` box 已前置，可立即起播）。
-  - 上线时仅把实际选中的 **1~2 个文件** 复制到应用 `public/`（或 Android `res/raw/`）中；若未来重新启用 `vite-plugin-pwa` 离线预缓存，需注意单个资产体积在 `2–2.8 MiB` 区间，超过 Workbox 默认 `2 MiB` 单文件阈值，届时按需调大配置或改用按需缓存。
+  - 上线时仅把实际选中的 **1~2 个文件** 复制到应用 `public/`（或 Android `res/raw/`）中；若未来重新启用 `vite-plugin-pwa` 离线预缓存，需注意透明 `WebP`（约 `2.15 MiB`）略超 Workbox 默认 `2 MiB` 单文件阈值，届时按需调大配置或改用按需缓存。
 
 ## 校验与重新渲染命令
 
