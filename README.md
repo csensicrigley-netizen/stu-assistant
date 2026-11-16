@@ -198,4 +198,4 @@ MIT。见 [`LICENSE`](LICENSE)。
 
 如果它让你少迟到过一次、少错过一次作业，可以到 **[爱发电](https://afdian.com/a/oyishi)** 请我喝杯咖啡；不赞助也完全不影响使用，功能一点不少给。赞助的同学提需求，我会优先排期。
 
-> 入驻公告：https://github.com/csensicrigley-netizen/stu-assistant/issues/37
+> 入驻公告：https://github.com/csensicrigley-netizen/afdian
