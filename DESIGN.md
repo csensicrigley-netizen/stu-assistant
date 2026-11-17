@@ -6,6 +6,8 @@
 
 后续 Android 原生 UI 重构的设计规则、技术路线与开工检查见 [UI 重构设计与实施准备](docs/UI重构设计与实施准备.md)。下文保留现有 React／Capacitor 界面的设计记录。
 
+真理钟原生开屏采用固定白瓷／黑曜舞台色，动画期间保留已就绪页面的操作；Android 7–11 允许系统起窗与应用固定外观存在短暂配色差异。实现、兼容范围与验收见[开屏更新说明](docs/真理钟开屏更新.md)。
+
 底栏已先行接入原 WebView 的 GPU 绘制图层，最新实现、实测与验证 APK 见 [WebView 实时 GPU 液态玻璃验证](docs/WebView实时GPU液态玻璃验证.md)。
 
 截图在 `web/shots/`（`node scripts/shoot.mjs`），可复现的检查在 `web/scripts/audit.mjs`。

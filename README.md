@@ -33,6 +33,8 @@
 
 界面细节见 [`DESIGN.md`](DESIGN.md)，需求与取舍见 [`PLAN.md`](PLAN.md)。
 
+Android 真理钟开屏、动画期间操作和旧系统兼容范围见[开屏更新说明](docs/真理钟开屏更新.md)。
+
 ---
 
 ## 架构

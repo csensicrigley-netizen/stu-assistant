@@ -1,10 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Launch screen before Android 12: the mark centred on paper (dark: ink). -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:drawable="@color/paper" />
+    <item android:drawable="@color/splash_porcelain" />
     <item
-        android:width="112dp"
-        android:height="112dp"
+        android:width="288dp"
+        android:height="288dp"
         android:gravity="center"
-        android:drawable="@drawable/splash_mark" />
+        android:drawable="@drawable/ic_splash_truth_bell_light" />
 </layer-list>
