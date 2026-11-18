@@ -356,11 +356,11 @@ fun NButton(
     haptic: NativeButtonHaptic = if (primary) NativeButtonHaptic.Submit else NativeButtonHaptic.Utility,
 ) {
     val c = LocalNativeColors.current
-    val dark = LocalLiquidGlassDarkTheme.current == true
+    val progress = liquidGlassThemeProgress()
     val surfaceColor = if (primary) {
         c.brand.copy(alpha = if (enabled) 0.86f else 0.35f)
     } else {
-        c.surface.copy(alpha = if (enabled) (if (dark) 0.38f else 0.48f) else 0.20f)
+        c.surface.copy(alpha = if (enabled) (0.48f - 0.10f * progress) else 0.20f)
     }
     val textColor = if (primary) {
         c.onBrand.copy(alpha = if (enabled) 1f else 0.65f)
@@ -511,67 +511,47 @@ fun Modifier.nativeGlassCard(
     elevated: Boolean = true,
 ): Modifier {
     val c = LocalNativeColors.current
-    val dark = LocalLiquidGlassDarkTheme.current == true
+    val progress = liquidGlassThemeProgress()
     val shape = RoundedRectangle(radiusDp.dp)
     val baseSurface = tint ?: c.surface
     val hasCustomTint = tint != null
-    val fillBrush = remember(baseSurface, c.brand, hasCustomTint, dark) {
+    val fillBrush = remember(baseSurface, c.brand, hasCustomTint, progress) {
         if (hasCustomTint) {
-            val topTone = lerp(baseSurface, Color.White, if (dark) 0.10f else 0.28f)
-                .copy(alpha = if (dark) 0.80f else 0.85f)
-            val bottomTone = baseSurface.copy(alpha = if (dark) 0.72f else 0.76f)
+            val topTone = lerp(baseSurface, Color.White, 0.28f - 0.18f * progress)
+                .copy(alpha = 0.85f - 0.05f * progress)
+            val bottomTone = baseSurface.copy(alpha = 0.76f - 0.04f * progress)
             Brush.verticalGradient(listOf(topTone, bottomTone))
-        } else if (dark) {
-            Brush.linearGradient(
-                colors = listOf(
-                    lerp(baseSurface, Color.White, 0.13f).copy(alpha = 0.70f),
-                    baseSurface.copy(alpha = 0.58f),
-                    lerp(baseSurface, c.brand, 0.06f).copy(alpha = 0.65f),
-                ),
-                start = Offset.Zero,
-                end = Offset(620f, 540f),
-            )
         } else {
             Brush.linearGradient(
                 colors = listOf(
-                    Color.White.copy(alpha = 0.82f),
-                    baseSurface.copy(alpha = 0.64f),
-                    Color.White.copy(alpha = 0.74f),
+                    lerp(Color.White.copy(alpha = 0.82f),
+                        lerp(baseSurface, Color.White, 0.13f).copy(alpha = 0.70f), progress),
+                    baseSurface.copy(alpha = 0.64f - 0.06f * progress),
+                    lerp(Color.White.copy(alpha = 0.74f),
+                        lerp(baseSurface, c.brand, 0.06f).copy(alpha = 0.65f), progress),
                 ),
                 start = Offset.Zero,
                 end = Offset(620f, 540f),
             )
         }
     }
-    val rimBrush = remember(c.border, c.brand, dark) {
-        if (dark) {
-            Brush.linearGradient(
-                colors = listOf(
-                    Color.White.copy(alpha = 0.28f),
-                    c.border.copy(alpha = 0.46f),
-                    c.brand.copy(alpha = 0.22f),
-                ),
-                start = Offset.Zero,
-                end = Offset(520f, 520f),
-            )
-        } else {
-            Brush.linearGradient(
-                colors = listOf(
-                    Color.White.copy(alpha = 0.96f),
-                    c.border.copy(alpha = 0.52f),
-                    Color.White.copy(alpha = 0.84f),
-                ),
-                start = Offset.Zero,
-                end = Offset(520f, 520f),
-            )
-        }
+    val rimBrush = remember(c.border, c.brand, progress) {
+        Brush.linearGradient(
+            colors = listOf(
+                Color.White.copy(alpha = 0.96f - 0.68f * progress),
+                c.border.copy(alpha = 0.52f - 0.06f * progress),
+                lerp(Color.White.copy(alpha = 0.84f), c.brand.copy(alpha = 0.22f), progress),
+            ),
+            start = Offset.Zero,
+            end = Offset(520f, 520f),
+        )
     }
-    val shadowTint = c.brand.copy(alpha = if (dark) 0.16f else 0.055f)
+    val shadowTint = c.brand.copy(alpha = 0.055f + 0.105f * progress)
     return this
         .then(
             if (elevated) {
                 Modifier.shadow(
-                    elevation = if (dark) 3.dp else 2.dp,
+                    elevation = (2f + progress).dp,
                     shape = shape,
                     ambientColor = shadowTint,
                     spotColor = shadowTint,
@@ -769,7 +749,7 @@ fun NField(
     autoFocus: Boolean = false,
 ) {
     val c = LocalNativeColors.current
-    val dark = LocalLiquidGlassDarkTheme.current == true
+    val progress = liquidGlassThemeProgress()
     val focus = remember { FocusRequester() }
     var focused by remember { mutableStateOf(false) }
     val keyboard = LocalSoftwareKeyboardController.current
@@ -780,9 +760,9 @@ fun NField(
         }
     }
     val fieldShape = RoundedRectangle(14.dp)
-    val borderColor = if (focused) c.brand.copy(alpha = 0.72f) else c.border.copy(alpha = if (dark) 0.65f else 0.80f)
+    val borderColor = if (focused) c.brand.copy(alpha = 0.72f) else c.border.copy(alpha = 0.80f - 0.15f * progress)
     val borderWidth = if (focused) 1.5.dp else 1.dp
-    val fieldBg = c.surface.copy(alpha = if (dark) 0.56f else 0.76f)
+    val fieldBg = c.surface.copy(alpha = 0.76f - 0.20f * progress)
 
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         if (label.isNotEmpty()) NText(label, 13, bold = true, muted = true)
@@ -896,7 +876,7 @@ internal fun NativeStepSwitcherBar(
     onReset: (() -> Unit)? = null,
 ) {
     val c = LocalNativeColors.current
-    val dark = LocalLiquidGlassDarkTheme.current == true
+    val progress = liquidGlassThemeProgress()
     Row(
         Modifier
             .fillMaxWidth()
@@ -905,7 +885,7 @@ internal fun NativeStepSwitcherBar(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        NativeStepIconButton(previousLabel, "chevron-left", enabled = canPrevious, dark = dark, onClick = onPrevious)
+        NativeStepIconButton(previousLabel, "chevron-left", enabled = canPrevious, progress = progress, onClick = onPrevious)
         Column(
             Modifier.weight(1f),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -968,7 +948,7 @@ internal fun NativeStepSwitcherBar(
                 }
             }
         }
-        NativeStepIconButton(nextLabel, "chevron-right", enabled = canNext, dark = dark, onClick = onNext)
+        NativeStepIconButton(nextLabel, "chevron-right", enabled = canNext, progress = progress, onClick = onNext)
     }
 }
 
@@ -977,7 +957,7 @@ private fun NativeStepIconButton(
     label: String,
     icon: String,
     enabled: Boolean,
-    dark: Boolean,
+    progress: Float,
     onClick: () -> Unit,
 ) {
     val c = LocalNativeColors.current
@@ -986,7 +966,7 @@ private fun NativeStepIconButton(
         modifier = Modifier.size(48.dp).semantics { contentDescription = label },
         enabled = enabled,
         haptic = NativeButtonHaptic.Navigation,
-        surfaceColor = c.surface.copy(alpha = if (enabled) (if (dark) 0.38f else 0.48f) else 0.18f),
+        surfaceColor = c.surface.copy(alpha = if (enabled) (0.48f - 0.10f * progress) else 0.18f),
     ) {
         NativeIcon(icon, c.ink.copy(alpha = if (enabled) 1f else 0.35f), size = 16.dp, strokeWidth = 2.1f)
     }

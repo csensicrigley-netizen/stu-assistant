@@ -12,7 +12,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.unit.dp
@@ -194,8 +193,7 @@ internal fun nativeImportDocument(doc:AcademicTimetableDoc):JSONObject = JSONObj
             Box(Modifier.width(24.dp),contentAlignment=Alignment.Center){NText(p.code,12,muted=true,maxLines=1,softWrap=false,tabularNums=true)}
             (1..7).forEach {day->
                 val course=courses.firstOrNull{it.meetings.any{m->m.weekday==day&&p.index in m.periods}}
-                val dark=LocalNativeColors.current.bg.luminance()<.2f
-                val swatch=course?.let{nativeCourseSwatch(it.hue,dark,LocalNativePalette.current)}
+                val swatch=course?.let{currentNativeCourseSwatch(it.hue)}
                 val mark=swatch?.mark?:LocalNativeColors.current.border.copy(alpha=.4f)
                 val mid=swatch?.mid?:mark
                 val shape=RoundedRectangle(4.dp)

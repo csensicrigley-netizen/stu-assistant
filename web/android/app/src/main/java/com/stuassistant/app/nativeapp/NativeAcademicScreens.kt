@@ -58,7 +58,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
-import androidx.compose.ui.graphics.luminance
+import com.stuassistant.app.glass.liquidGlassThemeProgress
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -262,8 +262,7 @@ private data class AcademicTones(val soft: Color, val softInk: Color, val amber:
 
 @Composable
 private fun academicTones(): AcademicTones {
-    val dark = LocalNativeColors.current.bg.luminance() < .2f
-    val sem = nativeSemanticTones(dark, LocalNativePalette.current)
+    val sem = currentNativeSemanticTones()
     return AcademicTones(sem.soft, sem.softInk, sem.amber, sem.dangerInk)
 }
 
@@ -454,20 +453,15 @@ private fun academicReconnect(s: NativeState): List<String> {
 /** Unified course recipes across all campus palettes × light/dark. */
 private typealias AcademicCourseColors = NativeCourseSwatch
 
-private fun academicCourseRecipe(hue: Int, dark: Boolean, palette: String): AcademicCourseColors =
-    nativeCourseSwatch(hue, dark, palette)
-
 @Composable
-private fun academicCourseColors(hue: Int) =
-    academicCourseRecipe(hue, LocalNativeColors.current.bg.luminance() < .2f, LocalNativePalette.current)
+private fun academicCourseColors(hue: Int): AcademicCourseColors = currentNativeCourseSwatch(hue)
 
 @Composable
 internal fun academicCourseColor(hue: Int): Color = academicCourseColors(hue).mark
 
 @Composable
 private fun academicLeafColor(): Color {
-    val dark = LocalNativeColors.current.bg.luminance() < .2f
-    return nativeSemanticTones(dark, LocalNativePalette.current).leaf
+    return currentNativeSemanticTones().leaf
 }
 
 @Composable
@@ -479,8 +473,7 @@ private fun AcademicRibbon(
     scaleOnly: Boolean = false,
 ) {
     val colors = LocalNativeColors.current
-    val dark = colors.bg.luminance() < .2f
-    val palette = LocalNativePalette.current
+    val courseMarks = blocks.map { currentNativeCourseSwatch(it.course.hue).mark }
     Column(verticalArrangement = Arrangement.spacedBy(5.dp), modifier = Modifier.fillMaxWidth()) {
         if (!scaleOnly) Canvas(Modifier.fillMaxWidth().height(if (compact) 16.dp else 22.dp)) {
             val span = (AcademicTimetable.gridEnd - AcademicTimetable.gridStart).toFloat()
@@ -495,8 +488,8 @@ private fun AcademicRibbon(
                     }
                 }
             }
-            blocks.forEach { block ->
-                val color = academicCourseRecipe(block.course.hue, dark, palette).mark
+            blocks.forEachIndexed { index, block ->
+                val color = courseMarks[index]
                 val width = (x(block.endMin) - x(block.startMin)).coerceAtLeast(2f)
                 drawRoundRect(
                     color.copy(alpha = if (nowMinute != null && block.endMin <= nowMinute) .42f else .88f),
@@ -665,7 +658,7 @@ private fun AcademicNowCard(
     onOpen: (AcademicBlock) -> Unit,
 ) {
     val colors = LocalNativeColors.current
-    val dark = colors.bg.luminance() < .2f
+    val progress = liquidGlassThemeProgress()
 
     if (status.kind == "closed") {
         NCard {
@@ -720,7 +713,7 @@ private fun AcademicNowCard(
     val moved = previous != null && previous.location.isNotEmpty() && block.location.isNotEmpty() &&
         previous.location != block.location && block.startMin - previous.endMin <= 30
     val heroShape = RoundedRectangle(26.dp)
-    val shadowTint = mark.copy(alpha = if (dark) 0.28f else 0.14f)
+    val shadowTint = mark.copy(alpha = 0.14f + 0.14f * progress)
 
     Box(
         Modifier
@@ -730,14 +723,14 @@ private fun AcademicNowCard(
             .background(
                 Brush.linearGradient(
                     colors = listOf(
-                        lerp(tint, colors.surface, if (dark) 0.25f else 0.15f),
+                        lerp(tint, colors.surface, 0.15f + 0.10f * progress),
                         colors.surface,
                     ),
                     start = Offset(0f, 0f),
                     end = Offset(900f, 700f),
                 ),
             )
-            .border(1.dp, mark.copy(alpha = if (dark) 0.34f else 0.26f), heroShape),
+            .border(1.dp, mark.copy(alpha = 0.26f + 0.08f * progress), heroShape),
     ) {
         AcademicHeroDecoration(mark, Modifier.matchParentSize())
         Column(

@@ -14,7 +14,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.lerp
+import com.stuassistant.app.glass.liquidGlassThemeProgress
 import androidx.compose.ui.graphics.Color
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.kyant.backdrop.backdrops.layerBackdrop
@@ -35,6 +36,7 @@ val LocalCalendarComposer = staticCompositionLocalOf<() -> Unit> { {} }
 internal fun CalendarTimeline(day: String, onDay: (String) -> Unit, drafts: List<JSONObject>, selected: Int,
     existing: List<CalendarMark>, doc: AcademicTimetableDoc?, onEdit: (Int, String, Long, Long?) -> Unit, onSelect: (Int) -> Unit, onPrecise: (CalendarMark) -> Unit) {
     val colors = LocalNativeColors.current
+    val themeProgress = liquidGlassThemeProgress()
     val density = LocalDensity.current
     val reduced = com.stuassistant.app.glass.LocalLiquidGlassReducedMotion.current
     val blockShape = remember { RoundedRectangle(12.dp) }
@@ -163,7 +165,7 @@ internal fun CalendarTimeline(day: String, onDay: (String) -> Unit, drafts: List
                                     val editable=mark.item>=0
                                     val focused=editable&&mark.item==selected
                                     val point=mark.end==null
-                                    val tint=when {mark.field=="deadline"->if(colors.bg.luminance()>.5f)Color(0xFFD63760)else Color(0xFFFF809D)
+                                    val tint=when {mark.field=="deadline"->lerp(Color(0xFFD63760),Color(0xFFFF809D),themeProgress)
                                         editable->colors.brand;mark.source=="course"->colors.muted;else->Color(0xFF398A79)}
                                     val position=Modifier.offset{IntOffset(left.roundToInt(),rect.top.roundToInt())}
                                         .width(with(density){eventWidth.toDp()}).requiredHeight(with(density){rect.height.toDp()})

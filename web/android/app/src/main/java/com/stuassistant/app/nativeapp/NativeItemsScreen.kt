@@ -34,7 +34,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.kyant.shapes.Capsule
 import com.kyant.shapes.RoundedRectangle
-import com.stuassistant.app.glass.LocalLiquidGlassDarkTheme
+import com.stuassistant.app.glass.liquidGlassThemeProgress
 import com.stuassistant.app.glass.LocalLiquidGlassReducedMotion
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -204,13 +204,13 @@ internal fun NativeItemsPage(
 @Composable
 private fun ItemsComposeBanner(onClick: () -> Unit) {
     val c = LocalNativeColors.current
-    val dark = LocalLiquidGlassDarkTheme.current == true
+    val progress = liquidGlassThemeProgress()
     val shape = RoundedRectangle(20.dp)
-    val shadowColor = c.brand.copy(alpha = if (dark) 0.28f else 0.16f)
-    val fill = remember(c.brand, dark) {
+    val shadowColor = c.brand.copy(alpha = 0.16f + 0.12f * progress)
+    val fill = remember(c.brand, progress) {
         Brush.linearGradient(
             listOf(
-                lerp(c.brand, Color.White, if (dark) 0.14f else 0.18f).copy(alpha = 0.88f),
+                lerp(c.brand, Color.White, 0.18f - 0.04f * progress).copy(alpha = 0.88f),
                 c.brand.copy(alpha = 0.84f),
             ),
             start = Offset.Zero,
