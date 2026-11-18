@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Auto-system launch resolves to Dark Obsidian when system is in Dark mode -->
+    <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/splash_obsidian</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash_truth_bell_dark</item>
+        <item name="windowSplashScreenAnimationDuration">0</item>
+        <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>
+        <item name="android:windowBackground">@drawable/splash_dark</item>
+        <item name="android:statusBarColor">@color/splash_obsidian</item>
+        <item name="android:navigationBarColor">@color/splash_obsidian</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>

@@ -20,6 +20,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.unit.dp
@@ -36,24 +37,22 @@ class NativeActivity:ComponentActivity() {
     private lateinit var feedback:NativeFeedback
     private val work=MainScope()
     private var ready by mutableStateOf(false)
+    private var playLaunchReveal by mutableStateOf(false)
     private var resumeEpoch by mutableIntStateOf(0)
     override fun onCreate(savedInstanceState:Bundle?) {
-        NativeLaunchAppearance.prepare(this)
-        val splash = installSplashScreen()
+        val splash=installSplashScreen()
+        playLaunchReveal=savedInstanceState==null
+        splash.setOnExitAnimationListener {provider->provider.remove()}
         super.onCreate(savedInstanceState)
-        splash.setKeepOnScreenCondition { !ready }
-        splash.setOnExitAnimationListener { screen ->
-            if (Settings.Global.getFloat(contentResolver,Settings.Global.ANIMATOR_DURATION_SCALE,1f)==0f) screen.remove()
-            else screen.view.animate().alpha(0f).setDuration(140).withEndAction { screen.remove() }.start()
-        }
         enableEdgeToEdge()
         window.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
         store=NativeStore(applicationContext);feedback=NativeFeedback(this)
+        LauncherThemeSync.syncSplashThemeImmediate(this,store.state.value.theme)
         if(applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE !=0) {
             AcademicClock.setPreviewTime(intent.getStringExtra("now"))
             if(intent.getBooleanExtra("preview",false))store.enterPreview()
         }
-        setContent {NativeApplication(store,feedback,ready,resumeEpoch)}
+        setContent {NativeApplication(store,feedback,ready,playLaunchReveal,{playLaunchReveal=false},{mode->LauncherThemeSync.syncSplashThemeImmediate(this,mode)},resumeEpoch)}
         migrateLegacyStorage(this,store) {ready=true;refresh("read")}
     }
     private fun refresh(how:String) {
@@ -62,18 +61,33 @@ class NativeActivity:ComponentActivity() {
     }
     override fun onResume() {super.onResume();resumeEpoch++;if(ready)refresh("auto")}
     override fun onPause() {feedback.cancel();super.onPause()}
+    override fun onStop() {
+        if(!isChangingConfigurations&&::store.isInitialized) {
+            LauncherThemeSync.syncLauncherAliasOnStop(applicationContext,store.state.value.theme)
+        }
+        super.onStop()
+    }
     override fun onDestroy() {work.cancel();feedback.close();store.close();super.onDestroy()}
 }
 
-@Composable private fun NativeApplication(store:NativeStore,feedback:NativeFeedback,ready:Boolean,resumeEpoch:Int) {
+@Composable private fun NativeApplication(store:NativeStore,feedback:NativeFeedback,ready:Boolean,playLaunchReveal:Boolean,onLaunchRevealFinished:()->Unit,onThemeModeObserved:(String)->Unit,resumeEpoch:Int) {
     val s by store.state.collectAsState()
     val systemDark=isSystemInDarkTheme()
     val dark=s.theme=="dark" || (s.theme=="system"&&systemDark)
     val colors=remember(dark,s.palette) {nativeColors(dark,s.palette)}
+    val launchState=remember {SundialLaunchState(playLaunchReveal)}
     val context=androidx.compose.ui.platform.LocalContext.current
     val activity=context as ComponentActivity
-    SideEffect {WindowCompat.getInsetsController(activity.window,activity.window.decorView).apply {isAppearanceLightStatusBars=!dark;isAppearanceLightNavigationBars=!dark}}
-    LaunchedEffect(s.theme,s.palette,dark) { NativeLaunchAppearance.sync(activity,s.theme,s.palette,dark) }
+    SideEffect {
+        WindowCompat.getInsetsController(activity.window,activity.window.decorView).apply {
+            isAppearanceLightStatusBars=!dark
+            isAppearanceLightNavigationBars=!dark
+        }
+    }
+    LaunchedEffect(s.theme) { onThemeModeObserved(s.theme) }
+    LaunchedEffect(colors.bg) {
+        activity.window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(colors.bg.toArgb()))
+    }
     val reduced=remember(resumeEpoch) {Settings.Global.getFloat(context.contentResolver,Settings.Global.ANIMATOR_DURATION_SCALE,1f)==0f}
     var route by rememberSaveable {mutableStateOf("today")}
     var calendarOpen by rememberSaveable {mutableStateOf(false)}
@@ -101,78 +115,87 @@ class NativeActivity:ComponentActivity() {
     BackHandler {activity.moveTaskToBack(true)}
     BackHandler(enabled=!needsWelcome&&!connect&&route!="today"&&sheets.entries.isEmpty()) {route=if(route=="import"||route=="medical")"me"else"today"}
     CompositionLocalProvider(LocalCalendarComposer provides {calendarOpen=true},LocalNativeColors provides colors,LocalNativePalette provides s.palette,LocalNativeForegroundEpoch provides resumeEpoch,LocalNativeBackdrop provides base,LocalNativeFeedback provides feedback,LocalNativeStrength provides s.hapticStrength,LocalNativeConnect provides onConnect,LocalNativeSheets provides sheets,LocalLiquidGlassDarkTheme provides dark,LocalLiquidGlassAccentColor provides colors.brand,LocalLiquidGlassReducedMotion provides reduced) {
-        Box(Modifier.fillMaxSize().background(colors.bg)) {
-            val orbPrimary = colors.brand.copy(alpha = if (dark) 0.22f else 0.15f)
-            val orbWarm = lerp(colors.brand, colors.danger, 0.42f).copy(alpha = if (dark) 0.14f else 0.10f)
-            val orbBreeze = lerp(colors.brand, Color(0xFF38A89D), 0.38f).copy(alpha = if (dark) 0.12f else 0.085f)
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .layerBackdrop(base)
-                    .background(colors.bg)
-                    .drawWithCache {
-                        val w = size.width
-                        val h = size.height
-                        val valid = w > 1f && h > 1f
-                        val c1 = Offset(w * 0.86f, h * 0.10f)
-                        val r1 = (w * 0.80f).coerceAtLeast(1f)
-                        val c2 = Offset(w * 0.12f, h * 0.34f)
-                        val r2 = (w * 0.70f).coerceAtLeast(1f)
-                        val c3 = Offset(w * 0.84f, h * 0.72f)
-                        val r3 = (w * 0.74f).coerceAtLeast(1f)
-                        val b1 = if (valid) Brush.radialGradient(listOf(orbPrimary, Color.Transparent), c1, r1) else null
-                        val b2 = if (valid) Brush.radialGradient(listOf(orbWarm, Color.Transparent), c2, r2) else null
-                        val b3 = if (valid) Brush.radialGradient(listOf(orbBreeze, Color.Transparent), c3, r3) else null
-                        onDrawBehind {
-                            if (b1 != null) drawCircle(b1, r1, c1)
-                            if (b2 != null) drawCircle(b2, r2, c2)
-                            if (b3 != null) drawCircle(b3, r3, c3)
-                        }
-                    },
-            )
-            Box(Modifier.fillMaxSize().layerBackdrop(page).nativeSheetBackground(sheets)
-                .then(if(calendarOpen) Modifier.clearAndSetSemantics {} else Modifier)) {
-                if(!ready) Box(Modifier.fillMaxSize(),contentAlignment=Alignment.Center){NativeLogo(80)}
-                else if(needsWelcome||connect) NativeWelcomeScreen(store,s,start=gateStart,onDone={connect=false;store.reloadAfterMutation()},onCancel=if(gateCancelable){{connect=false}}else null)
-                else NativePageTransition(NativePageRoute(route,campusView),reduced) { snapshot ->
-                    when {
-                        snapshot.route=="today"->NativeTodayScreen(store,s,navigate,onConnect)
-                        snapshot.route=="week"->NativeWeekScreen(store,s,navigate,onConnect)
-                        snapshot.route.startsWith("items")->NativeCalendarItemsScreen(store,s,onConnect)
-                        snapshot.route.startsWith("campus")->NativeCampusScreen(store,s,snapshot.campusView,onConnect,{campusView=it})
-                        snapshot.route=="me"->NativeMeScreen(store,s,onConnect,{connect=false;route="today"},navigate)
-                        snapshot.route=="medical"->NativeMedicalScreen(store,s,navigate)
-                        snapshot.route=="import"->NativeImportScreen(store,s,navigate)
-                        else->NativeTodayScreen(store,s,navigate,onConnect)
-                    }
-                }
-            }
-            // Keep the same bar mounted behind the full-screen modal. A sheet
-            // covers it normally without owning its visibility or lifetime.
-            if(showBottomNavigation) {
-                val current=if(route=="import"||route=="medical")"me"else route.substringBefore(':')
-                val urgent=s.tasks.map(AcademicRecords::task).count {it.id !in s.done&&AcademicRecords.bucket(it) in listOf("today","overdue")}
-                val reconnect=s.sources.count {it.optString("state")=="need_login"&&it.optString("source") in academicStrings(s.user?.optJSONArray("bound"))}
-                val tabs=listOf(GlassNavigationTab("today","今天"),GlassNavigationTab("week","课表"),GlassNavigationTab("items","事项",urgent),GlassNavigationTab("campus","校园"),GlassNavigationTab("me","我的",reconnect))
-                Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height((104+bottom).dp).nativeSheetBackground(sheets)
+        Box(Modifier.fillMaxSize().background(if(launchState.active) launchStageColor(dark) else colors.bg)) {
+            Box(Modifier.fillMaxSize().background(colors.bg).launchIrisRevealEffect(launchState,dark=dark)) {
+                val orbPrimary = colors.brand.copy(alpha = if (dark) 0.22f else 0.15f)
+                val orbWarm = lerp(colors.brand, colors.danger, 0.42f).copy(alpha = if (dark) 0.14f else 0.10f)
+                val orbBreeze = lerp(colors.brand, Color(0xFF38A89D), 0.38f).copy(alpha = if (dark) 0.12f else 0.085f)
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .layerBackdrop(base)
+                        .background(colors.bg)
+                        .drawWithCache {
+                            val w = size.width
+                            val h = size.height
+                            val valid = w > 1f && h > 1f
+                            val c1 = Offset(w * 0.86f, h * 0.10f)
+                            val r1 = (w * 0.80f).coerceAtLeast(1f)
+                            val c2 = Offset(w * 0.12f, h * 0.34f)
+                            val r2 = (w * 0.70f).coerceAtLeast(1f)
+                            val c3 = Offset(w * 0.84f, h * 0.72f)
+                            val r3 = (w * 0.74f).coerceAtLeast(1f)
+                            val b1 = if (valid) Brush.radialGradient(listOf(orbPrimary, Color.Transparent), c1, r1) else null
+                            val b2 = if (valid) Brush.radialGradient(listOf(orbWarm, Color.Transparent), c2, r2) else null
+                            val b3 = if (valid) Brush.radialGradient(listOf(orbBreeze, Color.Transparent), c3, r3) else null
+                            onDrawBehind {
+                                if (b1 != null) drawCircle(b1, r1, c1)
+                                if (b2 != null) drawCircle(b2, r2, c2)
+                                if (b3 != null) drawCircle(b3, r3, c3)
+                            }
+                        },
+                )
+                Box(Modifier.fillMaxSize().layerBackdrop(page).nativeSheetBackground(sheets)
                     .then(if(calendarOpen) Modifier.clearAndSetSemantics {} else Modifier)) {
-                    LiquidGlassBottomBar(GlassNavigationState(current,tabs,dark,s.palette,s.hapticStrength,bottom,reduced),combined) {next->
-                        // Also reject a selection queued before the sheet opened.
-                        if(sheets.entries.isEmpty()&&!calendarOpen) {
-                            if(next!=current){feedback.play("navigation",s.hapticStrength);route=next}
-                            else if(route=="import"||route=="medical"){route="me"}
+                    if(!ready) Box(Modifier.fillMaxSize(),contentAlignment=Alignment.Center){NativeLogo(80)}
+                    else if(needsWelcome||connect) NativeWelcomeScreen(store,s,start=gateStart,onDone={connect=false;store.reloadAfterMutation()},onCancel=if(gateCancelable){{connect=false}}else null)
+                    else NativePageTransition(NativePageRoute(route,campusView),reduced) { snapshot ->
+                        when {
+                            snapshot.route=="today"->NativeTodayScreen(store,s,navigate,onConnect)
+                            snapshot.route=="week"->NativeWeekScreen(store,s,navigate,onConnect)
+                            snapshot.route.startsWith("items")->NativeCalendarItemsScreen(store,s,onConnect)
+                            snapshot.route.startsWith("campus")->NativeCampusScreen(store,s,snapshot.campusView,onConnect,{campusView=it})
+                            snapshot.route=="me"->NativeMeScreen(store,s,onConnect,{connect=false;route="today"},navigate)
+                            snapshot.route=="medical"->NativeMedicalScreen(store,s,navigate)
+                            snapshot.route=="import"->NativeImportScreen(store,s,navigate)
+                            else->NativeTodayScreen(store,s,navigate,onConnect)
                         }
                     }
                 }
-            }
-            if(ready) NativeUpdatePrompt(store,combined,Modifier.align(Alignment.BottomCenter).padding(start=12.dp,end=12.dp,bottom=(104+bottom).dp).nativeSheetBackground(sheets))
-            NativeHomeAnnouncement(store,ready&&!needsWelcome&&!connect&&route=="today"&&!ime&&!calendarOpen,sheets.entries.isEmpty())
-            NativeSheetHost(sheets,combined)
-            AnimatedVisibility(calendarOpen&&s.token!=null&&!s.preview, enter=slideInVertically(tween(420)){ -it/12 }+fadeIn(tween(220)), exit=slideOutVertically(tween(260)){ -it/12 }+fadeOut(tween(220))) {
-                CompositionLocalProvider(LocalNativeBackdrop provides base) {
-                    NativeCalendarComposer(store,s,inputBackdrop=combined) {calendarOpen=false}
+                // Keep the same bar mounted behind the full-screen modal. A sheet
+                // covers it normally without owning its visibility or lifetime.
+                if(showBottomNavigation) {
+                    val current=if(route=="import"||route=="medical")"me"else route.substringBefore(':')
+                    val urgent=s.tasks.map(AcademicRecords::task).count {it.id !in s.done&&AcademicRecords.bucket(it) in listOf("today","overdue")}
+                    val reconnect=s.sources.count {it.optString("state")=="need_login"&&it.optString("source") in academicStrings(s.user?.optJSONArray("bound"))}
+                    val tabs=listOf(GlassNavigationTab("today","今天"),GlassNavigationTab("week","课表"),GlassNavigationTab("items","事项",urgent),GlassNavigationTab("campus","校园"),GlassNavigationTab("me","我的",reconnect))
+                    Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height((104+bottom).dp).nativeSheetBackground(sheets)
+                        .then(if(calendarOpen) Modifier.clearAndSetSemantics {} else Modifier)) {
+                        LiquidGlassBottomBar(GlassNavigationState(current,tabs,dark,s.palette,s.hapticStrength,bottom,reduced),combined) {next->
+                            // Also reject a selection queued before the sheet opened.
+                            if(sheets.entries.isEmpty()&&!calendarOpen) {
+                                if(next!=current){feedback.play("navigation",s.hapticStrength);route=next}
+                                else if(route=="import"||route=="medical"){route="me"}
+                            }
+                        }
+                    }
+                }
+                if(ready) NativeUpdatePrompt(store,combined,Modifier.align(Alignment.BottomCenter).padding(start=12.dp,end=12.dp,bottom=(104+bottom).dp).nativeSheetBackground(sheets))
+                NativeHomeAnnouncement(store,ready&&!needsWelcome&&!connect&&route=="today"&&!ime&&!calendarOpen,sheets.entries.isEmpty())
+                NativeSheetHost(sheets,combined)
+                AnimatedVisibility(calendarOpen&&s.token!=null&&!s.preview, enter=slideInVertically(tween(420)){ -it/12 }+fadeIn(tween(220)), exit=slideOutVertically(tween(260)){ -it/12 }+fadeOut(tween(220))) {
+                    CompositionLocalProvider(LocalNativeBackdrop provides base) {
+                        NativeCalendarComposer(store,s,inputBackdrop=combined) {calendarOpen=false}
+                    }
                 }
             }
+            SundialLaunchOverlay(
+                state=launchState,
+                ready=ready,
+                reducedMotion=reduced,
+                dark=dark,
+                onFinished=onLaunchRevealFinished,
+            )
         }
     }
 }
