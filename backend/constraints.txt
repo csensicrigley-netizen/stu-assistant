@@ -28,7 +28,7 @@ keyring==25.7.0
 mcp==2.3.0
 mcp-types==2.3.0
 more-itertools==11.2.1
-opentelemetry-api==1.45.1
+opentelemetry-api==1.45.2
 packaging==26.3
 pillow==12.3.0
 platformdirs==4.13.7
