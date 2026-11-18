@@ -34,7 +34,7 @@ import androidx.compose.ui.unit.dp
 import com.kyant.shapes.Capsule
 import com.kyant.shapes.RoundedRectangle
 import com.stuassistant.app.glass.LiquidSlider
-import com.stuassistant.app.glass.LocalLiquidGlassDarkTheme
+import com.stuassistant.app.glass.liquidGlassThemeProgress
 import com.stuassistant.app.glass.LocalLiquidGlassReducedMotion
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -55,9 +55,7 @@ fun NativeMeScreen(
     onNavigate: (String) -> Unit = {},
 ) {
     val c = LocalNativeColors.current
-    val dark = LocalLiquidGlassDarkTheme.current == true
-    val palette = LocalNativePalette.current
-    val tones = remember(dark, palette) { nativeSemanticTones(dark, palette) }
+    val tones = currentNativeSemanticTones()
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val toggleFeedback = nHapticFeedback("toggle")
@@ -562,7 +560,7 @@ internal fun NativeFeedbackSettings(store: NativeStore, s: NativeState) {
 @Composable
 private fun NativePaletteGrid(selectedKey: String, onSelect: (String) -> Unit) {
     val c = LocalNativeColors.current
-    val dark = LocalLiquidGlassDarkTheme.current == true
+    val progress = liquidGlassThemeProgress()
     val reduced = LocalLiquidGlassReducedMotion.current
     Column(
         Modifier.fillMaxWidth().selectableGroup(),
@@ -578,11 +576,10 @@ private fun NativePaletteGrid(selectedKey: String, onSelect: (String) -> Unit) {
                         label = "palette-item-scale",
                     )
                     val cardShape = RoundedRectangle(16.dp)
-                    val bgColor = when {
-                        active && dark -> c.brand.copy(alpha = 0.18f)
-                        active -> c.brand.copy(alpha = 0.11f)
-                        dark -> c.bg.copy(alpha = 0.55f)
-                        else -> c.bg.copy(alpha = 0.65f)
+                    val bgColor = if (active) {
+                        c.brand.copy(alpha = 0.11f + 0.07f * progress)
+                    } else {
+                        c.bg.copy(alpha = 0.65f - 0.10f * progress)
                     }
                     Row(
                         Modifier

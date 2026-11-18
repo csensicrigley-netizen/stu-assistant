@@ -43,7 +43,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.kyant.shapes.Capsule
 import com.kyant.shapes.RoundedRectangle
-import com.stuassistant.app.glass.LocalLiquidGlassDarkTheme
+import com.stuassistant.app.glass.liquidGlassThemeProgress
 import com.stuassistant.app.glass.LocalLiquidGlassReducedMotion
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
@@ -496,9 +496,8 @@ private fun campusSampleCharging(device: CampusDevice): CampusCharge {
 @OptIn(ExperimentalLayoutApi::class)
 private fun CampusLife(store: NativeStore, s: NativeState, now: AcademicMoment, active: Boolean) {
     val c = LocalNativeColors.current
-    val dark = LocalLiquidGlassDarkTheme.current == true
-    val palette = LocalNativePalette.current
-    val tones = remember(dark, palette) { nativeSemanticTones(dark, palette) }
+    val themeProgress = liquidGlassThemeProgress()
+    val tones = currentNativeSemanticTones()
     val selectTick = nSelectionFeedback()
 
     var charging by remember { mutableStateOf<List<CampusCharge>>(emptyList()) }
@@ -572,7 +571,7 @@ private fun CampusLife(store: NativeStore, s: NativeState, now: AcademicMoment, 
                             if (reduced) snap() else spring(dampingRatio = 0.72f, stiffness = 680f),
                             label = "charge-card-scale",
                         )
-                        val cardTint = if (selected) lerp(c.surface, c.brand, if (dark) 0.18f else 0.09f) else null
+                        val cardTint = if (selected) lerp(c.surface, c.brand, 0.09f + 0.09f * themeProgress) else null
                         Column(
                             Modifier
                                 .weight(1f)
@@ -1074,9 +1073,8 @@ private fun CampusEntrances() {
 @OptIn(ExperimentalLayoutApi::class)
 private fun CampusCalendar(now: AcademicMoment) {
     val c = LocalNativeColors.current
-    val dark = LocalLiquidGlassDarkTheme.current == true
-    val palette = LocalNativePalette.current
-    val tones = remember(dark, palette) { nativeSemanticTones(dark, palette) }
+    val themeProgress = liquidGlassThemeProgress()
+    val tones = currentNativeSemanticTones()
     val position = AcademicCalendar.position(now.date)
     val term = position?.term ?: AcademicCalendar.currentOrNext(now.date)
     val rawProgress = AcademicCalendar.progress(term, now.ms)
@@ -1162,9 +1160,9 @@ private fun CampusCalendar(now: AcademicMoment) {
                             .background(
                                 phaseTone.copy(
                                     alpha = if (activePhase) {
-                                        if (dark) 0.36f else 0.26f
+                                        0.26f + 0.10f * themeProgress
                                     } else {
-                                        if (dark) 0.20f else 0.14f
+                                        0.14f + 0.06f * themeProgress
                                     },
                                 ),
                             )
@@ -1207,7 +1205,7 @@ private fun CampusCalendar(now: AcademicMoment) {
                 Row(
                     Modifier
                         .clip(Capsule())
-                        .background(phaseTone.copy(alpha = if (dark) 0.14f else 0.09f))
+                        .background(phaseTone.copy(alpha = 0.09f + 0.05f * themeProgress))
                         .border(0.6.dp, phaseTone.copy(alpha = 0.20f), Capsule())
                         .padding(horizontal = 8.dp, vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -1322,14 +1320,14 @@ private fun CampusCalendar(now: AcademicMoment) {
                                             )
                                             past -> Brush.verticalGradient(
                                                 listOf(
-                                                    c.surface.copy(alpha = if (dark) 0.42f else 0.55f),
-                                                    c.bg.copy(alpha = if (dark) 0.36f else 0.48f),
+                                                    c.surface.copy(alpha = 0.55f - 0.13f * themeProgress),
+                                                    c.bg.copy(alpha = 0.48f - 0.12f * themeProgress),
                                                 ),
                                             )
                                             else -> Brush.verticalGradient(
                                                 listOf(
-                                                    tone.copy(alpha = if (dark) 0.20f else 0.13f),
-                                                    tone.copy(alpha = if (dark) 0.15f else 0.09f),
+                                                    tone.copy(alpha = 0.13f + 0.07f * themeProgress),
+                                                    tone.copy(alpha = 0.09f + 0.06f * themeProgress),
                                                 ),
                                             )
                                         },
