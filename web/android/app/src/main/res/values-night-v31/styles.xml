@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="AppTheme" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/brand</item>
+        <item name="colorPrimaryDark">@color/brand_deep</item>
+        <item name="colorAccent">@color/accent</item>
+        <item name="android:windowSplashScreenBackground">@color/splash_obsidian</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_splash_truth_bell_dark</item>
+        <item name="android:windowSplashScreenIconBackgroundColor">@android:color/transparent</item>
+        <item name="android:windowSplashScreenAnimationDuration">0</item>
+    </style>
+
+    <!-- Auto-system launch on Android 12+ (Dark Obsidian in system Dark mode) -->
+    <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/splash_obsidian</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash_truth_bell_dark</item>
+        <item name="windowSplashScreenAnimationDuration">0</item>
+        <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>
+        <item name="android:windowSplashScreenBackground">@color/splash_obsidian</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_splash_truth_bell_dark</item>
+        <item name="android:windowSplashScreenIconBackgroundColor">@android:color/transparent</item>
+        <item name="android:windowSplashScreenAnimationDuration">0</item>
+        <item name="android:windowBackground">@drawable/splash_dark</item>
+        <item name="android:statusBarColor">@color/splash_obsidian</item>
+        <item name="android:navigationBarColor">@color/splash_obsidian</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>

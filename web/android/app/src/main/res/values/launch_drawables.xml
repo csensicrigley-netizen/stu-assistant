@@ -1,5 +1,0 @@
-<resources>
-    <item name="launch_icon" type="drawable">@drawable/splash_mark</item>
-    <item name="launch_icon_light" type="drawable">@drawable/splash_mark_light</item>
-    <item name="launch_icon_dark" type="drawable">@drawable/splash_mark_dark</item>
-</resources>
