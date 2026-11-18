@@ -8,7 +8,6 @@ package com.stuassistant.app.glass
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -28,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -76,13 +76,12 @@ fun LiquidSlider(
     val latestOnValueChangeFinished by rememberUpdatedState(onValueChangeFinished)
     val latestOnValueChangeCancelled by rememberUpdatedState(onValueChangeCancelled)
     val reducedMotion = LocalLiquidGlassReducedMotion.current
-    val isLightTheme = !(LocalLiquidGlassDarkTheme.current ?: isSystemInDarkTheme())
+    val darkProgress = liquidGlassThemeProgress()
     val accentColor = LocalLiquidGlassAccentColor.current ?:
-        if (isLightTheme) Color(0xFF0088FF)
-        else Color(0xFF0091FF)
-    val trackColor =
-        if (isLightTheme) Color(0xFF787878).copy(0.2f)
-        else Color(0xFF787880).copy(0.36f)
+        lerp(Color(0xFF0088FF), Color(0xFF0091FF), darkProgress)
+    val trackColor = lerp(
+        Color(0xFF787878).copy(0.2f), Color(0xFF787880).copy(0.36f), darkProgress,
+    )
 
     val trackBackdrop = rememberLayerBackdrop()
 

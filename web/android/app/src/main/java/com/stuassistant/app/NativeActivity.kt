@@ -9,6 +9,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
@@ -70,11 +71,34 @@ class NativeActivity:ComponentActivity() {
     override fun onDestroy() {work.cancel();feedback.close();store.close();super.onDestroy()}
 }
 
+/**
+ * Issue #35: interpolate the theme colour table instead of swapping it in one frame.
+ * Every field crosses over the same 220 ms tween, so background, cards, text and the glass
+ * controls move together. When the system asks for reduced motion (ANIMATOR_DURATION_SCALE
+ * is 0) the tween duration collapses to 0 and the table changes immediately, which keeps
+ * the existing accessibility behaviour and avoids double-looking transitions.
+ */
+@Composable private fun animatedNativeColors(target:NativeColors,reduced:Boolean):NativeColors {
+    val spec=tween<Color>(durationMillis=if(reduced) 0 else AppThemeTransitionDurationMillis)
+    return NativeColors(
+        bg=animateColorAsState(target.bg,spec,label="nativeColorsBg").value,
+        surface=animateColorAsState(target.surface,spec,label="nativeColorsSurface").value,
+        ink=animateColorAsState(target.ink,spec,label="nativeColorsInk").value,
+        muted=animateColorAsState(target.muted,spec,label="nativeColorsMuted").value,
+        brand=animateColorAsState(target.brand,spec,label="nativeColorsBrand").value,
+        danger=animateColorAsState(target.danger,spec,label="nativeColorsDanger").value,
+        border=animateColorAsState(target.border,spec,label="nativeColorsBorder").value,
+        onBrand=animateColorAsState(target.onBrand,spec,label="nativeColorsOnBrand").value,
+    )
+}
+
 @Composable private fun NativeApplication(store:NativeStore,feedback:NativeFeedback,ready:Boolean,playLaunchReveal:Boolean,onLaunchRevealFinished:()->Unit,onThemeModeObserved:(String)->Unit,resumeEpoch:Int) {
     val s by store.state.collectAsState()
     val systemDark=isSystemInDarkTheme()
     val dark=s.theme=="dark" || (s.theme=="system"&&systemDark)
-    val colors=remember(dark,s.palette) {nativeColors(dark,s.palette)}
+    // Issue #35: keep the target table separate from the animated one so the window,
+    // status bar and system insets keep using the final colour instead of every frame.
+    val targetColors=remember(dark,s.palette) {nativeColors(dark,s.palette)}
     val launchState=remember {SundialLaunchState(playLaunchReveal)}
     val context=androidx.compose.ui.platform.LocalContext.current
     val activity=context as ComponentActivity
@@ -85,10 +109,19 @@ class NativeActivity:ComponentActivity() {
         }
     }
     LaunchedEffect(s.theme) { onThemeModeObserved(s.theme) }
-    LaunchedEffect(colors.bg) {
-        activity.window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(colors.bg.toArgb()))
+    LaunchedEffect(targetColors.bg) {
+        activity.window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(targetColors.bg.toArgb()))
     }
     val reduced=remember(resumeEpoch) {Settings.Global.getFloat(context.contentResolver,Settings.Global.ANIMATOR_DURATION_SCALE,1f)==0f}
+    // Issue #35: the native shell used to swap the colour table in a single frame, while the
+    // web build animated the same change through CSS transitions. Interpolate the table so the
+    // two layers behave alike; reduced motion still switches immediately.
+    val colors=animatedNativeColors(targetColors,reduced)
+    val themeProgress by animateFloatAsState(
+        targetValue=if(dark) 1f else 0f,
+        animationSpec=tween(durationMillis=if(reduced) 0 else AppThemeTransitionDurationMillis),
+        label="nativeGlassTheme",
+    )
     var route by rememberSaveable {mutableStateOf("today")}
     var calendarOpen by rememberSaveable {mutableStateOf(false)}
     var campusView by rememberSaveable {mutableStateOf("notices")}
@@ -114,12 +147,12 @@ class NativeActivity:ComponentActivity() {
     LaunchedEffect(s.hapticStrength) {if(s.hapticStrength==0)feedback.cancel()}
     BackHandler {activity.moveTaskToBack(true)}
     BackHandler(enabled=!needsWelcome&&!connect&&route!="today"&&sheets.entries.isEmpty()) {route=if(route=="import"||route=="medical")"me"else"today"}
-    CompositionLocalProvider(LocalCalendarComposer provides {calendarOpen=true},LocalNativeColors provides colors,LocalNativePalette provides s.palette,LocalNativeForegroundEpoch provides resumeEpoch,LocalNativeBackdrop provides base,LocalNativeFeedback provides feedback,LocalNativeStrength provides s.hapticStrength,LocalNativeConnect provides onConnect,LocalNativeSheets provides sheets,LocalLiquidGlassDarkTheme provides dark,LocalLiquidGlassAccentColor provides colors.brand,LocalLiquidGlassReducedMotion provides reduced) {
+    CompositionLocalProvider(LocalCalendarComposer provides {calendarOpen=true},LocalNativeColors provides colors,LocalNativePalette provides s.palette,LocalNativeForegroundEpoch provides resumeEpoch,LocalNativeBackdrop provides base,LocalNativeFeedback provides feedback,LocalNativeStrength provides s.hapticStrength,LocalNativeConnect provides onConnect,LocalNativeSheets provides sheets,LocalLiquidGlassDarkTheme provides dark,LocalLiquidGlassAccentColor provides colors.brand,LocalLiquidGlassReducedMotion provides reduced,LocalLiquidGlassThemeProgress provides themeProgress) {
         Box(Modifier.fillMaxSize().background(if(launchState.active) launchStageColor(dark) else colors.bg)) {
             Box(Modifier.fillMaxSize().background(colors.bg).launchIrisRevealEffect(launchState,dark=dark)) {
-                val orbPrimary = colors.brand.copy(alpha = if (dark) 0.22f else 0.15f)
-                val orbWarm = lerp(colors.brand, colors.danger, 0.42f).copy(alpha = if (dark) 0.14f else 0.10f)
-                val orbBreeze = lerp(colors.brand, Color(0xFF38A89D), 0.38f).copy(alpha = if (dark) 0.12f else 0.085f)
+                val orbPrimary = colors.brand.copy(alpha = 0.15f + 0.07f * themeProgress)
+                val orbWarm = lerp(colors.brand, colors.danger, 0.42f).copy(alpha = 0.10f + 0.04f * themeProgress)
+                val orbBreeze = lerp(colors.brand, Color(0xFF38A89D), 0.38f).copy(alpha = 0.085f + 0.035f * themeProgress)
                 Box(
                     Modifier
                         .fillMaxSize()
