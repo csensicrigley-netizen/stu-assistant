@@ -30,6 +30,8 @@ The nine component/helper files below are source ports of the official catalog, 
 
 ## Deliberate adaptations
 
+The app supplies a shared 220 ms light-to-dark progress alongside its interpolated native colour table. Tab surfaces and pressed fills, slider/toggle tracks, and dialog surface/brightness/blur interpolate between the existing endpoint recipes. Standalone controls without the progress override keep their original theme defaults. The navigation adapter consumes the app's animated colour table rather than constructing a second target-only table. Reduced motion sets the shared progress duration to zero; gesture physics, lens geometry and endpoint material values are unchanged.
+
 1. All source ports use `com.stuassistant.app.glass`. Catalog-only imports between the copied files are removed because they now share one package. Each file carries its fixed source URL and license attribution.
 2. `AppAppearance.kt` supplies optional dark-theme and accent overrides from the App. Without overrides, `LiquidBottomTabs` retains the upstream system-theme and blue-accent defaults. The original glass opacity, blur, lens, highlight and shadow recipes remain unchanged.
 3. A reduced-motion flag selects instant animation specs and removes scale, velocity deformation, panel displacement and captured-content enlargement. With the flag off, upstream numeric parameters are unchanged.

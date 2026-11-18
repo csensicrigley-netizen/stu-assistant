@@ -6,7 +6,6 @@
  */
 package com.stuassistant.app.glass
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
@@ -24,9 +23,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.disabled
@@ -65,13 +64,12 @@ fun LiquidToggle(
     val latestSelected by rememberUpdatedState(selected)
     val latestOnSelect by rememberUpdatedState(onSelect)
     val reducedMotion = LocalLiquidGlassReducedMotion.current
-    val isLightTheme = !(LocalLiquidGlassDarkTheme.current ?: isSystemInDarkTheme())
+    val darkProgress = liquidGlassThemeProgress()
     val accentColor = LocalLiquidGlassAccentColor.current ?:
-        if (isLightTheme) Color(0xFF34C759)
-        else Color(0xFF30D158)
-    val trackColor =
-        if (isLightTheme) Color(0xFF787878).copy(0.2f)
-        else Color(0xFF787880).copy(0.36f)
+        lerp(Color(0xFF34C759), Color(0xFF30D158), darkProgress)
+    val trackColor = lerp(
+        Color(0xFF787878).copy(0.2f), Color(0xFF787880).copy(0.36f), darkProgress,
+    )
 
     val density = LocalDensity.current
     val isLtr = LocalLayoutDirection.current == LayoutDirection.Ltr

@@ -6,12 +6,12 @@
  */
 package com.stuassistant.app.glass
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.unit.dp
 import com.kyant.backdrop.Backdrop
 import com.kyant.backdrop.drawBackdrop
@@ -34,13 +34,12 @@ fun LiquidDialogSurface(
     frosted: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val isLightTheme = !(LocalLiquidGlassDarkTheme.current ?: isSystemInDarkTheme())
-    val containerColor = when {
-        frosted && isLightTheme -> Color(0xFFFAFAFA).copy(0.90f)
-        frosted -> Color(0xFF242228).copy(0.94f)
-        isLightTheme -> Color(0xFFFAFAFA).copy(0.6f)
-        else -> Color(0xFF121212).copy(0.4f)
-    }
+    val darkProgress = liquidGlassThemeProgress()
+    val containerColor = lerp(
+        Color(0xFFFAFAFA).copy(if (frosted) 0.90f else 0.6f),
+        if (frosted) Color(0xFF242228).copy(0.94f) else Color(0xFF121212).copy(0.4f),
+        darkProgress,
+    )
 
     Column(
         modifier.drawBackdrop(
@@ -48,10 +47,10 @@ fun LiquidDialogSurface(
             shape = { shape },
             effects = {
                 colorControls(
-                    brightness = if (isLightTheme) (if (frosted) 0.05f else 0.2f) else 0f,
+                    brightness = (if (frosted) 0.05f else 0.2f) * (1f - darkProgress),
                     saturation = if (frosted) 1.1f else 1.5f,
                 )
-                blur((if (frosted) 28f else if (isLightTheme) 16f else 8f).dp.toPx())
+                blur((if (frosted) 28f else 16f - 8f * darkProgress).dp.toPx())
                 lens(24f.dp.toPx(), 48f.dp.toPx(), depthEffect = true)
             },
             highlight = { Highlight.Plain },

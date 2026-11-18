@@ -22,6 +22,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -39,6 +40,9 @@ import com.stuassistant.app.glass.LiquidBottomTabs
 import com.stuassistant.app.glass.LocalLiquidGlassAccentColor
 import com.stuassistant.app.glass.LocalLiquidGlassDarkTheme
 import com.stuassistant.app.glass.LocalLiquidGlassReducedMotion
+import com.stuassistant.app.glass.LocalLiquidGlassThemeProgress
+import com.stuassistant.app.nativeapp.LocalNativeColors
+import com.stuassistant.app.nativeapp.NativeColors
 import com.stuassistant.app.nativeapp.NativeFontFamily
 import com.stuassistant.app.nativeapp.NativeIcon
 import com.stuassistant.app.nativeapp.nativeColors
@@ -80,7 +84,11 @@ fun LiquidGlassBottomBar(
     val onTabSelected: (Int) -> Unit = remember {
         { index -> latestState.tabs.getOrNull(index)?.let { latestOnSelect(it.key) } }
     }
-    val colors = remember(state.dark, state.palette) { navigationColors(state.dark, state.palette) }
+    val sharedProgress = LocalLiquidGlassThemeProgress.current
+    val progress = sharedProgress ?: if (state.dark) 1f else 0f
+    val targetTokens = remember(state.dark, state.palette) { nativeColors(state.dark, state.palette) }
+    val tokens = if (sharedProgress != null) LocalNativeColors.current else targetTokens
+    val colors = navigationColors(tokens, progress)
     Box(Modifier.fillMaxSize().testTag("native-liquid-glass-navigation")) {
         CompositionLocalProvider(
             LocalLiquidGlassDarkTheme provides state.dark,
@@ -198,13 +206,12 @@ private data class NavigationColors(
     val badge: Color = Color(0xFFB9364B),
 )
 
-private fun navigationColors(dark: Boolean, palette: String): NavigationColors {
-    val tokens = nativeColors(dark, palette)
+private fun navigationColors(tokens: NativeColors, darkProgress: Float): NavigationColors {
     return NavigationColors(
         paper = tokens.bg,
         surface = tokens.surface,
-        ink = tokens.ink.copy(alpha = if (dark) 0.80f else 0.72f),
+        ink = tokens.ink.copy(alpha = 0.72f + 0.08f * darkProgress),
         accent = tokens.brand,
-        badge = if (dark) tokens.danger else Color(0xFFB9364B),
+        badge = lerp(Color(0xFFB9364B), tokens.danger, darkProgress),
     )
 }

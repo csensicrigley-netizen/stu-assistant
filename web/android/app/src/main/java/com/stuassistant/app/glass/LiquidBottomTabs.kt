@@ -9,7 +9,6 @@ package com.stuassistant.app.glass
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.EaseOut
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
@@ -32,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
@@ -69,14 +69,13 @@ fun LiquidBottomTabs(
     modifier: Modifier = Modifier,
     content: @Composable RowScope.() -> Unit
 ) {
-    val isLightTheme = !(LocalLiquidGlassDarkTheme.current ?: isSystemInDarkTheme())
+    val darkProgress = liquidGlassThemeProgress()
     val reducedMotion = LocalLiquidGlassReducedMotion.current
     val accentColor = LocalLiquidGlassAccentColor.current ?:
-        if (isLightTheme) Color(0xFF0088FF)
-        else Color(0xFF0091FF)
-    val containerColor =
-        if (isLightTheme) Color(0xFFFAFAFA).copy(0.4f)
-        else Color(0xFF121212).copy(0.4f)
+        lerp(Color(0xFF0088FF), Color(0xFF0091FF), darkProgress)
+    val containerColor = lerp(
+        Color(0xFFFAFAFA).copy(0.4f), Color(0xFF121212).copy(0.4f), darkProgress,
+    )
 
     val tabsBackdrop = rememberLayerBackdrop()
 
@@ -285,8 +284,7 @@ fun LiquidBottomTabs(
                     onDrawSurface = {
                         val progress = dampedDragAnimation.pressProgress
                         drawRect(
-                            if (isLightTheme) Color.Black.copy(0.1f)
-                            else Color.White.copy(0.1f),
+                            lerp(Color.Black, Color.White, darkProgress).copy(0.1f),
                             alpha = 1f - progress
                         )
                         drawRect(Color.Black.copy(alpha = 0.03f * progress))
