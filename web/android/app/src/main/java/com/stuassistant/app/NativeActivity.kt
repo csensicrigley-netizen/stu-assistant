@@ -70,11 +70,34 @@ class NativeActivity:ComponentActivity() {
     override fun onDestroy() {work.cancel();feedback.close();store.close();super.onDestroy()}
 }
 
+/**
+ * Issue #35: interpolate the theme colour table instead of swapping it in one frame.
+ * Every field crosses over the same 220 ms tween, so background, cards, text and the glass
+ * controls move together. When the system asks for reduced motion (ANIMATOR_DURATION_SCALE
+ * is 0) the tween duration collapses to 0 and the table changes immediately, which keeps
+ * the existing accessibility behaviour and avoids double-looking transitions.
+ */
+@Composable private fun animatedNativeColors(target:NativeColors,reduced:Boolean):NativeColors {
+    val spec=tween<Color>(durationMillis=if(reduced) 0 else 220)
+    return NativeColors(
+        bg=animateColorAsState(target.bg,spec,label="nativeColorsBg").value,
+        surface=animateColorAsState(target.surface,spec,label="nativeColorsSurface").value,
+        ink=animateColorAsState(target.ink,spec,label="nativeColorsInk").value,
+        muted=animateColorAsState(target.muted,spec,label="nativeColorsMuted").value,
+        brand=animateColorAsState(target.brand,spec,label="nativeColorsBrand").value,
+        danger=animateColorAsState(target.danger,spec,label="nativeColorsDanger").value,
+        border=animateColorAsState(target.border,spec,label="nativeColorsBorder").value,
+        onBrand=animateColorAsState(target.onBrand,spec,label="nativeColorsOnBrand").value,
+    )
+}
+
 @Composable private fun NativeApplication(store:NativeStore,feedback:NativeFeedback,ready:Boolean,playLaunchReveal:Boolean,onLaunchRevealFinished:()->Unit,onThemeModeObserved:(String)->Unit,resumeEpoch:Int) {
     val s by store.state.collectAsState()
     val systemDark=isSystemInDarkTheme()
     val dark=s.theme=="dark" || (s.theme=="system"&&systemDark)
-    val colors=remember(dark,s.palette) {nativeColors(dark,s.palette)}
+    // Issue #35: keep the target table separate from the animated one so the window,
+    // status bar and system insets keep using the final colour instead of every frame.
+    val targetColors=remember(dark,s.palette) {nativeColors(dark,s.palette)}
     val launchState=remember {SundialLaunchState(playLaunchReveal)}
     val context=androidx.compose.ui.platform.LocalContext.current
     val activity=context as ComponentActivity
@@ -85,10 +108,14 @@ class NativeActivity:ComponentActivity() {
         }
     }
     LaunchedEffect(s.theme) { onThemeModeObserved(s.theme) }
-    LaunchedEffect(colors.bg) {
-        activity.window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(colors.bg.toArgb()))
+    LaunchedEffect(targetColors.bg) {
+        activity.window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(targetColors.bg.toArgb()))
     }
     val reduced=remember(resumeEpoch) {Settings.Global.getFloat(context.contentResolver,Settings.Global.ANIMATOR_DURATION_SCALE,1f)==0f}
+    // Issue #35: the native shell used to swap the colour table in a single frame, while the
+    // web build animated the same change through CSS transitions. Interpolate the table so the
+    // two layers behave alike; reduced motion still switches immediately.
+    val colors=animatedNativeColors(targetColors,reduced)
     var route by rememberSaveable {mutableStateOf("today")}
     var calendarOpen by rememberSaveable {mutableStateOf(false)}
     var campusView by rememberSaveable {mutableStateOf("notices")}
