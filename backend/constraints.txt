@@ -45,7 +45,7 @@ requests==2.34.2
 rpds-py==2026.9.1
 ruamel.yaml==0.19.1
 socksio==1.0.0
-soupsieve==3.0.4
+soupsieve==4.0
 sse-starlette==3.6.0
 starlette==1.10.0
 tomlkit==0.15.2
