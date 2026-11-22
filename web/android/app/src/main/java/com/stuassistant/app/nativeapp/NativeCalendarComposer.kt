@@ -27,7 +27,9 @@ import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.*
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.*
@@ -45,6 +47,7 @@ import kotlin.math.max
 import kotlin.math.sin
 
 private val CalendarRevealEase = CubicBezierEasing(.18f, .48f, .22f, 1f)
+private const val CALENDAR_INPUT_LIMIT = 200
 
 /** Feathered circular reveal in this layer's coordinate system, seeded at Submit. */
 private fun Modifier.calendarReveal(progress: Float, origin: Offset) = graphicsLayer {
@@ -64,12 +67,22 @@ private fun Modifier.calendarReveal(progress: Float, origin: Offset) = graphicsL
 
 /** Only an explicit submission calls Jev. Keyboard, header and review share one stable anchor. */
 @Composable
-fun NativeCalendarComposer(store: NativeStore, s: NativeState, inputBackdrop: Backdrop = LocalNativeBackdrop.current, close: () -> Unit) {
+internal fun NativeCalendarComposer(
+    store: NativeStore,
+    s: NativeState,
+    inputBackdrop: Backdrop = LocalNativeBackdrop.current,
+    initialDraft: CalendarComposerDraft? = null,
+    close: () -> Unit,
+) {
     val c = LocalNativeColors.current
     val scope = rememberCoroutineScope()
     val keyboard = LocalSoftwareKeyboardController.current
     val focus = remember { FocusRequester() }
-    var text by rememberSaveable { mutableStateOf("") }
+    var input by rememberSaveable(stateSaver = TextFieldValue.Saver) {
+        val text = initialDraft?.let { it.text.ifBlank { it.note } }?.take(CALENDAR_INPUT_LIMIT).orEmpty()
+        mutableStateOf(TextFieldValue(text, selection = TextRange(text.length)))
+    }
+    val text = input.text
     var phase by rememberSaveable { mutableStateOf("input") }
     var packed by rememberSaveable { mutableStateOf("[]") }
     var selected by rememberSaveable { mutableIntStateOf(0) }
@@ -125,8 +138,11 @@ fun NativeCalendarComposer(store: NativeStore, s: NativeState, inputBackdrop: Ba
                     reviewNeeded = items.any { (it.optJSONArray("issues")?.length() ?: 0) > 0 } || (response.optJSONArray("issues")?.length() ?: 0) > 0
                     items.map { it.getJSONObject("draft") }
                 }
-                packed = JSONArray(result).toString(); selected = 0
-                day = CalendarDrafts.date(result.first()) ?: day
+                val draftsWithLocalDetails = result.mapIndexed { index, draft ->
+                    if (index == 0 && initialDraft != null) initialDraft.applyTo(draft) else draft
+                }
+                packed = JSONArray(draftsWithLocalDetails).toString(); selected = 0
+                day = CalendarDrafts.date(draftsWithLocalDetails.first()) ?: day
                 phase = "review"
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) {
@@ -156,7 +172,7 @@ fun NativeCalendarComposer(store: NativeStore, s: NativeState, inputBackdrop: Ba
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding()) {
             Row(Modifier.padding(horizontal = 24.dp, vertical = 12.dp).fillMaxWidth().height(72.dp)
                 .semantics { contentDescription = "日历输入栏" }.padding(start = 8.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                BasicTextField(text, { if (phase == "input") text = it.take(200) },
+                BasicTextField(input, { if (phase == "input") input = it.copy(text = it.text.take(CALENDAR_INPUT_LIMIT)) },
                     Modifier.weight(1f).height(56.dp).wrapContentHeight(Alignment.CenterVertically).focusRequester(focus)
                         .semantics { contentDescription = "记一件事输入框" },
                     enabled = phase == "input", maxLines = 2,

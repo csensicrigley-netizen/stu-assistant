@@ -524,6 +524,42 @@ class NativeItemsInteractionInstrumentedTest {
         }
     }
 
+    @Test fun quickAddPassesTheTypedDraftToAiAndKeepsTheLocalCopy() {
+        val handoff = AtomicReference<CalendarComposerDraft>()
+        val title = "明天写实验报告"
+        val note = "核对第三组数据"
+        launch(now = "2026-11-24T09:42:00+08:00") {
+            NativeItemsPage(
+                NativeState(token = "offline-fixture", calendarFocusDate = "2026-11-24"), emptyList(),
+                onOpenAiComposer = { handoff.set(it) },
+                onSetRecordDone = { _, _ -> }, onSetCourseDone = { _, _ -> },
+            )
+        }.use {
+            tap("记一件事")
+            waitFor("收起新建")
+            fun type(tag: String, value: String) {
+                val field = nodes().first { it.isVisibleToUser && it.isEditable && it.viewIdResourceName == tag }
+                assertTrue(field.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, Bundle().apply {
+                    putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, value)
+                }))
+                waitFor(value)
+            }
+            type("items-quick-title", title)
+            type("items-quick-note", note)
+            tap("AI")
+            waitFor("记一件事")
+            val draft = checkNotNull(handoff.get())
+            assertEquals(title, draft.text)
+            assertEquals(note, draft.note)
+            val candidate = JSONObject().put("title", "写实验报告")
+            assertEquals(note, draft.applyTo(candidate).getJSONObject("details").getString("note"))
+            assertFalse(candidate.has("details"))
+            tap("记一件事")
+            waitFor(title)
+            waitFor(note)
+        }
+    }
+
     @Test fun pickingATimeFreeDateCreatesAnAllDayItem() {
         val saved = AtomicReference<JSONObject>()
         val title = "整理讲义"

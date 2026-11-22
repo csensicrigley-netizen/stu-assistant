@@ -129,6 +129,9 @@ class NativeActivity:ComponentActivity() {
     )
     var route by rememberSaveable {mutableStateOf("today")}
     var calendarOpen by rememberSaveable {mutableStateOf(false)}
+    var calendarDraft by key(s.server, s.user?.optString("id"), s.preview) {
+        rememberSaveable { mutableStateOf<CalendarComposerDraft?>(null) }
+    }
     var campusView by rememberSaveable {mutableStateOf("notices")}
     var connect by rememberSaveable {mutableStateOf(false)}
     var gateStart by rememberSaveable {mutableStateOf("hello")}
@@ -141,6 +144,10 @@ class NativeActivity:ComponentActivity() {
     }
     val onConnect:()->Unit={gateStart=if(s.token!=null&&!s.preview)"bind"else"account";gateCancelable=true;connect=true}
     val navigate:(String)->Unit={if(it.startsWith("campus:"))campusView=it.substringAfter(':');route=it}
+    val openCalendarComposer: (CalendarComposerDraft) -> Unit = { draft ->
+        calendarDraft = draft
+        calendarOpen = true
+    }
     val base=rememberLayerBackdrop()
     val page=rememberLayerBackdrop()
     val combined=rememberCombinedBackdrop(base,page)
@@ -157,7 +164,7 @@ class NativeActivity:ComponentActivity() {
     LaunchedEffect(s.hapticStrength) {if(s.hapticStrength==0)feedback.cancel()}
     BackHandler {activity.moveTaskToBack(true)}
     BackHandler(enabled=!needsWelcome&&!connect&&route!="today"&&sheets.entries.isEmpty()) {route=if(route=="import"||route=="medical")"me"else"today"}
-    CompositionLocalProvider(LocalCalendarComposer provides {calendarOpen=true},LocalNativeColors provides colors,LocalNativePalette provides s.palette,LocalNativeForegroundEpoch provides resumeEpoch,LocalNativeBackdrop provides base,LocalNativeFeedback provides feedback,LocalNativeStrength provides s.hapticStrength,LocalNativeConnect provides onConnect,LocalNativeSheets provides sheets,LocalNativeBottomBarSuppressor provides barSuppressor,LocalLiquidGlassDarkTheme provides dark,LocalLiquidGlassAccentColor provides colors.brand,LocalLiquidGlassReducedMotion provides reduced,LocalLiquidGlassThemeProgress provides themeProgress) {
+    CompositionLocalProvider(LocalCalendarComposer provides openCalendarComposer,LocalNativeColors provides colors,LocalNativePalette provides s.palette,LocalNativeForegroundEpoch provides resumeEpoch,LocalNativeBackdrop provides base,LocalNativeFeedback provides feedback,LocalNativeStrength provides s.hapticStrength,LocalNativeConnect provides onConnect,LocalNativeSheets provides sheets,LocalNativeBottomBarSuppressor provides barSuppressor,LocalLiquidGlassDarkTheme provides dark,LocalLiquidGlassAccentColor provides colors.brand,LocalLiquidGlassReducedMotion provides reduced,LocalLiquidGlassThemeProgress provides themeProgress) {
         Box(Modifier.fillMaxSize().background(if(launchState.active) launchStageColor(dark) else colors.bg)) {
             Box(Modifier.fillMaxSize().background(colors.bg).launchIrisRevealEffect(launchState,dark=dark)) {
                 val orbPrimary = colors.brand.copy(alpha = 0.15f + 0.07f * themeProgress)
@@ -245,7 +252,11 @@ class NativeActivity:ComponentActivity() {
                 NativeSheetHost(sheets,combined)
                 AnimatedVisibility(calendarOpen&&s.token!=null&&!s.preview, enter=slideInVertically(tween(420)){ -it/12 }+fadeIn(tween(220)), exit=slideOutVertically(tween(260)){ -it/12 }+fadeOut(tween(220))) {
                     CompositionLocalProvider(LocalNativeBackdrop provides base) {
-                        NativeCalendarComposer(store,s,inputBackdrop=combined) {calendarOpen=false}
+                        key(calendarDraft) {
+                            NativeCalendarComposer(store, s, inputBackdrop = combined, initialDraft = calendarDraft) {
+                                calendarOpen = false
+                            }
+                        }
                     }
                 }
             }

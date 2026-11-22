@@ -27,7 +27,7 @@ import androidx.compose.ui.unit.*
 import org.json.JSONObject
 import kotlin.math.roundToInt
 
-val LocalCalendarComposer = staticCompositionLocalOf<() -> Unit> { {} }
+internal val LocalCalendarComposer = staticCompositionLocalOf<(CalendarComposerDraft) -> Unit> { {} }
 
 /** Read-only context and editable drafts share one three-day viewport.
  * Drawing and gesture hit testing use the same [calendarBoxes] geometry.

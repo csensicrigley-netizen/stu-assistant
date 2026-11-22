@@ -1022,7 +1022,7 @@ internal fun ItemsQuickAddSheet(
     onDraftNoteChange: (String) -> Unit,
     onCyclePriority: () -> Unit,
     onSetManual: (date: String?, startMin: Int?, endMin: Int?, allDay: Boolean, tokenOff: Boolean) -> Unit,
-    onOpenAiComposer: () -> Unit,
+    onOpenAiComposer: (CalendarComposerDraft) -> Unit,
     onSubmit: (title: String, note: String, priority: ItemsPriority, date: String?, startMin: Int?, endMin: Int?, allDay: Boolean) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -1288,8 +1288,16 @@ internal fun ItemsQuickAddSheet(
                         if (canUseOnlineAi) {
                             ItemsSheetTextAction("AI", "spark", c.brand) {
                                 tick()
-                                dismiss()
-                                onOpenAiComposer()
+                                onOpenAiComposer(
+                                    CalendarComposerDraft(
+                                        text = draftTitle,
+                                        note = draftNote,
+                                        priority = draftPriority,
+                                        date = manualDate.takeUnless { tokenOff },
+                                        startMin = manualStartMin.takeUnless { manualAllDay },
+                                        endMin = manualEndMin.takeUnless { manualAllDay },
+                                    ),
+                                )
                             }
                         }
                         Spacer(Modifier.weight(1f))

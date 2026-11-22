@@ -1,8 +1,33 @@
 package com.stuassistant.app.nativeapp
 
 import org.json.JSONObject
+import java.io.Serializable
 import java.time.Instant
 import kotlin.math.roundToInt
+
+internal data class CalendarComposerDraft(
+    val text: String,
+    val note: String,
+    val priority: ItemsPriority,
+    val date: String?,
+    val startMin: Int?,
+    val endMin: Int?,
+) : Serializable {
+    fun applyTo(candidate: JSONObject): JSONObject {
+        var draft = candidate
+        if (note.isNotBlank()) {
+            val existing = draft.optJSONObject("details")?.optString("note").orEmpty()
+            val combined = listOf(note.trim(), existing).filter { it.isNotBlank() }.distinct().joinToString("\n")
+            draft = ItemsDrafts.setNote(draft, combined)
+        }
+        if (priority != ItemsPriority.NORMAL) draft = ItemsDrafts.setPriority(draft, priority)
+        if (date != null && CalendarDrafts.date(draft) == null) {
+            draft = if (startMin != null) ItemsDrafts.setTimed(draft, date, startMin, endMin ?: startMin + 60)
+            else ItemsDrafts.setAllDay(draft, date)
+        }
+        return draft
+    }
+}
 
 /** Canonical server fields are kept intact. Visual edits alter only their owned field. */
 internal object CalendarDrafts {

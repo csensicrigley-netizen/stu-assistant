@@ -185,7 +185,7 @@ fun NativeCalendarItemsScreen(
             records = records,
             initialRoute = route,
             error = error,
-            onOpenAiComposer = { if (s.preview || s.token == null) onConnect() else openAiComposer() },
+            onOpenAiComposer = { draft -> if (s.preview || s.token == null) onConnect() else openAiComposer(draft) },
             onSetRecordDone = { id, done ->
                 records = records.map { r ->
                     if (r.optString("id") == id) JSONObject(r.toString()).put("done", done) else r
@@ -258,7 +258,7 @@ internal fun NativeItemsPage(
     initialAcadOpen: Boolean = initialRoute.substringAfter(':', "") == "academic",
     error: String? = null,
     onAdd: (() -> Unit)? = null,
-    onOpenAiComposer: (() -> Unit)? = null,
+    onOpenAiComposer: ((CalendarComposerDraft) -> Unit)? = null,
     onSetRecordDone: (String, Boolean) -> Unit,
     onTogglePlan: (JSONObject) -> Unit = {},
     onSetCourseDone: (String, Boolean) -> Unit,
@@ -1300,7 +1300,12 @@ internal fun NativeItemsPage(
                     quickManualAllDay = ma
                     quickTokenOff = to
                 },
-                onOpenAiComposer = { onOpenAiComposer?.invoke() },
+                onOpenAiComposer = { draft ->
+                    onOpenAiComposer?.let { open ->
+                        quickAddOpen = false
+                        open(draft)
+                    }
+                },
                 onSubmit = { title, note, prio, date, startMin, endMin, allDay ->
                     val rec = ItemsDrafts.newRecord(
                         title = title,
