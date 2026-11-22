@@ -89,6 +89,29 @@ class NativeStore internal constructor(
         return result
     }
 
+    /** Generate a short-lived one-time export ticket for the companion `today` app. */
+    suspend fun exportTodayTimetable(semester: String? = null): NativeTodayExportTicket = withContext(Dispatchers.IO) {
+        val owner = session()
+        requireSignedIn(owner)
+        val body = JSONObject().apply {
+            if (!semester.isNullOrBlank()) put("semester", semester.trim())
+        }
+        val response = requestOwned(owner, "/v1/export/today", "POST", body)
+        val code = response.optString("code").trim()
+        val deepLink = response.optString("deep_link").trim()
+        if (code.isBlank() || !isAllowedTodayDeepLink(deepLink)) {
+            throw invalidResponse("导出响应缺少有效的导入码或跳转链接")
+        }
+        NativeTodayExportTicket(
+            code = code,
+            expiresIn = response.optInt("expires_in", 300),
+            deepLink = deepLink,
+            semester = response.optString("semester").trim(),
+            campus = response.optString("campus").trim(),
+            courseCount = response.optInt("course_count", 0),
+        )
+    }
+
     private fun calendarKey(): String {
         val current = state.value
         val uid = userId(current) ?: throw NativeApiError("not_signed_in", 401, "请先登录助手账号")
@@ -287,17 +310,35 @@ class NativeStore internal constructor(
         }
     }
 
-    fun setAppearance(theme: String? = null, palette: String? = null, strength: Int? = null) {
+    fun setAppearance(
+        theme: String? = null,
+        palette: String? = null,
+        strength: Int? = null,
+        style: String? = null,
+    ) {
         synchronized(lock) {
             if (closed) return
             val nextTheme = theme?.takeIf { it in setOf("system", "light", "dark") } ?: state.value.theme
             val nextPalette = palette?.takeIf { it in NATIVE_PALETTE_KEYS } ?: state.value.palette
+            val nextStyle = style?.takeIf { it in NATIVE_STYLE_KEYS } ?: state.value.style
             val nextStrength = strength?.coerceIn(0, 100) ?: state.value.hapticStrength
-            if (nextTheme == state.value.theme && nextPalette == state.value.palette && nextStrength == state.value.hapticStrength) return
-            prefs.edit().putString("theme", nextTheme).putString("palette", nextPalette)
-                .putInt("strength", nextStrength).apply()
-            mutableState.value = state.value.copy(theme = nextTheme, palette = nextPalette,
-                hapticStrength = nextStrength)
+            if (nextTheme == state.value.theme &&
+                nextPalette == state.value.palette &&
+                nextStyle == state.value.style &&
+                nextStrength == state.value.hapticStrength
+            ) return
+            prefs.edit()
+                .putString("theme", nextTheme)
+                .putString("palette", nextPalette)
+                .putString("style", nextStyle)
+                .putInt("strength", nextStrength)
+                .apply()
+            mutableState.value = state.value.copy(
+                theme = nextTheme,
+                palette = nextPalette,
+                style = nextStyle,
+                hapticStrength = nextStrength,
+            )
         }
     }
 
@@ -740,10 +781,13 @@ class NativeStore internal constructor(
         } catch (error: Exception) { return base.copy(error = message(error)) }
     }
 
-    private fun appearanceState(server: String) = NativeState(server = server,
+    private fun appearanceState(server: String) = NativeState(
+        server = server,
         theme = prefs.getString("theme", "system")?.takeIf { it in setOf("system", "light", "dark") } ?: "system",
-        palette = normalizeNativePalette(prefs.getString("palette", "sweet")),
-        hapticStrength = prefs.getInt("strength", 100).coerceIn(0, 100))
+        palette = normalizeNativePalette(prefs.getString("palette", NATIVE_DEFAULT_PALETTE)),
+        style = normalizeNativeStyle(prefs.getString("style", NATIVE_DEFAULT_STYLE)),
+        hapticStrength = prefs.getInt("strength", 100).coerceIn(0, 100),
+    )
 
     private fun withSchool(base: NativeState): NativeState {
         val uid = userId(base) ?: return base

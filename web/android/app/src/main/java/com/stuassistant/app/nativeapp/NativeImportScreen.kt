@@ -84,7 +84,7 @@ internal fun nativeImportDocument(doc:AcademicTimetableDoc):JSONObject = JSONObj
                 NButton("‹ 换校区",{go(0)},haptic=NativeButtonHaptic.Navigation)
                 NChips(importMethods,method,{method=it})
                 when(method) {
-                    "paste"->{NField("把课表粘在这里",text,{text=it},multiline=true,placeholder="细胞生物学实验 | 周四 6-9节 | 1-16周 | 何昭明 | 桑浦山-细胞生物学实验室-理433\n高等数学 | 周一 1-2节,周三 3-4节 | 1-16周 | 张三 | 桑浦山-E305",minHeight=190);NText("一行一门课，竖线或制表符分隔。从 Excel 直接复制也行。",14,muted=true);ImportHowTo()}
+                    "paste"->{NField("把课表粘在这里",text,{text=it},multiline=true,placeholder="前端工程实践 | 周四 6-9节 | 1-16周 | 沈清扬 | 实验楼-数字媒体室508\n高等数学 | 周一 1-2节,周三 3-4节 | 1-16周 | 林致远 | 明理楼-A201",minHeight=190);NText("一行一门课，竖线或制表符分隔。从 Excel 直接复制也行。",14,muted=true);ImportHowTo()}
                     "csv"->NCard {
                         NText("Excel 里按「课程名称 / 星期 / 节次 / 周次 / 教师 / 地点」六列填，存成 CSV UTF-8 再选进来。先下模板最省事。",14,muted=true)
                         FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
@@ -136,10 +136,10 @@ internal fun nativeImportDocument(doc:AcademicTimetableDoc):JSONObject = JSONObj
     NRow("怎么填（三种格式，抄一种就行）",trailing=if(open)"⌃"else"⌄",onClick={open=!open})
     if(open)NCard {
         NText("① 一行一课（推荐）",14,true)
-        NText("课程名 | 时间 | 周次 | 教师 | 地点\n细胞生物学实验 | 周四 6-9节 | 1-16周 | 何昭明 | 桑浦山-理433\n高等数学 | 周一 1-2节,周三 3-4节 | 1-16周 | 张三 | 桑浦山-E305",14)
+        NText("课程名 | 时间 | 周次 | 教师 | 地点\n前端工程实践 | 周四 6-9节 | 1-16周 | 沈清扬 | 实验楼-508\n高等数学 | 周一 1-2节,周三 3-4节 | 1-16周 | 林致远 | 明理楼-A201",14)
         NText("竖线换成制表符（Tab）也行。时间和周次能省，但课程名必须有。",14,muted=true)
         NText("② 从 Excel 直接复制",14,true)
-        NText("课程名称\t星期\t节次\t周次\t教师\t地点\n细胞生物学实验\t四\t6-9\t1-16\t何昭明\t理433",14)
+        NText("课程名称\t星期\t节次\t周次\t教师\t地点\n前端工程实践\t四\t6-9\t1-16\t沈清扬\t实验楼-508",14)
         NText("表头认这些写法：课程名称/课程名/课程、星期/周几、节次/节/时间、周次/周、教师/老师、地点/教室。",14,muted=true)
         NText("③ 简写也认",14,true)
         NText("周四 6-9节   星期四 第6-9节   四 6-9   Thu 6-9\n1-16周  第1-16周  1,3,5周  1-8,10-16周  1-16单周\n节次：6-9   第6节-第9节   6,7,8,9",14)

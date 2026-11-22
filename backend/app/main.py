@@ -12,7 +12,7 @@ import time
 import threading
 from typing import Any
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, Response
+from fastapi import Body, Depends, FastAPI, Header, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, field_validator
 
@@ -26,7 +26,14 @@ from .config import settings
 from .db import DB, now
 from .push.router import build_router
 from .stucompat import install as install_compat_patches
-from .ratelimit import bind_limiter, login_account_limiter, login_ip_limiter, register_limiter
+from .ratelimit import (
+    bind_limiter,
+    login_account_limiter,
+    login_ip_limiter,
+    register_limiter,
+    today_claim_limiter,
+    today_export_limiter,
+)
 from .sync import is_syncing, start_sync
 from .tenancy import purge_tenant
 
@@ -1130,6 +1137,49 @@ def med_sync(body: MedSyncIn, uid: str = Depends(current_user)) -> dict:
 @app.delete("/v1/med/session")
 def med_unlink(uid: str = Depends(current_user)) -> dict:
     return {"ok": DB(settings.db_path).med_session_delete(uid)}
+
+
+# --------------------------------------------------------------------------
+# today 一键课表导出（一次性短码，不含任何用户身份或凭据）
+# --------------------------------------------------------------------------
+
+class TodayExportIn(BaseModel):
+    semester: str | None = Field(default=None, max_length=32)
+
+
+class TodayClaimIn(BaseModel):
+    code: str = Field(default="", max_length=64)
+
+
+@app.post("/v1/export/today")
+def export_today_create(
+    body: TodayExportIn | None = Body(default=None),
+    uid: str = Depends(current_user),
+) -> dict:
+    from . import today_export
+
+    if not today_export_limiter.allow(uid):
+        raise HTTPException(429, "too_many_attempts")
+    db = DB(settings.db_path)
+    if settings.demo and not db.items_of(uid, "timetable"):
+        _seed_demo(uid)
+    semester = (body.semester or "").strip() if body else ""
+    ticket = today_export.create_export_ticket(db, uid, semester=semester)
+    if ticket is None:
+        raise HTTPException(404, "no_timetable")
+    return ticket
+
+
+@app.post("/v1/export/today/claim")
+def export_today_claim(body: TodayClaimIn, request: Request) -> dict:
+    from . import today_export
+
+    if not today_claim_limiter.allow(_client_ip(request)):
+        raise HTTPException(429, "too_many_attempts")
+    snapshot = today_export.claim_export_ticket(DB(settings.db_path), body.code)
+    if snapshot is None:
+        raise HTTPException(404, "ticket_invalid_or_expired")
+    return snapshot
 
 
 @app.api_route("/v1/{rest:path}", methods=["GET", "POST", "DELETE"], include_in_schema=False)

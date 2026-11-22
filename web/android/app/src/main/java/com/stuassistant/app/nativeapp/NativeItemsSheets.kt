@@ -451,7 +451,7 @@ internal fun ItemsEventEditSheet(
             }
 
             val sheetShape = remember { RoundedRectangle(26.dp) }
-            LiquidDialogSurface(
+            NativeStyledDialogSurface(
                 backdrop = backdrop,
                 shape = sheetShape,
                 modifier = Modifier
@@ -1105,7 +1105,7 @@ internal fun ItemsQuickAddSheet(
                     .background(Color.Black.copy(alpha = 0.28f))
                     .pointerInput(visible) { detectTapGestures { if (visible) dismiss() } },
             )
-            LiquidDialogSurface(
+            NativeStyledDialogSurface(
                 backdrop = backdrop,
                 shape = RoundedRectangle(26.dp),
                 modifier = Modifier

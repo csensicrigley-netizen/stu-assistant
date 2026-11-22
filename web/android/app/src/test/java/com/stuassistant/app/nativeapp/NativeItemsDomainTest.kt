@@ -94,9 +94,16 @@ class NativeItemsDomainTest {
         for (key in listOf("sweet", "classic", "phoenix", "pine", "lilac", "latte")) {
             assertEquals(key, normalizeNativePalette(key))
         }
-        assertEquals("sweet", normalizeNativePalette(null))
-        assertEquals("sweet", normalizeNativePalette(""))
-        assertEquals("sweet", normalizeNativePalette("unknown-theme"))
+        assertEquals(NATIVE_DEFAULT_PALETTE, normalizeNativePalette(null))
+        assertEquals(NATIVE_DEFAULT_PALETTE, normalizeNativePalette(""))
+        assertEquals(NATIVE_DEFAULT_PALETTE, normalizeNativePalette("unknown-theme"))
+
+        for (style in NATIVE_STYLE_KEYS) {
+            assertEquals(style, normalizeNativeStyle(style))
+        }
+        assertEquals(NATIVE_DEFAULT_STYLE, normalizeNativeStyle(null))
+        assertEquals(NATIVE_DEFAULT_STYLE, normalizeNativeStyle(""))
+        assertEquals(NATIVE_DEFAULT_STYLE, normalizeNativeStyle("unknown-style"))
     }
 
     @Test fun itemsDraftsRoundTripsTimedAllDayInboxAndPreservesUnknownFields() {

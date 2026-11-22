@@ -2,13 +2,19 @@ package com.stuassistant.app.nativeapp
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.*
 import androidx.compose.foundation.interaction.*
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
@@ -69,7 +75,10 @@ data class NativeColors(
     val danger: Color,
     val border: Color,
     val onBrand: Color = Color.White,
-)
+) {
+    val card: Color get() = surface
+    val line: Color get() = border
+}
 
 val LocalNativeColors = staticCompositionLocalOf {
     NativeColors(
@@ -86,7 +95,8 @@ val LocalNativeBackdrop = staticCompositionLocalOf<Backdrop> { error("Native bac
 val LocalNativeFeedback = staticCompositionLocalOf<NativeFeedbackSink?> { null }
 val LocalNativeStrength = staticCompositionLocalOf { 100 }
 val LocalNativeConnect = staticCompositionLocalOf<() -> Unit> { {} }
-val LocalNativePalette = staticCompositionLocalOf { "sweet" }
+val LocalNativePalette = staticCompositionLocalOf { NATIVE_DEFAULT_PALETTE }
+val LocalNativeStyle = staticCompositionLocalOf { NATIVE_DEFAULT_STYLE }
 val LocalNativeForegroundEpoch = staticCompositionLocalOf { 0 }
 
 val NativeFontFamily = FontFamily(
@@ -259,11 +269,18 @@ fun NPage(
     title: String,
     eyebrow: String = "",
     actions: (@Composable RowScope.() -> Unit)? = null,
+    contentKey: Any? = null,
+    contentForward: Boolean = true,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val scroll = rememberScrollState()
     val c = LocalNativeColors.current
     val topEdgeDepth = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 40.dp
+    LaunchedEffect(contentKey) {
+        if (contentKey != null && scroll.value > 0) {
+            scroll.scrollTo(0)
+        }
+    }
 
     Box(
         Modifier
@@ -316,7 +333,29 @@ fun NPage(
                     }
                 }
             }
-            content()
+            if (contentKey == null) {
+                content()
+            } else {
+                val forward by rememberUpdatedState(contentForward)
+                AnimatedContent(
+                    targetState = contentKey,
+                    transitionSpec = {
+                        val dir = if (forward) 1 else -1
+                        (slideInHorizontally(animationSpec = NativeMotion.enterOffset()) { (it / 7) * dir } +
+                            NativeMotion.fadeIn(190)).togetherWith(
+                            slideOutHorizontally(animationSpec = NativeMotion.exit(150)) { (-it / 9) * dir } +
+                                NativeMotion.fadeOut(130)
+                        ).using(SizeTransform(clip = false))
+                    },
+                    label = "npage-subcontent",
+                ) {
+                    Column(
+                        Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(18.dp),
+                        content = content,
+                    )
+                }
+            }
         }
     }
 }
@@ -403,6 +442,32 @@ internal fun NativeGlassButton(
 ) {
     val source = remember { MutableInteractionSource() }
     val commitRelease = NativePressFeedback(source, enabled, haptic)
+    if (LocalNativeStyle.current == "modern") {
+        val c = LocalNativeColors.current
+        val pressed by source.collectIsPressedAsState()
+        val scale = rememberPressScale(pressed, NativeMotion.PressRow, enabled)
+        val borderColor = c.border.copy(alpha = if (enabled) 0.52f else 0.22f)
+        Row(
+            modifier = modifier
+                .nativeScale(scale)
+                .clip(shape)
+                .background(surfaceColor, shape)
+                .border(0.75.dp, borderColor, shape)
+                .clickable(
+                    interactionSource = source,
+                    indication = null,
+                    enabled = enabled,
+                    role = Role.Button,
+                    onClick = { commitRelease(); onClick() },
+                )
+                .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+            verticalAlignment = Alignment.CenterVertically,
+            content = content,
+        )
+        return
+    }
     LiquidButton(
         { commitRelease(); onClick() },
         LocalNativeBackdrop.current,
@@ -500,12 +565,58 @@ internal fun NativePressFeedback(
 }
 
 /**
- * Translucent iOS Liquid Glass card surface for 120Hz scrolling:
- * allows warm campus ambient light orbs on `base` to softly glow through frosted glass fills,
- * framed by diagonal specular rim catchlights without per-card RenderEffect blur overhead.
+ * Card surface modifier supporting both Liquid Glass ("glass") and Modern ("modern") material styles.
  */
 @Composable
 fun Modifier.nativeGlassCard(
+    radiusDp: Int = 22,
+    tint: Color? = null,
+    elevated: Boolean = true,
+): Modifier = if (LocalNativeStyle.current == "modern") {
+    nativeOpaqueCard(radiusDp, tint, elevated)
+} else {
+    nativeTranslucentCard(radiusDp, tint, elevated)
+}
+
+@Composable
+private fun Modifier.nativeOpaqueCard(
+    radiusDp: Int,
+    tint: Color?,
+    elevated: Boolean,
+): Modifier {
+    val c = LocalNativeColors.current
+    val dark = LocalLiquidGlassDarkTheme.current ?: isSystemInDarkTheme()
+    val shape = RoundedCornerShape(radiusDp.dp)
+    val fill = tint ?: c.surface
+    val borderColor = if (tint != null) {
+        c.border.copy(alpha = 0.22f)
+    } else if (dark) {
+        c.border.copy(alpha = 0.85f)
+    } else {
+        c.border.copy(alpha = 0.65f)
+    }
+    val shadowAmbient = Color.Black.copy(alpha = if (dark) 0.24f else 0.05f)
+    val shadowSpot = Color.Black.copy(alpha = if (dark) 0.32f else 0.08f)
+    return this
+        .then(
+            if (elevated) {
+                Modifier.shadow(
+                    elevation = if (dark) 6.dp else 4.dp,
+                    shape = shape,
+                    ambientColor = shadowAmbient,
+                    spotColor = shadowSpot,
+                )
+            } else {
+                Modifier
+            },
+        )
+        .clip(shape)
+        .background(fill, shape)
+        .border(0.75.dp, borderColor, shape)
+}
+
+@Composable
+private fun Modifier.nativeTranslucentCard(
     radiusDp: Int = 22,
     tint: Color? = null,
     elevated: Boolean = true,
@@ -690,7 +801,9 @@ fun NChips(
     val callback by rememberUpdatedState(onSelect)
     val tick = nHapticFeedback(haptic ?: "selection")
     val c = LocalNativeColors.current
-    LiquidBottomTabs(
+    val dark = LocalLiquidGlassDarkTheme.current ?: isSystemInDarkTheme()
+    val modern = isModernStyle(LocalNativeStyle.current)
+    NativeStyledTabs(
         selectedTabIndex = { options.indexOfFirst { it.first == current }.coerceAtLeast(0) },
         onTabSelected = { i ->
             options.getOrNull(i)?.first?.let {
@@ -703,21 +816,23 @@ fun NChips(
         backdrop = LocalNativeBackdrop.current,
         tabsCount = options.size,
         modifier = Modifier.fillMaxWidth().semantics { isTraversalGroup = true },
+        isLightTheme = !dark,
+        accentColor = c.brand,
+        compact = true,
     ) {
         options.forEach { (key, label) ->
             val isSelected = key == current
-            LiquidBottomTab(
-                onClick = {
-                    if (key != current) {
-                        if (haptic != null) tick()
-                        callback(key)
-                    }
-                },
-                modifier = Modifier.semantics {
-                    selected = isSelected
-                    contentDescription = label
-                },
-            ) {
+            val onClick = {
+                if (key != current) {
+                    if (haptic != null) tick()
+                    callback(key)
+                }
+            }
+            val itemModifier = Modifier.semantics {
+                selected = isSelected
+                contentDescription = label
+            }
+            val labelContent: @Composable ColumnScope.() -> Unit = {
                 BasicText(
                     text = label,
                     maxLines = 1,
@@ -731,6 +846,11 @@ fun NChips(
                         align = TextAlign.Center,
                     ),
                 )
+            }
+            if (modern) {
+                NativeStyledTab(onClick = onClick, modifier = itemModifier, content = labelContent)
+            } else {
+                LiquidBottomTab(onClick = onClick, modifier = itemModifier, content = labelContent)
             }
         }
     }

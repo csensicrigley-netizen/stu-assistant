@@ -519,7 +519,7 @@ internal fun ItemsScalePopover(
                     .fillMaxSize()
                     .pointerInput(Unit) { detectTapGestures { onDismiss() } },
             )
-            LiquidDialogSurface(
+            NativeStyledDialogSurface(
                 backdrop = backdrop,
                 shape = RoundedRectangle(18.dp),
                 modifier = Modifier
@@ -625,7 +625,7 @@ internal fun ItemsMonthDrawer(
         val centerYear = runCatching { LocalDate.parse(centerWed).year }.getOrNull() ?: 2026
         val pos = runCatching { AcademicCalendar.position(centerWed) }.getOrNull()
 
-        LiquidDialogSurface(
+        NativeStyledDialogSurface(
             backdrop = backdrop,
             shape = RoundedRectangle(20.dp),
             modifier = Modifier

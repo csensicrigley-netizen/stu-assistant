@@ -2,6 +2,7 @@ package com.stuassistant.app.nativeapp
 
 import android.view.View
 import android.view.ViewTreeObserver
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
@@ -56,17 +58,19 @@ import kotlin.math.roundToInt
 fun NativeCampusScreen(
     store: NativeStore,
     s: NativeState,
-    initialSection: String = "notices",
+    initialSection: String = "home",
     onConnect: () -> Unit = {},
     onSectionChange: (String) -> Unit = {},
 ) {
-    var section by rememberSaveable { mutableStateOf(initialSection) }
+    val sectionOrder = listOf("home", "notices", "life", "calendar")
+    var section by rememberSaveable {
+        mutableStateOf(initialSection.takeIf { it in sectionOrder } ?: "home")
+    }
     LaunchedEffect(initialSection) {
-        section = initialSection.takeIf { it in listOf("notices", "life", "calendar") } ?: "notices"
+        section = initialSection.takeIf { it in sectionOrder } ?: "home"
     }
     val active = campusForeground()
     val now = campusNow(active)
-    val sectionOrder = listOf("notices", "life", "calendar")
     val currentIdx = sectionOrder.indexOf(section).coerceAtLeast(0)
     fun selectSection(next: String) {
         if (next != section) {
@@ -74,13 +78,77 @@ fun NativeCampusScreen(
             onSectionChange(next)
         }
     }
-    NPage("校园", "汕头大学", actions = { CampusModePill(store, s, onConnect) }) {
-        NChips(
-            options = listOf("notices" to "通知", "life" to "生活", "calendar" to "校历"),
-            value = section,
-            onSelect = { selectSection(it) },
-            haptic = "selection",
-        )
+    NPage("校园", "", actions = { CampusModePill(store, s, onConnect) }) {
+        val c = LocalNativeColors.current
+        val tick = nSelectionFeedback()
+        val tabs = listOf("home" to "常用", "notices" to "通知", "life" to "生活", "calendar" to "校历")
+        Column(Modifier.fillMaxWidth()) {
+            Row(
+                Modifier.fillMaxWidth().selectableGroup(),
+                horizontalArrangement = Arrangement.spacedBy(24.dp),
+            ) {
+                tabs.forEach { (key, label) ->
+                    val selected = section == key
+                    val tabInteraction = remember { MutableInteractionSource() }
+                    val tabPressed by tabInteraction.collectIsPressedAsState()
+                    val tabScale = rememberPressScale(tabPressed, NativeMotion.PressCell)
+                    val tabColor by animateColorAsState(
+                        targetValue = if (selected) c.ink else c.muted,
+                        animationSpec = NativeMotion.select(),
+                        label = "campus-tab-ink",
+                    )
+                    val barAlpha by animateFloatAsState(
+                        targetValue = if (selected) 1f else 0f,
+                        animationSpec = NativeMotion.select(0.001f),
+                        label = "campus-tab-bar-alpha",
+                    )
+                    val barScale by animateFloatAsState(
+                        targetValue = if (selected) 1f else 0.35f,
+                        animationSpec = NativeMotion.pop(0.001f),
+                        label = "campus-tab-bar-scale",
+                    )
+                    Column(
+                        Modifier
+                            .nativeScale(tabScale)
+                            .selectable(
+                                selected = selected,
+                                interactionSource = tabInteraction,
+                                indication = null,
+                                role = Role.Tab,
+                            ) {
+                                if (!selected) {
+                                    tick()
+                                    selectSection(key)
+                                }
+                            }
+                            .padding(vertical = 8.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        NText(
+                            label,
+                            16,
+                            bold = selected,
+                            color = tabColor,
+                            maxLines = 1,
+                            softWrap = false,
+                        )
+                        Box(
+                            Modifier
+                                .width(22.dp)
+                                .height(3.dp)
+                                .graphicsLayer {
+                                    alpha = barAlpha
+                                    scaleX = barScale
+                                }
+                                .clip(Capsule())
+                                .background(c.ink),
+                        )
+                    }
+                }
+            }
+            Box(Modifier.fillMaxWidth().height(0.75.dp).background(c.border.copy(alpha = 0.65f)))
+        }
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -98,9 +166,217 @@ fun NativeCampusScreen(
             ) { targetSection ->
                 Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(20.dp)) {
                     when (targetSection) {
+                        "home" -> CampusHome(
+                            s = s,
+                            now = now,
+                            onSelectSection = ::selectSection,
+                        )
                         "life" -> CampusLife(store, s, now, active)
                         "calendar" -> CampusCalendar(now)
                         else -> CampusNotices(s, now)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CampusHome(
+    s: NativeState,
+    now: AcademicMoment,
+    onSelectSection: (String) -> Unit,
+) {
+    val c = LocalNativeColors.current
+    val tones = currentNativeSemanticTones()
+    val context = LocalContext.current
+    var showAllServices by rememberSaveable { mutableStateOf(false) }
+
+    val quickServices = listOf(
+        Triple("图书馆", "book") { onSelectSection("life") },
+        Triple("教务系统", "study") { nativeOpenLink(context, "http://jw.stu.edu.cn/") },
+        Triple("一卡通", "bolt") { nativeOpenLink(context, "http://192.168.48.49:8080/hpao/main") },
+        Triple("综合报修", "spark") { nativeOpenLink(context, "http://repair.stu.edu.cn/") },
+    )
+
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            NText("常用服务", 19, bold = true)
+            NButton(
+                label = if (showAllServices) "收起" else "全部服务",
+                onClick = { showAllServices = !showAllServices },
+                haptic = NativeButtonHaptic.Navigation,
+            )
+        }
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            quickServices.forEach { (label, icon, action) ->
+                val tileInteraction = remember { MutableInteractionSource() }
+                val tilePressed by tileInteraction.collectIsPressedAsState()
+                val tileScale = rememberPressScale(tilePressed, NativeMotion.PressCell)
+                Column(
+                    Modifier
+                        .weight(1f)
+                        .nativeScale(tileScale)
+                        .clip(RoundedCornerShape(16.dp))
+                        .clickable(
+                            interactionSource = tileInteraction,
+                            indication = null,
+                            role = Role.Button,
+                            onClick = action,
+                        )
+                        .padding(vertical = 8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Box(
+                        Modifier
+                            .size(56.dp)
+                            .nativeGlassCard(18, elevated = false),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        NativeIcon(icon, c.brand, size = 24.dp, strokeWidth = 1.95f)
+                    }
+                    NText(label, 13, bold = true, maxLines = 1, softWrap = false)
+                }
+            }
+        }
+        if (showAllServices) {
+            CampusEntrances()
+        }
+    }
+
+    val pos = AcademicCalendar.position(now.date)
+    val term = pos?.term ?: AcademicCalendar.currentOrNext(now.date)
+    val weekText = pos?.week?.let { "第 $it 周" } ?: term.label
+
+    Row(
+        Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        val lifeInteraction = remember { MutableInteractionSource() }
+        val lifePressed by lifeInteraction.collectIsPressedAsState()
+        val lifeScale = rememberPressScale(lifePressed, NativeMotion.PressCard)
+        Column(
+            Modifier
+                .weight(1f)
+                .fillMaxHeight()
+                .nativeScale(lifeScale)
+                .nativeGlassCard(20)
+                .clickable(
+                    interactionSource = lifeInteraction,
+                    indication = null,
+                    role = Role.Button,
+                ) { onSelectSection("life") }
+                .padding(horizontal = 16.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                NIconBadge("bus", c.brand, sizeDp = 38, iconDp = 18)
+                NTag("实时", tones.leaf)
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                NText("生活服务", 16, bold = true, maxLines = 1, softWrap = false)
+                NText("充电桩 · 校车 · 常用入口", 12, muted = true, maxLines = 1, softWrap = false)
+            }
+        }
+
+        val calInteraction = remember { MutableInteractionSource() }
+        val calPressed by calInteraction.collectIsPressedAsState()
+        val calScale = rememberPressScale(calPressed, NativeMotion.PressCard)
+        Column(
+            Modifier
+                .weight(1f)
+                .fillMaxHeight()
+                .nativeScale(calScale)
+                .nativeGlassCard(20)
+                .clickable(
+                    interactionSource = calInteraction,
+                    indication = null,
+                    role = Role.Button,
+                ) { onSelectSection("calendar") }
+                .padding(horizontal = 16.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                NIconBadge("calendar", c.brand, sizeDp = 38, iconDp = 18)
+                NTag(weekText, c.brand)
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                NText("学年日历", 16, bold = true, maxLines = 1, softWrap = false)
+                NText("${AcademicClock.monthDay(now.date)} · ${AcademicClock.weekdayText(now.weekday)}", 12, muted = true, maxLines = 1, softWrap = false)
+            }
+        }
+    }
+
+    val notices = remember(s.notices) { s.notices.map(AcademicRecords::notice).take(3) }
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            NText("校园新鲜事", 19, bold = true)
+            NButton(
+                label = "全部通知",
+                onClick = { onSelectSection("notices") },
+                haptic = NativeButtonHaptic.Navigation,
+            )
+        }
+        if (notices.isEmpty()) {
+            NCard {
+                NText("暂无最新校园通知", 14, muted = true)
+            }
+        } else {
+            NCard {
+                notices.forEachIndexed { index, notice ->
+                    if (index > 0) NDivider()
+                    val noticeInteraction = remember { MutableInteractionSource() }
+                    val noticePressed by noticeInteraction.collectIsPressedAsState()
+                    val noticeScale = rememberPressScale(noticePressed, NativeMotion.PressRow)
+                    Column(
+                        Modifier
+                            .fillMaxWidth()
+                            .nativeScale(noticeScale)
+                            .clip(RoundedCornerShape(10.dp))
+                            .clickable(
+                                interactionSource = noticeInteraction,
+                                indication = null,
+                                role = Role.Button,
+                            ) {
+                                notice.url?.let { nativeOpenLink(context, it) } ?: onSelectSection("notices")
+                            }
+                            .padding(vertical = 6.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            NTag(AcademicRecords.source(notice.source), c.brand)
+                            if (notice.publishedRaw.isNotEmpty()) {
+                                NText(notice.publishedRaw, 12, muted = true, tabularNums = true, maxLines = 1, softWrap = false)
+                            }
+                        }
+                        NText(notice.title, 15, bold = true, maxLines = 2)
+                        if (notice.section.isNotEmpty()) {
+                            NText(notice.section, 12, muted = true, maxLines = 1, softWrap = false)
+                        }
                     }
                 }
             }

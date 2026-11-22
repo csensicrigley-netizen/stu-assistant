@@ -132,7 +132,7 @@ class NativeActivity:ComponentActivity() {
     var calendarDraft by key(s.server, s.user?.optString("id"), s.preview) {
         rememberSaveable { mutableStateOf<CalendarComposerDraft?>(null) }
     }
-    var campusView by rememberSaveable {mutableStateOf("notices")}
+    var campusView by rememberSaveable {mutableStateOf("home")}
     var connect by rememberSaveable {mutableStateOf(false)}
     var gateStart by rememberSaveable {mutableStateOf("hello")}
     var gateCancelable by rememberSaveable {mutableStateOf(false)}
@@ -164,7 +164,7 @@ class NativeActivity:ComponentActivity() {
     LaunchedEffect(s.hapticStrength) {if(s.hapticStrength==0)feedback.cancel()}
     BackHandler {activity.moveTaskToBack(true)}
     BackHandler(enabled=!needsWelcome&&!connect&&route!="today"&&sheets.entries.isEmpty()) {route=if(route=="import"||route=="medical")"me"else"today"}
-    CompositionLocalProvider(LocalCalendarComposer provides openCalendarComposer,LocalNativeColors provides colors,LocalNativePalette provides s.palette,LocalNativeForegroundEpoch provides resumeEpoch,LocalNativeBackdrop provides base,LocalNativeFeedback provides feedback,LocalNativeStrength provides s.hapticStrength,LocalNativeConnect provides onConnect,LocalNativeSheets provides sheets,LocalNativeBottomBarSuppressor provides barSuppressor,LocalLiquidGlassDarkTheme provides dark,LocalLiquidGlassAccentColor provides colors.brand,LocalLiquidGlassReducedMotion provides reduced,LocalLiquidGlassThemeProgress provides themeProgress) {
+    CompositionLocalProvider(LocalCalendarComposer provides openCalendarComposer,LocalNativeColors provides colors,LocalNativePalette provides s.palette,LocalNativeStyle provides s.style,LocalNativeForegroundEpoch provides resumeEpoch,LocalNativeBackdrop provides base,LocalNativeFeedback provides feedback,LocalNativeStrength provides s.hapticStrength,LocalNativeConnect provides onConnect,LocalNativeSheets provides sheets,LocalNativeBottomBarSuppressor provides barSuppressor,LocalLiquidGlassDarkTheme provides dark,LocalLiquidGlassAccentColor provides colors.brand,LocalLiquidGlassReducedMotion provides reduced,LocalLiquidGlassThemeProgress provides themeProgress) {
         Box(Modifier.fillMaxSize().background(if(launchState.active) launchStageColor(dark) else colors.bg)) {
             Box(Modifier.fillMaxSize().background(colors.bg).launchIrisRevealEffect(launchState,dark=dark)) {
                 val orbPrimary = colors.brand.copy(alpha = 0.15f + 0.07f * themeProgress)
@@ -238,7 +238,7 @@ class NativeActivity:ComponentActivity() {
                         }
                         .nativeSheetBackground(sheets)
                         .then(if(calendarOpen||retractBottomNavigation) Modifier.clearAndSetSemantics {} else Modifier)) {
-                        LiquidGlassBottomBar(GlassNavigationState(current,tabs,dark,s.palette,s.hapticStrength,bottom,reduced),combined) {next->
+                        LiquidGlassBottomBar(GlassNavigationState(current,tabs,dark,s.palette,s.style,s.hapticStrength,bottom,reduced),combined) {next->
                             // Also reject a selection queued before the sheet opened.
                             if(sheets.entries.isEmpty()&&!calendarOpen&&!retractBottomNavigation) {
                                 if(next!=current){feedback.play("navigation",s.hapticStrength);route=next}

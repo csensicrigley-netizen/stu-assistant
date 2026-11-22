@@ -134,6 +134,16 @@ CREATE TABLE IF NOT EXISTS plans (
   updated_at REAL NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_plans_user_date ON plans(user_id, date, sort);
+
+-- today 一键课表导出一次性票据：只存课表快照 JSON，不含任何用户身份/凭据。
+CREATE TABLE IF NOT EXISTS today_export_tickets (
+  code_hash    TEXT PRIMARY KEY,
+  payload_json TEXT NOT NULL,
+  created_at   INTEGER NOT NULL,
+  expires_at   INTEGER NOT NULL,
+  claimed_at   INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_today_export_expires ON today_export_tickets(expires_at);
 """
 
 # Keep account deletion and the one-time legacy orphan cleanup in sync.
@@ -692,3 +702,43 @@ class DB:
                 )
                 moved += 1
         return moved
+
+    # ---------- today 课表一次性导出票据（无用户身份，单次消费） ----------
+
+    def today_ticket_create(
+        self,
+        code_hash: str,
+        payload: dict,
+        *,
+        ttl_seconds: int = 300,
+        now_ts: int | None = None,
+    ) -> dict:
+        ts = int(now_ts if now_ts is not None else now())
+        expires = ts + int(ttl_seconds)
+        body = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+        with self.conn() as c:
+            c.execute("DELETE FROM today_export_tickets WHERE expires_at < ?", (ts - 600,))
+            c.execute(
+                "INSERT INTO today_export_tickets(code_hash, payload_json, created_at, expires_at, claimed_at)"
+                " VALUES(?,?,?,?,NULL)",
+                (code_hash, body, ts, expires),
+            )
+        return {"created_at": ts, "expires_at": expires}
+
+    def today_ticket_claim(self, code_hash: str, *, now_ts: int | None = None) -> dict | None:
+        ts = int(now_ts if now_ts is not None else now())
+        with self.conn() as c:
+            cur = c.execute(
+                "UPDATE today_export_tickets SET claimed_at=?"
+                " WHERE code_hash=? AND claimed_at IS NULL AND expires_at>=?",
+                (ts, code_hash, ts),
+            )
+            if cur.rowcount != 1:
+                return None
+            row = c.execute(
+                "SELECT payload_json FROM today_export_tickets WHERE code_hash=?",
+                (code_hash,),
+            ).fetchone()
+        if row is None:
+            return None
+        return json.loads(row["payload_json"])

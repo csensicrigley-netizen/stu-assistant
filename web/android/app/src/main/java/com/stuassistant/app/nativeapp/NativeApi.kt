@@ -255,6 +255,7 @@ internal class NativeApi {
         path.startsWith("/v1/auth/") -> 45_000L
         path == "/v1/relogin" -> 60_000L
         path.startsWith("/v1/timetable") -> 40_000L
+        path.startsWith("/v1/export/") -> 30_000L
         path == "/v1/feed" || path == "/v1/grades" -> 30_000L
         else -> 15_000L
     }

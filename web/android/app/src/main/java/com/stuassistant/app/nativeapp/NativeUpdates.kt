@@ -19,7 +19,6 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import com.kyant.backdrop.Backdrop
 import com.kyant.shapes.RoundedRectangle
-import com.stuassistant.app.glass.LiquidDialogSurface
 import kotlinx.coroutines.*
 import org.json.JSONObject
 
@@ -73,7 +72,7 @@ private fun updateUrl(server:String,info:JSONObject)= info.optString("apk","/dow
     val shown=info?:return
     CompositionLocalProvider(LocalNativeBackdrop provides backdrop) {
         Box(modifier.fillMaxWidth(),contentAlignment=Alignment.BottomCenter) {
-            LiquidDialogSurface(backdrop,Modifier.widthIn(max=600.dp).fillMaxWidth().semantics {liveRegion=LiveRegionMode.Polite},RoundedRectangle(16.dp)) {
+            NativeStyledDialogSurface(backdrop,Modifier.widthIn(max=600.dp).fillMaxWidth().semantics {liveRegion=LiveRegionMode.Polite},RoundedRectangle(16.dp)) {
                 Row(Modifier.padding(horizontal=14.dp,vertical=12.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
                     Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(4.dp)) {
                         NText("新版本 ${shown.optString("versionName")} 可以更新${if(shown.optBoolean("mandatory"))"（必须更新）"else""}",14,true)

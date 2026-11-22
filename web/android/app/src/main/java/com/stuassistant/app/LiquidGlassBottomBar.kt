@@ -42,9 +42,15 @@ import com.stuassistant.app.glass.LocalLiquidGlassDarkTheme
 import com.stuassistant.app.glass.LocalLiquidGlassReducedMotion
 import com.stuassistant.app.glass.LocalLiquidGlassThemeProgress
 import com.stuassistant.app.nativeapp.LocalNativeColors
+import com.stuassistant.app.nativeapp.LocalNativeStyle
+import com.stuassistant.app.nativeapp.NATIVE_DEFAULT_PALETTE
+import com.stuassistant.app.nativeapp.NATIVE_DEFAULT_STYLE
 import com.stuassistant.app.nativeapp.NativeColors
 import com.stuassistant.app.nativeapp.NativeFontFamily
 import com.stuassistant.app.nativeapp.NativeIcon
+import com.stuassistant.app.nativeapp.NativeStyledTab
+import com.stuassistant.app.nativeapp.NativeStyledTabs
+import com.stuassistant.app.nativeapp.isModernStyle
 import com.stuassistant.app.nativeapp.nativeColors
 
 data class GlassNavigationTab(val key: String, val label: String, val badge: Int = 0)
@@ -53,7 +59,8 @@ data class GlassNavigationState(
     val current: String,
     val tabs: List<GlassNavigationTab>,
     val dark: Boolean = false,
-    val palette: String = "sweet",
+    val palette: String = NATIVE_DEFAULT_PALETTE,
+    val style: String = NATIVE_DEFAULT_STYLE,
     val strength: Int = 100,
     val bottomInset: Float = 0f,
     val reducedMotion: Boolean = false,
@@ -89,13 +96,15 @@ fun LiquidGlassBottomBar(
     val targetTokens = remember(state.dark, state.palette) { nativeColors(state.dark, state.palette) }
     val tokens = if (sharedProgress != null) LocalNativeColors.current else targetTokens
     val colors = navigationColors(tokens, progress)
+    val modern = isModernStyle(state.style)
     Box(Modifier.fillMaxSize().testTag("native-liquid-glass-navigation")) {
         CompositionLocalProvider(
             LocalLiquidGlassDarkTheme provides state.dark,
             LocalLiquidGlassAccentColor provides colors.accent,
             LocalLiquidGlassReducedMotion provides state.reducedMotion,
+            LocalNativeStyle provides state.style,
         ) {
-            LiquidBottomTabs(
+            NativeStyledTabs(
                 selectedTabIndex = selectedTabIndex,
                 onTabSelected = onTabSelected,
                 backdrop = backdrop,
@@ -104,19 +113,20 @@ fun LiquidGlassBottomBar(
                     .align(Alignment.TopCenter)
                     .padding(start = 16.dp, end = 16.dp, top = 30.dp)
                     .fillMaxWidth(),
+                isLightTheme = !state.dark,
+                accentColor = colors.accent,
+                containerColor = if (modern) colors.surface else Color.Unspecified,
             ) {
                 state.tabs.forEach { tab ->
                     val isSelected = tab.key == state.current
                     val tabColor = if (isSelected) colors.accent else colors.ink
-                    LiquidBottomTab(
-                        onClick = { latestOnSelect(tab.key) },
-                        modifier = Modifier.testTag("native-tab-${tab.key}").semantics {
-                            selected = isSelected
-                            contentDescription = if (tab.badge > 0) {
-                                "${tab.label}，${tab.badge} 项待处理"
-                            } else tab.label
-                        },
-                    ) {
+                    val tabModifier = Modifier.testTag("native-tab-${tab.key}").semantics {
+                        selected = isSelected
+                        contentDescription = if (tab.badge > 0) {
+                            "${tab.label}，${tab.badge} 项待处理"
+                        } else tab.label
+                    }
+                    val tabContent: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit = {
                         NativeIcon(
                             name = tab.key,
                             color = tabColor,
@@ -140,6 +150,19 @@ fun LiquidGlassBottomBar(
                                 ),
                             ),
                             modifier = Modifier.clearAndSetSemantics {},
+                        )
+                    }
+                    if (modern) {
+                        NativeStyledTab(
+                            onClick = { latestOnSelect(tab.key) },
+                            modifier = tabModifier,
+                            content = tabContent,
+                        )
+                    } else {
+                        LiquidBottomTab(
+                            onClick = { latestOnSelect(tab.key) },
+                            modifier = tabModifier,
+                            content = tabContent,
                         )
                     }
                 }

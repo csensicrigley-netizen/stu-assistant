@@ -6,6 +6,7 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
@@ -46,7 +47,9 @@ import androidx.compose.foundation.pager.PagerDefaults
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -115,6 +118,9 @@ private fun academicError(error: Exception): String {
     return when (code) {
         "network", "timeout" -> "服务器没有及时响应，检查网络后再试。"
         "invalid_token" -> "登录状态过期了，请重新登录。"
+        "not_signed_in" -> "请先登录助手账号后再操作。"
+        "no_timetable" -> "当前还没有可导出的课表，请先同步或手动导入课表。"
+        "too_many_attempts" -> "操作太频繁了，请稍后再试。"
         "invalid_input" -> "填写的内容格式不对。"
         "plan_not_found" -> "这条计划已经不在了，刷新一下。"
         else -> (error as? NativeApiError)?.detail?.ifEmpty { null } ?: error.message ?: "没有成功，请重试。"
@@ -317,8 +323,7 @@ private fun AcademicDuePreview(task: AcademicTask, now: Long) {
     Row(
         Modifier
             .fillMaxWidth()
-            .nativeGlassCard(18)
-            .padding(horizontal = 15.dp, vertical = 13.dp),
+            .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -559,35 +564,19 @@ fun NativeTodayScreen(store: NativeStore, s: NativeState, onNavigate: (String) -
     val notices = s.notices.map(AcademicRecords::notice).sortedByDescending { it.publishedMs ?: 0 }.take(4)
     val milestones = AcademicCalendar.milestones(now.date, 2)
     var open by remember { mutableStateOf<AcademicCourseSelection?>(null) }
+    var showDigest by rememberSaveable { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     var error by remember { mutableStateOf<String?>(null) }
+    val openComposer = LocalCalendarComposer.current
 
-    val summaryLine = when {
-        waiting -> "正在准备你的课表"
-        plan.status.kind == "closed" -> null
-        blocks.isNotEmpty() -> "${blocks.size} 节课 · 课堂 ${AcademicClock.span(AcademicTimetable.minutes(blocks))}" +
-            AcademicTimetable.hops(blocks).takeIf { it.isNotEmpty() }?.let { " · 换 ${it.size} 次教室" }.orEmpty()
-        pos == null -> "当前不在学期教学周内"
-        else -> null
-    }
+    val dateLine = "${AcademicClock.monthDay(now.date)} ${AcademicClock.weekdayText(now.weekday)}" +
+        if (pos != null) " · 第 ${pos.week} 周 · ${pos.phase?.label.orEmpty()}" else ""
 
     NPage(
-        title = AcademicClock.monthDay(now.date),
-        eyebrow = if (pos != null) {
-            "第 ${pos.week} 周 · ${pos.phase?.label.orEmpty()} · ${AcademicClock.weekdayText(now.weekday)}"
-        } else {
-            AcademicClock.weekdayText(now.weekday)
-        },
+        title = "今天",
+        eyebrow = dateLine,
         actions = { AcademicMode(store, s, onConnect) },
     ) {
-        if (summaryLine != null) Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            NativeIcon("spark", LocalNativeColors.current.brand.copy(alpha = 0.85f), size = 14.dp)
-            NText(summaryLine, 13, muted = true, maxLines = 1)
-        }
-
         val reconnect = academicReconnect(s)
         if (reconnect.isNotEmpty()) NCard {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -629,12 +618,28 @@ fun NativeTodayScreen(store: NativeStore, s: NativeState, onNavigate: (String) -
             }
         }
 
+        TodayActionRow(
+            activeBlock = current ?: next ?: later?.block,
+            activeDate = if (current != null || next != null) plan.date else later?.date ?: plan.date,
+            urgentTasks = tasks.size,
+            onOpenBlock = { block, date -> open = AcademicCourseSelection(block, date) },
+            onOpenWeek = { onNavigate("week") },
+            onOpenItems = { onNavigate("items") },
+            onAdd = {
+                if (s.preview || s.token == null) onConnect()
+                else openComposer(CalendarComposerDraft("", "", ItemsPriority.NORMAL, now.date, null, null))
+            },
+        )
+
         NError(error)
         if (s.sample) AcademicCta("这是示例课表", "连接校园账号后，换成你自己的课表、作业和成绩", "shield", onConnect)
 
         if (blocks.isNotEmpty()) AcademicSection("今天的时间") {
-            NCard { AcademicRibbon(blocks, now.minutes) }
-            AcademicAgenda(blocks, now.minutes, compact = true) { open = AcademicCourseSelection(it, plan.date) }
+            NCard {
+                AcademicDayOverview(blocks, now.minutes)
+                NDivider()
+                AcademicAgenda(blocks, now.minutes, compact = true) { open = AcademicCourseSelection(it, plan.date) }
+            }
         }
 
         AcademicSection("快到期", action = if (tasks.isNotEmpty()) "全部作业" else null, onAction = { onNavigate("items:school") }) {
@@ -651,19 +656,112 @@ fun NativeTodayScreen(store: NativeStore, s: NativeState, onNavigate: (String) -
                     NIconBadge("check", academicLeafColor(), sizeDp = 32, iconDp = 16)
                     NText("未来 4 天没有到期的作业，安心推进自己的安排吧", 13, muted = true, modifier = Modifier.weight(1f))
                 }
-                else -> tasks.forEach { task -> AcademicDuePreview(task, now.ms) }
+                else -> NCard {
+                    tasks.forEachIndexed { idx, task ->
+                        if (idx > 0) NDivider()
+                        AcademicDuePreview(task, now.ms)
+                    }
+                }
             }
         }
 
-        if (milestones.isNotEmpty()) AcademicSection("校历", action = "查看校历", onAction = { onNavigate("campus:calendar") }) {
-            AcademicMilestones(milestones)
-        }
-
-        if (notices.isNotEmpty()) AcademicSection("新通知", action = "全部通知", onAction = { onNavigate("campus:notices") }) {
-            notices.forEach { notice -> AcademicNoticePreview(notice) }
+        if (milestones.isNotEmpty() || notices.isNotEmpty()) {
+            val digestParts = buildList {
+                if (milestones.isNotEmpty()) add("${milestones.size} 个校历节点")
+                if (notices.isNotEmpty()) add("${notices.size} 条新通知")
+            }.joinToString(" · ")
+            NCard {
+                NRow(
+                    title = "校历与通知",
+                    subtitle = digestParts,
+                    trailing = if (showDigest) "收起" else "展开",
+                    trailingIcon = if (showDigest) "chevron-up" else "chevron-down",
+                    leadingIcon = "bell",
+                    onClick = { showDigest = !showDigest },
+                )
+            }
+            if (showDigest) {
+                if (milestones.isNotEmpty()) AcademicSection("校历", action = "查看校历", onAction = { onNavigate("campus:calendar") }) {
+                    AcademicMilestones(milestones)
+                }
+                if (notices.isNotEmpty()) AcademicSection("新通知", action = "全部通知", onAction = { onNavigate("campus:notices") }) {
+                    notices.forEach { notice -> AcademicNoticePreview(notice) }
+                }
+            }
         }
     }
     open?.let { AcademicCourseSheet(it, now) { open = null } }
+}
+
+@Composable
+private fun TodayActionRow(
+    activeBlock: AcademicBlock?,
+    activeDate: String,
+    urgentTasks: Int,
+    onOpenBlock: (AcademicBlock, String) -> Unit,
+    onOpenWeek: () -> Unit,
+    onOpenItems: () -> Unit,
+    onAdd: () -> Unit,
+) {
+    val c = LocalNativeColors.current
+    val items = listOf(
+        Triple(
+            if (activeBlock != null) "本节详情" else "记一件事",
+            if (activeBlock != null) "pin" else "plus",
+        ) {
+            if (activeBlock != null) onOpenBlock(activeBlock, activeDate) else onAdd()
+        },
+        Triple("本周课表", "week", onOpenWeek),
+        Triple(
+            if (urgentTasks > 0) "$urgentTasks 项快到期" else "记一件事",
+            if (urgentTasks > 0) "items" else "plus",
+            if (urgentTasks > 0) onOpenItems else onAdd,
+        ),
+    )
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        items.forEach { (label, icon, action) ->
+            val shape = RoundedRectangle(18.dp)
+            Row(
+                Modifier
+                    .weight(1f)
+                    .heightIn(min = 52.dp)
+                    .nativeCardAction(action, shape = shape)
+                    .nativeGlassCard(18)
+                    .padding(horizontal = 12.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                NativeIcon(icon, c.brand, size = 17.dp, strokeWidth = 2.0f)
+                AcademicText(label, c.ink, 13, bold = true, maxLines = 1, softWrap = false)
+            }
+        }
+    }
+}
+
+@Composable
+private fun AcademicDayOverview(blocks: List<AcademicBlock>, nowMinute: Int? = null) {
+    val c = LocalNativeColors.current
+    val first = blocks.minByOrNull { it.startMin }
+    val last = blocks.maxByOrNull { it.endMin }
+    val totalMinutes = AcademicTimetable.minutes(blocks)
+    val hops = AcademicTimetable.hops(blocks)
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            val windowText = if (first != null && last != null) "${first.start}–${last.end}" else "今日课程"
+            AcademicText(windowText, c.ink, 14, bold = true, maxLines = 1, softWrap = false, tabularNums = true)
+            val metaText = "${blocks.size} 节 · ${AcademicClock.span(totalMinutes)}" +
+                if (hops.isNotEmpty()) " · 换 ${hops.size} 次教室" else ""
+            NText(metaText, 12, muted = true, maxLines = 1, softWrap = false, tabularNums = true)
+        }
+        AcademicRibbon(blocks, nowMinute, compact = true, labelled = true)
+    }
 }
 
 private data class AcademicNowContent(
@@ -692,17 +790,14 @@ private fun AcademicNowCard(
         }
     } else null
     val content = AcademicNowContent(block, current != null, later, blocks.isNotEmpty(), status, previousRoom)
-    val colors = LocalNativeColors.current
     val reduced = LocalLiquidGlassReducedMotion.current
     val themeProgress = liquidGlassThemeProgress()
     val shape = RoundedRectangle(26.dp)
-    val shadowTint = block?.let {
-        academicCourseColor(it.course.hue).copy(alpha = 0.14f + 0.14f * themeProgress)
-    } ?: Color.Transparent
+    val shadowTint = if (block != null) Color(0xFF0A1424).copy(alpha = 0.24f) else Color.Transparent
 
     Box(
         Modifier.fillMaxWidth()
-            .shadow(if (block != null) 8.dp else 0.dp, shape, ambientColor = shadowTint, spotColor = shadowTint)
+            .shadow(if (block != null) 12.dp else 0.dp, shape, ambientColor = shadowTint, spotColor = shadowTint)
             .then(if (block != null) Modifier.nativeCardAction({ onOpen(block) }, shape = shape) else Modifier),
     ) {
         AnimatedContent(
@@ -717,23 +812,22 @@ private fun AcademicNowCard(
             if (hue == null) {
                 Box(Modifier.fillMaxSize().nativeGlassCard(22))
             } else {
-                val recipe = academicCourseColors(hue)
+                val mark = academicCourseColors(hue).mark
+                val heroSurface = lerp(Color(0xFF132238), Color(0xFF1E3250), themeProgress)
+                val heroTop = lerp(heroSurface, mark, 0.22f)
                 Box(
                     Modifier.fillMaxSize()
                         .background(
                             Brush.linearGradient(
-                                colors = listOf(
-                                    lerp(recipe.soft, colors.surface, 0.15f + 0.10f * themeProgress),
-                                    colors.surface,
-                                ),
+                                colors = listOf(heroTop, heroSurface),
                                 start = Offset.Zero,
                                 end = Offset(900f, 700f),
                             ),
                             shape,
                         )
-                        .border(1.dp, recipe.mark.copy(alpha = 0.26f + 0.08f * themeProgress), shape),
+                        .border(1.dp, Color.White.copy(alpha = 0.14f), shape),
                 ) {
-                    AcademicHeroDecoration(recipe.mark, Modifier.matchParentSize())
+                    AcademicHeroDecoration(mark, Modifier.matchParentSize())
                 }
             }
         }
@@ -825,12 +919,13 @@ private fun AcademicLessonHero(
     previous: AcademicBlock?,
     makeupNote: String,
 ) {
-    val colors = LocalNativeColors.current
-    val recipe = academicCourseColors(block.course.hue)
-    val mark = recipe.mark
+    val mark = academicCourseColors(block.course.hue).mark
+    val heroPrimary = Color(0xFFF8FAFC)
+    val heroSecondary = Color(0xFFCBD5E1)
+    val heroChipBg = Color.White.copy(alpha = 0.12f)
     Column(
-        Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 18.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Row(
             Modifier.fillMaxWidth(),
@@ -838,72 +933,72 @@ private fun AcademicLessonHero(
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Row(
-                Modifier
-                    .clip(Capsule())
-                    .background(mark.copy(alpha = 0.14f))
-                    .padding(horizontal = 10.dp, vertical = 5.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Box(Modifier.size(7.dp).clip(CircleShape).background(mark))
+                Box(Modifier.size(8.dp).clip(CircleShape).background(mark))
                 AcademicText(
                     text = if (inProgress) {
                         "正在上课 · 还剩 ${AcademicClock.span((block.endMin - minute).coerceIn(0, block.span))}"
                     } else {
                         "下一节 · ${if (block.startMin <= minute) "马上开始" else "还有 ${AcademicClock.span(block.startMin - minute)}"}"
                     },
-                    color = recipe.ink,
-                    fontSize = 12,
+                    color = heroSecondary,
+                    fontSize = 13,
                     bold = true,
                     maxLines = 1,
                     softWrap = false,
                     tabularNums = true,
                 )
             }
-            NText(
+            AcademicText(
                 AcademicTimetable.periodsText(block.periods),
+                heroSecondary,
                 12,
-                muted = true,
                 maxLines = 1,
                 softWrap = false,
                 tabularNums = true,
             )
         }
 
+        AcademicText(block.course.title, heroPrimary, 24, bold = true, maxLines = 2)
+
         Row(
-            verticalAlignment = Alignment.CenterVertically,
+            verticalAlignment = Alignment.Bottom,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            AcademicText(block.start, colors.ink, 36, bold = true, maxLines = 1, softWrap = false, tabularNums = true)
-            Box(Modifier.width(14.dp).height(2.5.dp).clip(Capsule()).background(mark.copy(alpha = 0.55f)))
-            AcademicText(block.end, colors.ink, 36, bold = true, maxLines = 1, softWrap = false, tabularNums = true)
+            AcademicText(block.start, heroPrimary, 40, bold = true, maxLines = 1, softWrap = false, tabularNums = true)
+            AcademicText(
+                "– ${block.end}",
+                heroSecondary,
+                20,
+                bold = true,
+                maxLines = 1,
+                softWrap = false,
+                tabularNums = true,
+                modifier = Modifier.padding(bottom = 4.dp),
+            )
         }
 
-        AcademicText(block.course.title, colors.ink, 20, bold = true, maxLines = 2)
+        Box(Modifier.fillMaxWidth().height(0.75.dp).background(Color.White.copy(alpha = 0.12f)))
 
         Row(
+            Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Row(
-                Modifier
-                    .clip(Capsule())
-                    .background(mark.copy(alpha = 0.11f))
-                    .padding(horizontal = 10.dp, vertical = 5.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(5.dp),
-            ) {
-                NativeIcon("pin", recipe.ink, size = 14.dp)
-                AcademicText(
-                    block.location.ifEmpty { "教务未标注地点" },
-                    recipe.ink,
-                    13,
-                    bold = true,
-                    maxLines = 1,
-                )
+            NativeIcon("pin", mark, size = 15.dp)
+            AcademicText(
+                block.location.ifEmpty { "教务未标注地点" },
+                heroPrimary,
+                14,
+                bold = true,
+                maxLines = 1,
+                modifier = Modifier.weight(1f, fill = false),
+            )
+            if (block.teacher.isNotEmpty()) {
+                AcademicText("· ${block.teacher}", heroSecondary, 13, maxLines = 1)
             }
-            val meta = (if (block.teacher.isNotEmpty()) "${block.teacher} · " else "") + AcademicClock.span(block.span)
-            NText(meta, 12, muted = true, maxLines = 1)
         }
 
         if (previous != null) {
@@ -911,21 +1006,21 @@ private fun AcademicLessonHero(
                 Modifier
                     .fillMaxWidth()
                     .clip(RoundedRectangle(12.dp))
-                    .background(mark.copy(alpha = 0.09f))
+                    .background(heroChipBg)
                     .padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                NativeIcon("spark", recipe.ink, size = 14.dp)
-                NText(
+                NativeIcon("spark", mark, size = 14.dp)
+                AcademicText(
                     "换教室：上一节在 ${previous.location}，课间 ${AcademicClock.span(block.startMin - previous.endMin)}",
+                    heroPrimary,
                     12,
-                    color = recipe.ink,
                     bold = true,
                 )
             }
         }
-        if (makeupNote.isNotEmpty()) NText(makeupNote, 13, bold = true)
+        if (makeupNote.isNotEmpty()) AcademicText(makeupNote, heroSecondary, 13, bold = true)
         if (inProgress) {
             AcademicProgress((minute - block.startMin).toFloat() / block.span, mark, Modifier.padding(top = 2.dp))
         }
@@ -1095,46 +1190,67 @@ private fun AcademicLesson(block: AcademicBlock, onOpen: (AcademicBlock) -> Unit
     val mark = recipe.mark
     val lessonShape = RoundedRectangle(18.dp)
     if (compact) {
+        val isLive = status == "live"
         Row(
-            Modifier.fillMaxWidth().nativeCardAction({ onOpen(block) }, shape = lessonShape),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            Modifier
+                .fillMaxWidth()
+                .nativeCardAction({ onOpen(block) }, shape = lessonShape)
+                .then(
+                    if (isLive) {
+                        Modifier
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(recipe.soft.copy(alpha = 0.72f))
+                            .border(1.dp, mark.copy(alpha = 0.35f), RoundedCornerShape(14.dp))
+                            .padding(horizontal = 10.dp, vertical = 9.dp)
+                    } else {
+                        Modifier.padding(vertical = 8.dp)
+                    },
+                ),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Column(Modifier.width(54.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                AcademicText(block.start, if (status == "past") c.muted else c.ink, 14, bold = true, maxLines = 1, softWrap = false, tabularNums = true)
+            Column(Modifier.width(48.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                AcademicText(block.start, if (status == "past") c.muted else c.ink, 15, bold = true, maxLines = 1, softWrap = false, tabularNums = true)
                 NText(block.end, 12, muted = true, maxLines = 1, softWrap = false, tabularNums = true)
             }
-            Row(
+            Box(
                 Modifier
-                    .weight(1f)
-                    .nativeGlassCard(18, tint = if (status == "live") recipe.soft else c.surface)
-                    .then(if (status == "live") Modifier.border(1.dp, recipe.mid.copy(alpha = .7f), lessonShape) else Modifier)
-                    .padding(horizontal = 14.dp, vertical = 11.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Box(
-                    Modifier
-                        .width(4.dp)
-                        .height(36.dp)
-                        .clip(Capsule())
-                        .background(mark.copy(alpha = if (status == "past") .38f else 1f)),
-                )
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    AcademicText(block.course.title, if (status == "past") c.muted else c.ink, 15, bold = true, maxLines = 2)
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        NativeIcon("pin", c.muted, size = 12.dp)
-                        NText(
-                            block.location.ifEmpty { "地点未标注" } + if (block.teacher.isNotEmpty()) " · ${block.teacher}" else "",
-                            12,
-                            muted = true,
-                            maxLines = 1,
-                        )
+                    .width(3.5.dp)
+                    .height(38.dp)
+                    .clip(Capsule())
+                    .background(mark.copy(alpha = if (status == "past") .38f else 1f)),
+            )
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Box(Modifier.weight(1f)) {
+                        AcademicText(block.course.title, if (status == "past") c.muted else c.ink, 16, bold = true, maxLines = 2)
                     }
-                    if (block.conflict) NText("与其他课时间重叠", 12, color = c.danger, bold = true)
+                    if (!isLive) {
+                        NativeIcon("chevron-right", c.muted, size = 16.dp)
+                    }
                 }
-                if (status == "live") NTag("上课中", mark)
-                else NativeIcon("chevron-right", c.muted, size = 16.dp)
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    NativeIcon("pin", if (isLive) mark else c.muted, size = 12.dp)
+                    NText(
+                        block.location.ifEmpty { "地点未标注" } + if (block.teacher.isNotEmpty()) " · ${block.teacher}" else "",
+                        13,
+                        muted = true,
+                        maxLines = 1,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (isLive) {
+                        NTag("上课中", mark)
+                    }
+                }
+                if (block.conflict) NText("与其他课时间重叠", 12, color = c.danger, bold = true)
             }
         }
         return
@@ -1179,6 +1295,130 @@ private fun AcademicLesson(block: AcademicBlock, onOpen: (AcademicBlock) -> Unit
 }
 
 @Composable
+private fun AcademicWeekStrip(
+    plans: List<AcademicDayPlan>,
+    selectedDay: Int,
+    todayWeekday: Int?,
+    onSelectDay: (Int) -> Unit,
+) {
+    val c = LocalNativeColors.current
+    val tick = nSelectionFeedback()
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .nativeGlassCard(20)
+            .padding(horizontal = 8.dp, vertical = 10.dp)
+            .selectableGroup(),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        plans.forEachIndexed { index, plan ->
+            val wd = index + 1
+            val selected = selectedDay == wd
+            val isToday = todayWeekday == wd
+            val dayLabel = listOf("一", "二", "三", "四", "五", "六", "日")[index]
+            val dateNum = plan.date.takeLast(2).toIntOrNull()?.toString() ?: plan.date.takeLast(2)
+            val shape = RoundedCornerShape(14.dp)
+            val interaction = remember { MutableInteractionSource() }
+            val pressed by interaction.collectIsPressedAsState()
+            val scale = rememberPressScale(pressed, NativeMotion.PressCell)
+            val cellBg by animateColorAsState(
+                targetValue = when {
+                    selected -> c.ink
+                    isToday -> c.brand.copy(alpha = 0.12f)
+                    else -> Color.Transparent
+                },
+                animationSpec = NativeMotion.select(),
+                label = "week-strip-bg",
+            )
+            val labelInk by animateColorAsState(
+                targetValue = when {
+                    selected -> c.bg.copy(alpha = 0.78f)
+                    isToday -> c.brand
+                    else -> c.muted
+                },
+                animationSpec = NativeMotion.select(),
+                label = "week-strip-label",
+            )
+            val dateInk by animateColorAsState(
+                targetValue = when {
+                    selected -> c.bg
+                    isToday -> c.brand
+                    else -> c.ink
+                },
+                animationSpec = NativeMotion.select(),
+                label = "week-strip-date",
+            )
+            Column(
+                Modifier
+                    .weight(1f)
+                    .nativeScale(scale)
+                    .clip(shape)
+                    .background(cellBg, shape)
+                    .selectable(
+                        selected = selected,
+                        interactionSource = interaction,
+                        indication = null,
+                        role = Role.Tab,
+                    ) {
+                        if (!selected) {
+                            tick()
+                            onSelectDay(wd)
+                        }
+                    }
+                    .semantics {
+                        contentDescription = "${AcademicClock.weekdayText(wd)} ${AcademicClock.slash(plan.date)}，${
+                            if (plan.status.kind == "closed") "停课"
+                            else if (plan.blocks.isEmpty()) "没有课"
+                            else "${plan.blocks.size} 节课"
+                        }"
+                    }
+                    .padding(vertical = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                AcademicText(
+                    text = dayLabel,
+                    color = labelInk,
+                    fontSize = 11,
+                    bold = true,
+                    maxLines = 1,
+                    softWrap = false,
+                )
+                AcademicText(
+                    text = dateNum,
+                    color = dateInk,
+                    fontSize = 16,
+                    bold = true,
+                    maxLines = 1,
+                    softWrap = false,
+                    tabularNums = true,
+                )
+                Row(
+                    Modifier.height(6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(3.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    val count = plan.blocks.size.coerceAtMost(4)
+                    if (count == 0) {
+                        Box(Modifier.size(4.dp))
+                    } else {
+                        plan.blocks.take(4).forEach { block ->
+                            val dotColor = if (selected) c.bg else academicCourseColor(block.course.hue)
+                            Box(
+                                Modifier
+                                    .size(4.5.dp)
+                                    .clip(CircleShape)
+                                    .background(dotColor),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 fun NativeWeekScreen(store: NativeStore, s: NativeState, onNavigate: (String) -> Unit, onConnect: () -> Unit) {
     val now = academicNow()
     val position = AcademicCalendar.position(now.date)
@@ -1189,12 +1429,18 @@ fun NativeWeekScreen(store: NativeStore, s: NativeState, onNavigate: (String) ->
     val week = pager.settledPage + 1
     var day by rememberSaveable(term.id) { mutableStateOf(if (position != null) now.weekday else 1) }
     var open by remember { mutableStateOf<AcademicCourseSelection?>(null) }
+    var showNotes by rememberSaveable { mutableStateOf(false) }
+    var showWeekSpectrum by rememberSaveable { mutableStateOf(false) }
     val doc = remember(s.timetable) { AcademicTimetable.normalize(s.timetable) }
     val colors = LocalNativeColors.current
+    val context = LocalContext.current
     val reduced = LocalLiquidGlassReducedMotion.current
     val scope = rememberCoroutineScope()
     val selectionFeedback by rememberUpdatedState(nSelectionFeedback())
     var swiping by remember(pager) { mutableStateOf(false) }
+    var exportingToday by remember { mutableStateOf(false) }
+    var exportTodayError by remember { mutableStateOf<String?>(null) }
+    var todayFallbackTicket by remember { mutableStateOf<NativeTodayExportTicket?>(null) }
 
     LaunchedEffect(pager) {
         pager.interactionSource.interactions.collect { interaction ->
@@ -1220,11 +1466,38 @@ fun NativeWeekScreen(store: NativeStore, s: NativeState, onNavigate: (String) ->
     }
 
     NPage("课表", term.label, actions = { AcademicMode(store, s, onConnect) }) {
+        if (!s.sample && doc != null && doc.courses.isNotEmpty()) {
+            AcademicCta(
+                title = if (exportingToday) "正在生成 today 导入码…" else "导入到 today",
+                subtitle = "一键同步课表到 today 安排表（支持本部、医学院与手动课表）",
+                icon = "external",
+                onClick = {
+                    if (exportingToday) return@AcademicCta
+                    scope.launch {
+                        exportingToday = true
+                        exportTodayError = null
+                        try {
+                            val ticket = store.exportTodayTimetable(doc.semester.takeIf { it.isNotBlank() })
+                            if (!openTodayImportDeepLink(context, ticket.deepLink)) {
+                                todayFallbackTicket = ticket
+                            }
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            exportTodayError = academicError(e)
+                        } finally {
+                            exportingToday = false
+                        }
+                    }
+                },
+            )
+            NError(exportTodayError)
+        }
         if (!s.sample && doc == null) {
             AcademicEmpty(
                 if (s.syncing || s.loading) "正在读取课表…" else "还没有课表",
                 if (s.syncing || s.loading) "第一次同步通常要半分钟左右。"
-                else "连接校园账号，或在「我的 · 数据来源」中绑定医学院教务 / 手动导入课表后，这里会显示每周课程。",
+                else "连接校园账号，或在「我的 · 课表与账号」中绑定医学院教务 / 手动导入课表后，这里会显示每周课程。",
             ) {
                 if (!s.syncing && !s.loading) {
                     NButton("去「我的」配置数据来源", { onNavigate("me") }, primary = true, haptic = NativeButtonHaptic.Navigation)
@@ -1278,103 +1551,111 @@ fun NativeWeekScreen(store: NativeStore, s: NativeState, onNavigate: (String) ->
                     (1..7).map { AcademicTimetable.planFor(doc, AcademicCalendar.dateOf(term, targetWeek, it)) }
                 }
                 val targetIsCurrent = position?.week == targetWeek
-                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Column(
-                        Modifier
-                            .fillMaxWidth()
-                            .nativeGlassCard(22)
-                            .padding(horizontal = 10.dp, vertical = 10.dp),
-                        verticalArrangement = Arrangement.spacedBy(2.dp),
-                    ) {
-                        Row(
-                            Modifier.fillMaxWidth().padding(horizontal = 6.dp),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    AcademicWeekStrip(
+                        plans = plans,
+                        selectedDay = day,
+                        todayWeekday = if (targetIsCurrent) now.weekday else null,
+                        onSelectDay = { day = it },
+                    )
+                    if (showWeekSpectrum) {
+                        Column(
+                            Modifier
+                                .fillMaxWidth()
+                                .nativeGlassCard(22)
+                                .padding(horizontal = 10.dp, vertical = 10.dp),
+                            verticalArrangement = Arrangement.spacedBy(2.dp),
                         ) {
-                            Spacer(Modifier.width(52.dp))
-                            Box(Modifier.weight(1f)) {
-                                AcademicRibbon(emptyList(), labelled = true, compact = true, scaleOnly = true)
-                            }
-                            Spacer(Modifier.width(5.dp))
-                        }
-                        val max = plans.maxOfOrNull { AcademicTimetable.minutes(it.blocks) }?.coerceAtLeast(1) ?: 1
-                        plans.forEachIndexed { index, plan ->
-                            val wd = index + 1
-                            val on = day == wd
-                            val isTodayRow = targetIsCurrent && wd == now.weekday
-                            val emphasis by animateFloatAsState(
-                                targetValue = if (on) 1f else 0f,
-                                animationSpec = if (reduced) snap() else tween(150),
-                                label = "selected weekday",
-                            )
                             Row(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedRectangle(14.dp))
-                                    .drawBehind { drawRect(colors.brand.copy(alpha = 0.11f * emphasis)) }
-                                    .selectable(selected = on, role = Role.RadioButton, onClick = { if (!on) day = wd })
-                                    .semantics {
-                                        contentDescription = "${AcademicClock.weekdayText(wd)} ${AcademicClock.slash(plan.date)}，${
-                                            if (plan.status.kind == "closed") "停课"
-                                            else if (plan.blocks.isEmpty()) "没有课"
-                                            else "${plan.blocks.size} 节，${AcademicClock.span(AcademicTimetable.minutes(plan.blocks))}"
-                                        }"
-                                    }
-                                    .heightIn(min = 46.dp)
-                                    .padding(horizontal = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically,
+                                Modifier.fillMaxWidth().padding(horizontal = 6.dp),
                                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                             ) {
-                                Row(
-                                    Modifier.width(52.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(5.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    NText(
-                                        listOf("一", "二", "三", "四", "五", "六", "日")[index],
-                                        14,
-                                        bold = true,
-                                        color = if (isTodayRow) colors.brand else lerp(colors.ink, colors.brand, emphasis),
-                                        maxLines = 1,
-                                        softWrap = false,
-                                    )
-                                    NText(
-                                        plan.date.takeLast(2).toIntOrNull()?.toString() ?: plan.date.takeLast(2),
-                                        12,
-                                        muted = !isTodayRow,
-                                        color = if (isTodayRow) colors.brand else null,
-                                        maxLines = 1,
-                                        softWrap = false,
-                                        tabularNums = true,
-                                    )
-                                }
+                                Spacer(Modifier.width(52.dp))
                                 Box(Modifier.weight(1f)) {
-                                    if (plan.status.kind == "closed") {
-                                        NText(plan.status.label, 12, muted = true, maxLines = 1)
-                                    } else {
-                                        AcademicRibbon(
-                                            plan.blocks,
-                                            if (isTodayRow) now.minutes else null,
-                                            compact = true,
+                                    AcademicRibbon(emptyList(), labelled = true, compact = true, scaleOnly = true)
+                                }
+                                Spacer(Modifier.width(5.dp))
+                            }
+                            val max = plans.maxOfOrNull { AcademicTimetable.minutes(it.blocks) }?.coerceAtLeast(1) ?: 1
+                            plans.forEachIndexed { index, plan ->
+                                val wd = index + 1
+                                val on = day == wd
+                                val isTodayRow = targetIsCurrent && wd == now.weekday
+                                val emphasis by animateFloatAsState(
+                                    targetValue = if (on) 1f else 0f,
+                                    animationSpec = if (reduced) snap() else tween(150),
+                                    label = "selected weekday",
+                                )
+                                Row(
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedRectangle(14.dp))
+                                        .drawBehind { drawRect(colors.brand.copy(alpha = 0.11f * emphasis)) }
+                                        .selectable(selected = on, role = Role.RadioButton, onClick = { if (!on) day = wd })
+                                        .semantics {
+                                            contentDescription = "${AcademicClock.weekdayText(wd)} ${AcademicClock.slash(plan.date)}，${
+                                                if (plan.status.kind == "closed") "停课"
+                                                else if (plan.blocks.isEmpty()) "没有课"
+                                                else "${plan.blocks.size} 节，${AcademicClock.span(AcademicTimetable.minutes(plan.blocks))}"
+                                            }"
+                                        }
+                                        .heightIn(min = 44.dp)
+                                        .padding(horizontal = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                ) {
+                                    Row(
+                                        Modifier.width(52.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(5.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        NText(
+                                            listOf("一", "二", "三", "四", "五", "六", "日")[index],
+                                            14,
+                                            bold = true,
+                                            color = if (isTodayRow) colors.brand else lerp(colors.ink, colors.brand, emphasis),
+                                            maxLines = 1,
+                                            softWrap = false,
+                                        )
+                                        NText(
+                                            plan.date.takeLast(2).toIntOrNull()?.toString() ?: plan.date.takeLast(2),
+                                            12,
+                                            muted = !isTodayRow,
+                                            color = if (isTodayRow) colors.brand else null,
+                                            maxLines = 1,
+                                            softWrap = false,
+                                            tabularNums = true,
                                         )
                                     }
-                                }
-                                Box(
-                                    Modifier
-                                        .width(5.dp)
-                                        .height(22.dp)
-                                        .clip(Capsule())
-                                        .background(colors.border.copy(alpha = 0.65f)),
-                                    contentAlignment = Alignment.BottomCenter,
-                                ) {
-                                    val barFraction = (AcademicTimetable.minutes(plan.blocks).toFloat() / max)
-                                        .let { if (it.isFinite()) it.coerceIn(0f, 1f) else 0f }
+                                    Box(Modifier.weight(1f)) {
+                                        if (plan.status.kind == "closed") {
+                                            NText(plan.status.label, 12, muted = true, maxLines = 1)
+                                        } else {
+                                            AcademicRibbon(
+                                                plan.blocks,
+                                                if (isTodayRow) now.minutes else null,
+                                                compact = true,
+                                            )
+                                        }
+                                    }
                                     Box(
                                         Modifier
-                                            .fillMaxWidth()
-                                            .fillMaxHeight(barFraction)
+                                            .width(5.dp)
+                                            .height(22.dp)
                                             .clip(Capsule())
-                                            .background(lerp(colors.muted.copy(alpha = 0.7f), colors.brand, emphasis)),
-                                    )
+                                            .background(colors.border.copy(alpha = 0.65f)),
+                                        contentAlignment = Alignment.BottomCenter,
+                                    ) {
+                                        val barFraction = (AcademicTimetable.minutes(plan.blocks).toFloat() / max)
+                                            .let { if (it.isFinite()) it.coerceIn(0f, 1f) else 0f }
+                                        Box(
+                                            Modifier
+                                                .fillMaxWidth()
+                                                .fillMaxHeight(barFraction)
+                                                .clip(Capsule())
+                                                .background(lerp(colors.muted.copy(alpha = 0.7f), colors.brand, emphasis)),
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -1389,15 +1670,22 @@ fun NativeWeekScreen(store: NativeStore, s: NativeState, onNavigate: (String) ->
                         label = "weekday agenda",
                     ) { selectedDay ->
                         val selected = plans[selectedDay - 1]
+                        val isSelectedToday = targetIsCurrent && selectedDay == now.weekday
                         AcademicSection(
-                            "${AcademicClock.weekdayText(selectedDay)} ${AcademicClock.slash(selected.date)}",
+                            "${AcademicClock.weekdayText(selectedDay)} · ${AcademicClock.monthDay(selected.date)}",
                             if (selected.blocks.isNotEmpty()) "${selected.blocks.size} 节 · ${AcademicClock.span(AcademicTimetable.minutes(selected.blocks))}" else "",
+                            action = if (showWeekSpectrum) "收起全周光谱" else "全周光谱",
+                            onAction = { showWeekSpectrum = !showWeekSpectrum },
                         ) {
                             when {
                                 selected.status.kind == "closed" -> AcademicEmpty("${selected.status.label} · 停课", "按教务处校历，这一天不上课。")
                                 selected.blocks.isEmpty() -> AcademicEmpty("这天没有理论课", "实验课和临时调课以学院通知为准。")
-                                else -> AcademicAgenda(selected.blocks, -1) { block ->
-                                    if (selectedDay == day) open = AcademicCourseSelection(block, selected.date)
+                                else -> NCard {
+                                    AcademicDayOverview(selected.blocks, if (isSelectedToday) now.minutes else null)
+                                    NDivider()
+                                    AcademicAgenda(selected.blocks, if (isSelectedToday) now.minutes else -1, compact = true) { block ->
+                                        if (selectedDay == day) open = AcademicCourseSelection(block, selected.date)
+                                    }
                                 }
                             }
                         }
@@ -1406,7 +1694,7 @@ fun NativeWeekScreen(store: NativeStore, s: NativeState, onNavigate: (String) ->
             }
         }
 
-        if (doc != null && (doc.pending.isNotEmpty() || doc.unarranged.isNotEmpty())) AcademicSection("需要留意") {
+        if (doc != null && (doc.pending.isNotEmpty() || doc.unarranged.isNotEmpty())) AcademicSection("未排入网格的课程") {
             NCard {
                 doc.pending.forEach { NText(it, 14, color = colors.danger) }
                 if (doc.unarranged.isNotEmpty()) {
@@ -1415,9 +1703,26 @@ fun NativeWeekScreen(store: NativeStore, s: NativeState, onNavigate: (String) ->
                 }
             }
         }
-        NText("只含教务系统里的理论课。节次时刻按教务处作息表：第二、四、五大节各 155 分钟，晚课 19:20 开始。", 12, muted = true)
+
+        NCard {
+            NRow(
+                title = "课表说明",
+                subtitle = "数据源 · 时间网格 · 换教室提醒",
+                trailing = if (showNotes) "收起" else "展开",
+                trailingIcon = if (showNotes) "chevron-up" else "chevron-down",
+                leadingIcon = "info",
+                onClick = { showNotes = !showNotes },
+            )
+            if (showNotes) {
+                NDivider()
+                NText("只含教务系统里的理论课。节次时刻按教务处作息表：第二、四、五大节各 155 分钟，晚课 19:20 开始。", 12, muted = true)
+            }
+        }
     }
     open?.let { AcademicCourseSheet(it, now) { open = null } }
+    todayFallbackTicket?.let { ticket ->
+        NativeTodayExportFallbackDialog(ticket = ticket, onDismiss = { todayFallbackTicket = null })
+    }
 }
 
 private data class AcademicCourseSelection(val block: AcademicBlock, val date: String)

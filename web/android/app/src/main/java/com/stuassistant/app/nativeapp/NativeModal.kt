@@ -318,7 +318,7 @@ private fun NativeDialogLayer(
             contentAlignment = Alignment.Center,
         ) {
             CompositionLocalProvider(LocalNativeBackdrop provides backdrop, LocalNativeSheetParent provides entry) {
-                LiquidDialogSurface(
+                NativeStyledDialogSurface(
                     backdrop,
                     modifier = Modifier.widthIn(max = 380.dp).fillMaxWidth().heightIn(max = maxHeight)
                         .graphicsLayer {
@@ -420,7 +420,7 @@ private fun NativeSheetLayer(entry: NativeSheetEntry, active: Boolean, backdrop:
                 ),
         )
         CompositionLocalProvider(LocalNativeBackdrop provides backdrop, LocalNativeSheetParent provides entry) {
-            LiquidDialogSurface(
+            NativeStyledDialogSurface(
                 backdrop,
                 modifier = Modifier.align(Alignment.BottomCenter)
                     // Include IME padding in the layer's own-height exit distance.
