@@ -486,7 +486,11 @@ class NativeStore internal constructor(
         var problem: String? = null
         if (owner.token != null) try { requestOwned(owner, "/v1/account/logout", "POST") }
         catch (error: CancellationException) { throw error }
-        catch (error: Exception) { problem = "本机已退出；服务器退出请求未完成：${message(error)}" }
+        catch (error: Exception) {
+            val alreadyExpired = error is NativeApiError && error.status == 401 &&
+                error.code in setOf("invalid_token", "token_revoked", "user_gone", "missing_bearer")
+            if (!alreadyExpired) problem = "本机已退出；服务器退出请求未完成：${message(error)}"
+        }
         synchronized(lock) { if (isCurrent(owner)) clearSession(owner, true, problem) }
     }
 
@@ -584,8 +588,9 @@ class NativeStore internal constructor(
     }
 
     private fun handleAuthenticationError(owner: NativeSession, error: NativeApiError) {
-        if (error.status == 401 && error.code in setOf("invalid_token", "user_gone", "missing_bearer")) synchronized(lock) {
-            if (isCurrent(owner)) clearSession(owner, false, "登录已过期，请重新登录")
+        if (error.status == 401 && error.code in setOf("invalid_token", "token_revoked", "user_gone", "missing_bearer")) synchronized(lock) {
+            val hint = if (error.code == "token_revoked") "登录状态已失效（可能在其他设备退出），请重新登录" else "登录已过期，请重新登录"
+            if (isCurrent(owner)) clearSession(owner, false, hint)
         }
     }
 

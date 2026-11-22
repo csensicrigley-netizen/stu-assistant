@@ -98,6 +98,7 @@ export function planErrorText(exc: unknown): string {
       network: "连不上助手服务器，检查一下网络。",
       timeout: "服务器没有及时响应，稍后再试。",
       invalid_token: "登录状态过期了，请重新登录。",
+      token_revoked: "登录状态已失效，请重新登录。",
       plan_not_found: "这条计划已经不在了，刷新一下。",
       invalid_input: "填写的内容格式不对。",
       "标题不能为空": "标题不能为空。",

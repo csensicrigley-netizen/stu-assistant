@@ -576,7 +576,7 @@ private fun accountError(error: Throwable): String {
         "too_many_attempts" -> "尝试太频繁了，过几分钟再试。"
         "login_throttled" -> "这一小时里连接次数太多了，稍后再试，避免学校锁定账号。"
         "authentication_budget" -> "这次登录尝试次数太多，学校暂时不接受，稍后再试。"
-        "invalid_token", "missing_bearer", "user_gone", "not_signed_in" -> "登录状态过期了，请重新登录。"
+        "invalid_token", "token_revoked", "missing_bearer", "user_gone", "not_signed_in" -> "登录状态已失效，请重新登录。"
         "account_disabled" -> "这个账号已停用。"
         "invalid_credentials" -> "学校统一认证没有通过：学号或密码不对。"
         "login_rejected" -> "学校拒绝了这次登录。可以先在浏览器登录一次学校系统，确认账号正常。"

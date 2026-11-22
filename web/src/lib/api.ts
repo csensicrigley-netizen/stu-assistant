@@ -335,6 +335,7 @@ export function errorText(exc: unknown): string {
       too_many_attempts: "尝试太频繁了，过几分钟再试。",
       login_throttled: "这一小时里连接次数太多了，稍后再试，避免学校锁定账号。",
       invalid_token: "登录状态过期了，请重新登录。",
+      token_revoked: "登录状态已失效，请重新登录。",
       invalid_input: "填写的内容格式不对，检查一下邮箱和口令（至少 8 位）。",
       account_disabled: "这个账号已停用。",
       no_timetable: "当前还没有可导出的课表，请先同步教务、连接医学院或手动导入课表。",

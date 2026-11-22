@@ -1,15 +1,13 @@
 {
   "channel": "product",
-  "versionName": "1.1.8",
-  "versionCode": 64,
+  "versionName": "1.1.9",
+  "versionCode": 65,
   "apk": "/download/stu-assistant.apk",
   "notes": [
-    "全新重构「事项」日程与编辑体验，支持时间轴日历、快捷草稿直达 AI 录入与顺滑拖拽收起",
-    "新增「液态玻璃 / 简约」双界面材质切换与默认海蓝色系，优化今日课堂卡片与连续周课表切换",
-    "新增课表一键「导入到 today」同步功能，支持本部、医学院与手动导入课表",
-    "优化网页端桌面认证居中、示例退出返回与全量虚构示例数据"
+    "修复在其他设备退出登录后 App 卡在 token_revoked 的问题，自动平滑引导重新登录",
+    "完整整合新版「事项」日程与编辑体验、双材质外观切换与「导入到 today」同步功能"
   ],
   "mandatory": false,
-  "releasedAt": "2026-11-22T23:35:00+08:00",
+  "releasedAt": "2026-11-22T23:48:00+08:00",
   "minSupported": "1.0.0"
 }

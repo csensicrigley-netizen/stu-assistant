@@ -117,7 +117,7 @@ private fun academicError(error: Exception): String {
     val code = (error as? NativeApiError)?.code ?: error.message.orEmpty()
     return when (code) {
         "network", "timeout" -> "服务器没有及时响应，检查网络后再试。"
-        "invalid_token" -> "登录状态过期了，请重新登录。"
+        "invalid_token", "token_revoked" -> "登录状态已失效，请重新登录。"
         "not_signed_in" -> "请先登录助手账号后再操作。"
         "no_timetable" -> "当前还没有可导出的课表，请先同步或手动导入课表。"
         "too_many_attempts" -> "操作太频繁了，请稍后再试。"
