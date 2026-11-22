@@ -33,6 +33,7 @@ import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -563,11 +564,11 @@ fun NativeTodayScreen(store: NativeStore, s: NativeState, onNavigate: (String) -
 
     val summaryLine = when {
         waiting -> "正在准备你的课表"
-        plan.status.kind == "closed" -> "${plan.status.label} · 今天不上课"
+        plan.status.kind == "closed" -> null
         blocks.isNotEmpty() -> "${blocks.size} 节课 · 课堂 ${AcademicClock.span(AcademicTimetable.minutes(blocks))}" +
             AcademicTimetable.hops(blocks).takeIf { it.isNotEmpty() }?.let { " · 换 ${it.size} 次教室" }.orEmpty()
-        pos != null -> "今天没有理论课，适合专注自己的节奏"
-        else -> "当前不在学期教学周内"
+        pos == null -> "当前不在学期教学周内"
+        else -> null
     }
 
     NPage(
@@ -579,7 +580,7 @@ fun NativeTodayScreen(store: NativeStore, s: NativeState, onNavigate: (String) -
         },
         actions = { AcademicMode(store, s, onConnect) },
     ) {
-        Row(
+        if (summaryLine != null) Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
@@ -663,6 +664,15 @@ fun NativeTodayScreen(store: NativeStore, s: NativeState, onNavigate: (String) -
     open?.let { AcademicCourseSheet(it, pos?.week ?: 0, now.weekday, now.minutes) { open = null } }
 }
 
+private data class AcademicNowContent(
+    val block: AcademicBlock?,
+    val inProgress: Boolean,
+    val later: AcademicNextClass?,
+    val finished: Boolean,
+    val status: AcademicDayStatus,
+    val previousRoom: AcademicBlock?,
+)
+
 @Composable
 private fun AcademicNowCard(
     current: AcademicBlock?,
@@ -673,37 +683,121 @@ private fun AcademicNowCard(
     status: AcademicDayStatus,
     onOpen: (AcademicBlock) -> Unit,
 ) {
-    val colors = LocalNativeColors.current
-    val progress = liquidGlassThemeProgress()
-
-    if (status.kind == "closed") {
-        NCard {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                NIconBadge("calendar", colors.brand, sizeDp = 36, iconDp = 18)
-                NTag("今日停课", colors.brand)
-            }
-            NText(status.label, 20, bold = true)
-            NText("按教务处校历，今天没有课。", 14, muted = true)
+    val block = if (status.kind == "closed") null else current ?: upcoming
+    val previousRoom = if (current == null && block != null && block.location.isNotEmpty()) {
+        blocks.getOrNull(blocks.indexOf(block) - 1)?.takeIf {
+            it.location.isNotEmpty() && it.location != block.location && block.startMin - it.endMin <= 30
         }
-        return
-    }
+    } else null
+    val content = AcademicNowContent(block, current != null, later, blocks.isNotEmpty(), status, previousRoom)
+    val colors = LocalNativeColors.current
+    val reduced = LocalLiquidGlassReducedMotion.current
+    val themeProgress = liquidGlassThemeProgress()
+    val shape = RoundedRectangle(26.dp)
+    val shadowTint = block?.let {
+        academicCourseColor(it.course.hue).copy(alpha = 0.14f + 0.14f * themeProgress)
+    } ?: Color.Transparent
 
-    val block = current ?: upcoming
-    if (block == null) {
-        NCard {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                NIconBadge(
-                    icon = if (blocks.isNotEmpty()) "check" else "spark",
-                    tint = if (blocks.isNotEmpty()) academicLeafColor() else colors.brand,
-                    sizeDp = 36,
-                    iconDp = 18,
-                )
-                NTag(
-                    text = if (blocks.isNotEmpty()) "今天的课上完了" else "今天没有课",
-                    color = if (blocks.isNotEmpty()) academicLeafColor() else colors.brand,
+    Box(
+        Modifier.fillMaxWidth()
+            .shadow(if (block != null) 8.dp else 0.dp, shape, ambientColor = shadowTint, spotColor = shadowTint)
+            .then(if (block != null) Modifier.nativeCardAction({ onOpen(block) }, shape = shape) else Modifier),
+    ) {
+        AnimatedContent(
+            targetState = block?.course?.hue,
+            modifier = Modifier.matchParentSize(),
+            transitionSpec = {
+                if (reduced) (EnterTransition.None togetherWith ExitTransition.None).using(null)
+                else (fadeIn(tween(180)) togetherWith fadeOut(tween(140))).using(null)
+            },
+            label = "today card surface",
+        ) { hue ->
+            if (hue == null) {
+                Box(Modifier.fillMaxSize().nativeGlassCard(22))
+            } else {
+                val recipe = academicCourseColors(hue)
+                Box(
+                    Modifier.fillMaxSize()
+                        .background(
+                            Brush.linearGradient(
+                                colors = listOf(
+                                    lerp(recipe.soft, colors.surface, 0.15f + 0.10f * themeProgress),
+                                    colors.surface,
+                                ),
+                                start = Offset.Zero,
+                                end = Offset(900f, 700f),
+                            ),
+                            shape,
+                        )
+                        .border(1.dp, recipe.mark.copy(alpha = 0.26f + 0.08f * themeProgress), shape),
+                ) {
+                    AcademicHeroDecoration(recipe.mark, Modifier.matchParentSize())
+                }
+            }
+        }
+        AnimatedContent(
+            targetState = content,
+            modifier = Modifier.fillMaxWidth(),
+            transitionSpec = {
+                if (reduced) (EnterTransition.None togetherWith ExitTransition.None).using(null)
+                else (fadeIn(tween(170)) togetherWith fadeOut(tween(125)))
+                    .using(SizeTransform { _, _ -> tween(220) })
+            },
+            // Countdown and progress use the current minute without restarting the card transition.
+            contentKey = {
+                listOf(it.block?.key, it.inProgress, it.later?.date, it.later?.block?.key,
+                    it.finished, it.status.kind, it.status.note.isNotEmpty(), it.previousRoom?.key)
+            },
+            label = "today course status",
+        ) { shown ->
+            val lesson = shown.block
+            if (lesson == null) {
+                AcademicIdleHero(shown.status, shown.finished, shown.later)
+            } else {
+                AcademicLessonHero(
+                    lesson, shown.inProgress, minute, shown.previousRoom,
+                    shown.status.note.takeIf { shown.status.kind == "makeup" }.orEmpty(),
                 )
             }
-            if (later != null) {
+        }
+    }
+}
+
+@Composable
+private fun AcademicIdleHero(status: AcademicDayStatus, finished: Boolean, later: AcademicNextClass?) {
+    val colors = LocalNativeColors.current
+    val closed = status.kind == "closed"
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            val tint = if (finished && !closed) academicLeafColor() else colors.brand
+            NIconBadge(
+                icon = when {
+                    closed -> "calendar"
+                    finished -> "check"
+                    else -> "spark"
+                },
+                tint = tint,
+                sizeDp = 36,
+                iconDp = 18,
+            )
+            NTag(
+                text = when {
+                    closed -> "今日停课"
+                    finished -> "今天的课上完了"
+                    else -> "今天没有课"
+                },
+                color = tint,
+            )
+        }
+        when {
+            closed -> {
+                NText(status.label, 20, bold = true)
+                NText("按教务处校历，今天没有课。", 14, muted = true)
+            }
+            later != null -> {
                 val whenPrefix = if (later.offset == 1) "明天" else "${AcademicClock.monthDay(later.date)} ${AcademicClock.weekdayText(later.plan.weekday)}"
                 NText("$whenPrefix ${later.block.start} · ${later.block.course.title}", 18, bold = true)
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -715,141 +809,123 @@ private fun AcademicNowCard(
                         muted = true,
                     )
                 }
-            } else {
-                NText("接下来两周没有排课", 18, bold = true)
             }
+            else -> NText("接下来两周没有排课", 18, bold = true)
         }
-        return
     }
+}
 
+@Composable
+private fun AcademicLessonHero(
+    block: AcademicBlock,
+    inProgress: Boolean,
+    minute: Int,
+    previous: AcademicBlock?,
+    makeupNote: String,
+) {
+    val colors = LocalNativeColors.current
     val recipe = academicCourseColors(block.course.hue)
-    val tint = recipe.soft
     val mark = recipe.mark
-    val previous = blocks.getOrNull(blocks.indexOf(block) - 1)
-    val moved = previous != null && previous.location.isNotEmpty() && block.location.isNotEmpty() &&
-        previous.location != block.location && block.startMin - previous.endMin <= 30
-    val heroShape = RoundedRectangle(26.dp)
-    val shadowTint = mark.copy(alpha = 0.14f + 0.14f * progress)
-
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .shadow(8.dp, heroShape, ambientColor = shadowTint, spotColor = shadowTint)
-            .nativeCardAction({ onOpen(block) }, shape = heroShape)
-            .background(
-                Brush.linearGradient(
-                    colors = listOf(
-                        lerp(tint, colors.surface, 0.15f + 0.10f * progress),
-                        colors.surface,
-                    ),
-                    start = Offset(0f, 0f),
-                    end = Offset(900f, 700f),
-                ),
-            )
-            .border(1.dp, mark.copy(alpha = 0.26f + 0.08f * progress), heroShape),
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 18.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        AcademicHeroDecoration(mark, Modifier.matchParentSize())
-        Column(
-            Modifier.padding(horizontal = 20.dp, vertical = 18.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Row(
-                Modifier.fillMaxWidth(),
+                Modifier
+                    .clip(Capsule())
+                    .background(mark.copy(alpha = 0.14f))
+                    .padding(horizontal = 10.dp, vertical = 5.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                Row(
-                    Modifier
-                        .clip(Capsule())
-                        .background(mark.copy(alpha = 0.14f))
-                        .padding(horizontal = 10.dp, vertical = 5.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    Box(Modifier.size(7.dp).clip(CircleShape).background(mark))
-                    AcademicText(
-                        text = if (current != null) {
-                            "正在上课 · 还剩 ${AcademicClock.span(block.endMin - minute)}"
-                        } else {
-                            "下一节 · ${if (block.startMin <= minute) "马上开始" else "还有 ${AcademicClock.span(block.startMin - minute)}"}"
-                        },
-                        color = recipe.ink,
-                        fontSize = 12,
-                        bold = true,
-                        maxLines = 1,
-                        softWrap = false,
-                        tabularNums = true,
-                    )
-                }
-                NText(
-                    AcademicTimetable.periodsText(block.periods),
-                    12,
-                    muted = true,
+                Box(Modifier.size(7.dp).clip(CircleShape).background(mark))
+                AcademicText(
+                    text = if (inProgress) {
+                        "正在上课 · 还剩 ${AcademicClock.span((block.endMin - minute).coerceIn(0, block.span))}"
+                    } else {
+                        "下一节 · ${if (block.startMin <= minute) "马上开始" else "还有 ${AcademicClock.span(block.startMin - minute)}"}"
+                    },
+                    color = recipe.ink,
+                    fontSize = 12,
+                    bold = true,
                     maxLines = 1,
                     softWrap = false,
                     tabularNums = true,
                 )
             }
+            NText(
+                AcademicTimetable.periodsText(block.periods),
+                12,
+                muted = true,
+                maxLines = 1,
+                softWrap = false,
+                tabularNums = true,
+            )
+        }
 
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            AcademicText(block.start, colors.ink, 36, bold = true, maxLines = 1, softWrap = false, tabularNums = true)
+            Box(Modifier.width(14.dp).height(2.5.dp).clip(Capsule()).background(mark.copy(alpha = 0.55f)))
+            AcademicText(block.end, colors.ink, 36, bold = true, maxLines = 1, softWrap = false, tabularNums = true)
+        }
+
+        AcademicText(block.course.title, colors.ink, 20, bold = true, maxLines = 2)
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             Row(
+                Modifier
+                    .clip(Capsule())
+                    .background(mark.copy(alpha = 0.11f))
+                    .padding(horizontal = 10.dp, vertical = 5.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
             ) {
-                AcademicText(block.start, colors.ink, 36, bold = true, maxLines = 1, softWrap = false, tabularNums = true)
-                Box(Modifier.width(14.dp).height(2.5.dp).clip(Capsule()).background(mark.copy(alpha = 0.55f)))
-                AcademicText(block.end, colors.ink, 36, bold = true, maxLines = 1, softWrap = false, tabularNums = true)
+                NativeIcon("pin", recipe.ink, size = 14.dp)
+                AcademicText(
+                    block.location.ifEmpty { "教务未标注地点" },
+                    recipe.ink,
+                    13,
+                    bold = true,
+                    maxLines = 1,
+                )
             }
+            val meta = (if (block.teacher.isNotEmpty()) "${block.teacher} · " else "") + AcademicClock.span(block.span)
+            NText(meta, 12, muted = true, maxLines = 1)
+        }
 
-            AcademicText(block.course.title, colors.ink, 20, bold = true, maxLines = 2)
-
+        if (previous != null) {
             Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedRectangle(12.dp))
+                    .background(mark.copy(alpha = 0.09f))
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                Row(
-                    Modifier
-                        .clip(Capsule())
-                        .background(mark.copy(alpha = 0.11f))
-                        .padding(horizontal = 10.dp, vertical = 5.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(5.dp),
-                ) {
-                    NativeIcon("pin", recipe.ink, size = 14.dp)
-                    AcademicText(
-                        block.location.ifEmpty { "教务未标注地点" },
-                        recipe.ink,
-                        13,
-                        bold = true,
-                        maxLines = 1,
-                    )
-                }
-                val meta = (if (block.teacher.isNotEmpty()) "${block.teacher} · " else "") + AcademicClock.span(block.span)
-                NText(meta, 12, muted = true, maxLines = 1)
+                NativeIcon("spark", recipe.ink, size = 14.dp)
+                NText(
+                    "换教室：上一节在 ${previous.location}，课间 ${AcademicClock.span(block.startMin - previous.endMin)}",
+                    12,
+                    color = recipe.ink,
+                    bold = true,
+                )
             }
-
-            if (moved && current == null) {
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedRectangle(12.dp))
-                        .background(mark.copy(alpha = 0.09f))
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    NativeIcon("spark", recipe.ink, size = 14.dp)
-                    NText(
-                        "换教室：上一节在 ${previous.location}，课间 ${AcademicClock.span(block.startMin - previous.endMin)}",
-                        12,
-                        color = recipe.ink,
-                        bold = true,
-                    )
-                }
-            }
-            if (status.kind == "makeup") NText(status.note, 13, bold = true)
-            if (current != null) {
-                AcademicProgress((minute - block.startMin).toFloat() / block.span, mark, Modifier.padding(top = 2.dp))
-            }
+        }
+        if (makeupNote.isNotEmpty()) NText(makeupNote, 13, bold = true)
+        if (inProgress) {
+            AcademicProgress((minute - block.startMin).toFloat() / block.span, mark, Modifier.padding(top = 2.dp))
         }
     }
 }
