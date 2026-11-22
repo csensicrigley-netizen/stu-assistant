@@ -1236,8 +1236,6 @@ internal fun NativeItemsPage(
             // 9) Contextual Sheets via native `NSheet` (`Course / Homework / All-Day`)
             ItemsContextualSheetHost(
                 modal = contextModal,
-                dateWindow = dateWindow,
-                doc = doc,
                 tasks = tasks,
                 doneTaskIds = s.done,
                 items = models,
@@ -1247,7 +1245,6 @@ internal fun NativeItemsPage(
                     tasks.firstOrNull { it.id == tid }?.let(::commitToggleHomework) ?: onSetCourseDone(tid, tid !in latestDoneIds)
                 },
                 onToggleItemDone = ::commitToggleRecord,
-                onOpenHomework = { t -> contextModal = ItemsContextModal.Homework(t) },
                 onOpenItemEdit = { item ->
                     contextModal = null
                     editingId = item.id

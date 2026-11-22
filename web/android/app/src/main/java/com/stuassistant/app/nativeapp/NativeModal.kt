@@ -41,6 +41,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
@@ -108,6 +109,7 @@ private class NativeSheetEntry(
     var containsFocus = false
     var hasBeenPresented = false
     var requested by mutableStateOf(true)
+    var scrimProgress: State<Float>? by mutableStateOf(null)
 }
 
 class NativeSheetController {
@@ -264,6 +266,13 @@ fun NativeSheetHost(controller: NativeSheetController, backdrop: Backdrop) {
         }
     }
 
+    if (entries.isNotEmpty()) {
+        Box(Modifier.fillMaxSize().drawBehind {
+            // The stack covers the page once. Nested sheets keep the same backdrop brightness.
+            val progress = entries.maxOf { it.scrimProgress?.value ?: 0f }.coerceIn(0f, 1f)
+            drawRect(Color.Black.copy(alpha = 0.32f * progress))
+        })
+    }
     // Keep underlying content composed: it may itself register the next NSheet in the stack.
     entries.forEach { entry ->
         key(entry) {
@@ -285,6 +294,7 @@ private fun NativeDialogLayer(
     val reducedMotion = LocalLiquidGlassReducedMotion.current
     val onDismiss by rememberUpdatedState { controller.requestDismiss(entry) }
     val motion = remember { NativeDialogMotion() }
+    SideEffect { entry.scrimProgress = motion.scrim.asState() }
     LaunchedEffect(entry.requested, reducedMotion) {
         if (!entry.requested) {
             motion.exit(reducedMotion)
@@ -303,7 +313,6 @@ private fun NativeDialogLayer(
     ) {
         Box(
             Modifier.fillMaxSize()
-                .drawBehind { drawRect(Color.Black.copy(alpha = .32f * motion.scrim.value)) }
                 .focusProperties { canFocus = false }
                 .clearAndSetSemantics {}
                 .clickable(
@@ -433,16 +442,15 @@ private fun NativeSheetLayer(entry: NativeSheetEntry, active: Boolean, backdrop:
         transitionSpec = { if (reducedMotion) snap() else spring(dampingRatio = .8333333f, stiffness = 400f) },
         label = "sheet slide",
     ) { if (it == EnterExitState.Visible) 1f else 0f }
-    val scrimProgress by transition.animateFloat(
+    val scrimProgress = transition.animateFloat(
         transitionSpec = { if (reducedMotion) snap() else tween(200) }, label = "sheet scrim",
     ) { if (it == EnterExitState.Visible) 1f else 0f }
+    SideEffect { entry.scrimProgress = scrimProgress }
     BoxWithConstraints(
         Modifier.fillMaxSize().then(if (active) Modifier else Modifier.clearAndSetSemantics {}.blockSheetPointers()),
     ) {
         Box(
             Modifier.fillMaxSize()
-                .graphicsLayer { alpha = scrimProgress.coerceIn(0f, 1f) }
-                .background(Color.Black.copy(alpha = .32f))
                 .focusProperties { canFocus = false }
                 .clearAndSetSemantics {}
                 .clickable(

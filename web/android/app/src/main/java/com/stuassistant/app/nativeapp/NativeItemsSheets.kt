@@ -816,8 +816,6 @@ internal sealed interface ItemsContextModal {
 @Composable
 internal fun ItemsContextualSheetHost(
     modal: ItemsContextModal?,
-    dateWindow: ItemsDateWindow,
-    doc: AcademicTimetableDoc?,
     tasks: List<AcademicTask>,
     doneTaskIds: Set<String>,
     items: List<ItemsRecordModel>,
@@ -825,17 +823,29 @@ internal fun ItemsContextualSheetHost(
     onDismiss: () -> Unit,
     onToggleCourseTask: (String) -> Unit,
     onToggleItemDone: (ItemsRecordModel) -> Unit,
-    onOpenHomework: (AcademicTask) -> Unit,
     onOpenItemEdit: (ItemsRecordModel) -> Unit,
     onTriageHomework: (AcademicTask) -> Unit,
     onJumpToScheduledHomework: (ItemsRecordModel) -> Unit,
     onQuickAddForCourse: (AcademicBlock, String) -> Unit,
     onQuickAddAllDay: (String) -> Unit,
 ) {
-    val c = LocalNativeColors.current
     val dark = LocalLiquidGlassDarkTheme.current == true
     val palette = LocalNativePalette.current
-    val context = LocalContext.current
+    var childTask by remember(modal) { mutableStateOf<AcademicTask?>(null) }
+    val homeworkSheet: @Composable (AcademicTask, () -> Unit) -> Unit = { task, close ->
+        ItemsHomeworkSheet(
+            task = task,
+            done = task.id in doneTaskIds,
+            linked = items.firstOrNull { it.schoolTaskId == task.id },
+            onDismiss = close,
+            onToggleCourseTask = onToggleCourseTask,
+            onTriageHomework = onTriageHomework,
+            onJumpToScheduledHomework = onJumpToScheduledHomework,
+        )
+    }
+    val nestedHomeworkSheet: @Composable () -> Unit = {
+        childTask?.let { task -> homeworkSheet(task) { childTask = null } }
+    }
 
     when (modal) {
         is ItemsContextModal.Course -> {
@@ -866,7 +876,7 @@ internal fun ItemsContextualSheetHost(
                                 subtitle = itemsTaskDeadline(task),
                                 done = task.id in doneTaskIds,
                                 onToggle = { onToggleCourseTask(task.id) },
-                                onOpen = { onOpenHomework(task) },
+                                onOpen = { childTask = task },
                             )
                         }
                     }
@@ -877,47 +887,10 @@ internal fun ItemsContextualSheetHost(
                     primary = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
+                nestedHomeworkSheet()
             }
         }
-        is ItemsContextModal.Homework -> {
-            val task = modal.task
-            val tDone = task.id in doneTaskIds
-            val linked = items.firstOrNull { it.schoolTaskId == task.id }
-
-            NSheet(task.title, onDismiss) {
-                Row(
-                    Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Box(Modifier.weight(1f)) {
-                        NRow("截止", itemsTaskDeadline(task), leadingIcon = "clock")
-                    }
-                    ItemsCheckbox(tDone, c.muted, task.title, { onToggleCourseTask(task.id) }, square = true)
-                }
-                if (task.course.isNotBlank()) NRow("课程", task.course, leadingIcon = "study")
-                NRow("来源", AcademicRecords.source(task.source), leadingIcon = "study")
-                if (task.schoolStatus.isNotBlank()) NRow("学校状态", task.schoolStatus)
-                task.url?.let { url ->
-                    NButton("打开 ${AcademicRecords.source(task.source)}", { nativeOpenLink(context, url) }, modifier = Modifier.fillMaxWidth(), haptic = NativeButtonHaptic.Navigation)
-                }
-                if (linked != null && linked.isScheduled) {
-                    NButton(
-                        "查看已排日程（${AcademicClock.slash(linked.date!!)}${linked.startClock?.let { " $it" }.orEmpty()}）",
-                        { onJumpToScheduledHomework(linked) },
-                        primary = true,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                } else if (!tDone) {
-                    NButton(
-                        "智能排入空闲时段",
-                        { onTriageHomework(task) },
-                        primary = true,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-            }
-        }
+        is ItemsContextModal.Homework -> homeworkSheet(modal.task, onDismiss)
         is ItemsContextModal.AllDay -> {
             val dues = tasks.filter { it.dueMs != null && AcademicClock.moment(it.dueMs).date == modal.date }
             val allDay = items.filter { it.date == modal.date && it.isAllDay }
@@ -932,7 +905,7 @@ internal fun ItemsContextualSheetHost(
                                 subtitle = listOf(task.course, itemsTaskDeadline(task)).filter { it.isNotBlank() }.joinToString(" · "),
                                 done = task.id in doneTaskIds,
                                 onToggle = { onToggleCourseTask(task.id) },
-                                onOpen = { onOpenHomework(task) },
+                                onOpen = { childTask = task },
                             )
                         }
                     }
@@ -960,9 +933,57 @@ internal fun ItemsContextualSheetHost(
                     primary = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
+                nestedHomeworkSheet()
             }
         }
         null -> Unit
+    }
+}
+
+@Composable
+private fun ItemsHomeworkSheet(
+    task: AcademicTask,
+    done: Boolean,
+    linked: ItemsRecordModel?,
+    onDismiss: () -> Unit,
+    onToggleCourseTask: (String) -> Unit,
+    onTriageHomework: (AcademicTask) -> Unit,
+    onJumpToScheduledHomework: (ItemsRecordModel) -> Unit,
+) {
+    val c = LocalNativeColors.current
+    val context = LocalContext.current
+    NSheet(task.title, onDismiss) {
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Box(Modifier.weight(1f)) {
+                NRow("截止", itemsTaskDeadline(task), leadingIcon = "clock")
+            }
+            ItemsCheckbox(done, c.muted, task.title, { onToggleCourseTask(task.id) }, square = true)
+        }
+        if (task.course.isNotBlank()) NRow("课程", task.course, leadingIcon = "study")
+        NRow("来源", AcademicRecords.source(task.source), leadingIcon = "study")
+        if (task.schoolStatus.isNotBlank()) NRow("学校状态", task.schoolStatus)
+        task.url?.let { url ->
+            NButton("打开 ${AcademicRecords.source(task.source)}", { nativeOpenLink(context, url) }, modifier = Modifier.fillMaxWidth(), haptic = NativeButtonHaptic.Navigation)
+        }
+        if (linked != null && linked.isScheduled) {
+            NButton(
+                "查看已排日程（${AcademicClock.slash(linked.date!!)}${linked.startClock?.let { " $it" }.orEmpty()}）",
+                { onJumpToScheduledHomework(linked) },
+                primary = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        } else if (!done) {
+            NButton(
+                "智能排入空闲时段",
+                { onTriageHomework(task) },
+                primary = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
     }
 }
 
