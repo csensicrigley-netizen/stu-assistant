@@ -17,8 +17,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
+import androidx.compose.ui.unit.Density
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SdkSuppress
@@ -339,6 +341,47 @@ class NativeItemsInteractionInstrumentedTest {
             waitFor("周一 23")
             tap("切换清单与日历")
             waitForCheckbox("标记完成：$monday")
+        }
+    }
+
+    @Test fun scaleMenuTracksTheButtonWithLargerText() {
+        val largeText = mutableStateOf(false)
+        val density = inst.targetContext.resources.displayMetrics.density
+        launch {
+            val normalDensity = LocalDensity.current
+            val fontScale = if (largeText.value) 1.55f else normalDensity.fontScale
+            CompositionLocalProvider(LocalDensity provides Density(normalDensity.density, fontScale)) {
+                NativeItemsPage(
+                    NativeState(calendarFocusDate = "2026-11-24"), emptyList(), initialGrid = true,
+                    onSetRecordDone = { _, _ -> }, onSetCourseDone = { _, _ -> },
+                )
+            }
+        }.use { scenario ->
+            fun assertAnchored() {
+                val deadline = SystemClock.uptimeMillis() + 4_000L
+                var button: Rect
+                var menu: Rect
+                var gap: Int
+                do {
+                    button = taggedBounds("items-scale-btn")
+                    menu = taggedBounds("items-scale-menu")
+                    gap = menu.top - button.bottom
+                    // Accessibility can expand the narrow button's hit area beyond its outline.
+                    if (kotlin.math.abs(gap - 4f * density) <= 2f * density &&
+                        menu.left >= button.left - 8f * density &&
+                        menu.left <= button.centerX() && menu.right >= button.centerX()) return
+                    SystemClock.sleep(50)
+                } while (SystemClock.uptimeMillis() < deadline)
+                fail("Scale menu did not anchor below the button: button=$button, menu=$menu, gap=$gap px")
+            }
+            gesture(taggedBounds("items-scale-btn"))
+            waitFor("单日视图")
+            assertAnchored()
+            scenario.onActivity { largeText.value = true }
+            inst.waitForIdleSync()
+            assertAnchored()
+            tap("单日视图")
+            waitFor("切换日历视图刻度，当前1日")
         }
     }
 

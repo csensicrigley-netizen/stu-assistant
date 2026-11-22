@@ -3,9 +3,11 @@ package com.stuassistant.app.nativeapp
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
@@ -34,6 +36,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -46,8 +49,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -67,6 +72,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
@@ -79,6 +85,7 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -469,8 +476,9 @@ internal fun ItemsScalePopover(
     selectedCols: Int,
     onSelectCols: (Int) -> Unit,
     onDismiss: () -> Unit,
-    topPaddingDp: Dp,
+    anchorBounds: Rect?,
 ) {
+    val anchor = anchorBounds ?: return
     val c = LocalNativeColors.current
     val dark = LocalLiquidGlassDarkTheme.current == true
     val reduced = LocalLiquidGlassReducedMotion.current
@@ -482,7 +490,30 @@ internal fun ItemsScalePopover(
         enter = if (reduced) EnterTransition.None else fadeIn(tween(150)),
         exit = if (reduced) ExitTransition.None else fadeOut(tween(120)),
     ) {
-        Box(Modifier.fillMaxSize()) {
+        val scale by transition.animateFloat(
+            transitionSpec = {
+                when {
+                    reduced -> snap()
+                    targetState == EnterExitState.Visible -> spring(0.76f, 520f)
+                    else -> tween(120)
+                }
+            },
+            label = "scale menu",
+        ) { state ->
+            when (state) {
+                EnterExitState.PreEnter -> 0.88f
+                EnterExitState.Visible -> 1f
+                EnterExitState.PostExit -> 0.9f
+            }
+        }
+        BoxWithConstraints(Modifier.fillMaxSize()) {
+            val density = LocalDensity.current
+            val margin = 8.dp
+            val menuWidth = minOf(168.dp, (maxWidth - margin * 2).coerceAtLeast(1.dp))
+            val left = with(density) { anchor.left.toDp() }
+                .coerceIn(margin, (maxWidth - menuWidth - margin).coerceAtLeast(margin))
+            val top = with(density) { anchor.bottom.toDp() } + 4.dp
+            val menuHeight = (maxHeight - top - margin).coerceAtLeast(0.dp)
             Box(
                 Modifier
                     .fillMaxSize()
@@ -492,15 +523,24 @@ internal fun ItemsScalePopover(
                 backdrop = backdrop,
                 shape = RoundedRectangle(18.dp),
                 modifier = Modifier
-                    .padding(top = topPaddingDp, start = 10.dp)
-                    .animateEnterExit(
-                        enter = if (reduced) EnterTransition.None else scaleIn(spring(0.76f, 520f), initialScale = 0.88f, transformOrigin = TransformOrigin(0.1f, 0f)),
-                        exit = if (reduced) ExitTransition.None else scaleOut(tween(120), targetScale = 0.9f, transformOrigin = TransformOrigin(0.1f, 0f)),
-                    )
-                    .width(168.dp)
-                    .shadow(14.dp, RoundedRectangle(18.dp), ambientColor = Color.Black.copy(alpha = 0.2f)),
+                    .absoluteOffset(left, top)
+                    .width(menuWidth)
+                    .heightIn(max = menuHeight)
+                    .graphicsLayer {
+                        transformOrigin = TransformOrigin(
+                            (anchor.center.x - left.toPx()) / size.width.coerceAtLeast(1f),
+                            (anchor.center.y - top.toPx()) / size.height.coerceAtLeast(1f),
+                        )
+                        scaleX = scale
+                        scaleY = scale
+                    }
+                    .shadow(14.dp, RoundedRectangle(18.dp), ambientColor = Color.Black.copy(alpha = 0.2f))
+                    .testTag("items-scale-menu"),
             ) {
-                Column(Modifier.padding(5.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Column(
+                    Modifier.verticalScroll(rememberScrollState()).padding(5.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
                     listOf(
                         Triple(1, "单日视图", "详细列宽"),
                         Triple(3, "三日视图", "均衡排期"),
@@ -758,6 +798,7 @@ internal fun ItemsWeekStrip(
     dayUrgency: (String) -> ItemsDayUrgency,
     onSelectDate: (String) -> Unit,
     onToggleScaleMenu: () -> Unit,
+    onScaleButtonPositioned: (LayoutCoordinates) -> Unit,
     onBeginCalScrub: () -> Float,
     onScrubCalOffset: (Float) -> Unit,
     onReleaseCalScrub: (velColsPerSec: Float) -> Unit,
@@ -826,8 +867,11 @@ internal fun ItemsWeekStrip(
                             onToggleScaleMenu()
                         }
                         .then(
-                            if (isGrid) Modifier.testTag("items-scale-btn").semantics {
-                                contentDescription = "切换日历视图刻度，当前${ItemsCalendarMath.scaleShortName(calCols)}"
+                            if (isGrid) {
+                                Modifier.onGloballyPositioned(onScaleButtonPositioned)
+                                    .testTag("items-scale-btn").semantics {
+                                        contentDescription = "切换日历视图刻度，当前${ItemsCalendarMath.scaleShortName(calCols)}"
+                                    }
                             } else Modifier.clearAndSetSemantics {},
                         ),
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -1339,6 +1383,7 @@ internal fun ItemsTopHeader(
     onOpenAcademic: () -> Unit,
     onSelectDate: (String) -> Unit,
     onToggleScaleMenu: () -> Unit,
+    onScaleButtonPositioned: (LayoutCoordinates) -> Unit,
     onBeginCalScrub: () -> Float,
     onScrubCalOffset: (Float) -> Unit,
     onReleaseCalScrub: (velColsPerSec: Float) -> Unit,
@@ -1571,6 +1616,7 @@ internal fun ItemsTopHeader(
                     dayUrgency = dayUrgency,
                     onSelectDate = onSelectDate,
                     onToggleScaleMenu = onToggleScaleMenu,
+                    onScaleButtonPositioned = onScaleButtonPositioned,
                     onBeginCalScrub = onBeginCalScrub,
                     onScrubCalOffset = onScrubCalOffset,
                     onReleaseCalScrub = onReleaseCalScrub,

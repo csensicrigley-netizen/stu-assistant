@@ -87,6 +87,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -95,6 +96,8 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.input.pointer.util.VelocityTracker
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
@@ -819,6 +822,17 @@ internal fun NativeItemsPage(
     val baseBackdrop = LocalNativeBackdrop.current
     val itemsContentBackdrop = rememberLayerBackdrop()
     val itemsChromeBackdrop = rememberCombinedBackdrop(baseBackdrop, itemsContentBackdrop)
+    var itemsLayerCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    var scaleButtonCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    var scaleAnchorBounds by remember { mutableStateOf<Rect?>(null) }
+
+    fun updateScaleAnchor() {
+        val layer = itemsLayerCoordinates ?: return
+        val button = scaleButtonCoordinates ?: return
+        if (layer.isAttached && button.isAttached) {
+            scaleAnchorBounds = layer.localBoundingBoxOf(button, clipBounds = false)
+        }
+    }
 
     val editingItem = editingId?.let { eid -> models.firstOrNull { it.id == eid } }
     NativeSuppressBottomBar(editingItem != null || quickAddOpen || acadOpen)
@@ -830,6 +844,10 @@ internal fun NativeItemsPage(
         Box(
             Modifier
                 .fillMaxSize()
+                .onGloballyPositioned {
+                    itemsLayerCoordinates = it
+                    updateScaleAnchor()
+                }
                 .graphicsLayer {
                     val p = academicProgress
                     translationX = -28.dp.toPx() * p
@@ -1084,6 +1102,10 @@ internal fun NativeItemsPage(
                 },
                 onSelectDate = { d -> jumpToDate(d) },
                 onToggleScaleMenu = { scaleMenuOpen = !scaleMenuOpen },
+                onScaleButtonPositioned = {
+                    scaleButtonCoordinates = it
+                    updateScaleAnchor()
+                },
                 onBeginCalScrub = ::beginGridNavigation,
                 onScrubCalOffset = ::panGridTo,
                 onReleaseCalScrub = ::releaseGridPan,
@@ -1158,7 +1180,7 @@ internal fun NativeItemsPage(
                     animateCalViewTo(cols, ItemsCalendarMath.offsetForDayIndex(idx, cols, dateWindow.totalDays))
                 },
                 onDismiss = { scaleMenuOpen = false },
-                topPaddingDp = statusTopDp + 162.dp,
+                anchorBounds = scaleAnchorBounds,
             )
 
             // 6) Floating `+` FAB (tucks away during drag or sheet open)
