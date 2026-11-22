@@ -6,7 +6,6 @@ import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.CubicBezierEasing
-import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
@@ -22,7 +21,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -55,10 +53,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
@@ -100,7 +97,6 @@ import com.kyant.shapes.RoundedRectangle
 import com.stuassistant.app.glass.LiquidDialogSurface
 import com.stuassistant.app.glass.LocalLiquidGlassDarkTheme
 import com.stuassistant.app.glass.LocalLiquidGlassReducedMotion
-import kotlinx.coroutines.launch
 import java.time.LocalDate
 
 @Composable
@@ -377,7 +373,6 @@ internal fun ItemsEventEditSheet(
     val dark = LocalLiquidGlassDarkTheme.current == true
     val palette = LocalNativePalette.current
     val reduced = LocalLiquidGlassReducedMotion.current
-    val scope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
     val tick = nSelectionFeedback()
@@ -404,18 +399,22 @@ internal fun ItemsEventEditSheet(
     var drawerOpen by remember(item.id) { mutableStateOf(!item.isScheduled) }
     var pickInboxDay by remember(item.id) { mutableStateOf(item.date ?: dateWindow.today) }
     val noteFocus = remember { FocusRequester() }
-    var dragY by remember(item.id) { mutableFloatStateOf(0f) }
-    LaunchedEffect(open) { if (open) dragY = 0f }
 
     val showDimOverlay = !isGridMode || !item.isTimed || typingMode
 
+    fun hideKeyboard() {
+        focusManager.clearFocus(force = true)
+        keyboard?.hide()
+    }
+
+    fun dismiss() {
+        hideKeyboard()
+        onClose()
+    }
+
+    val drag = key(item.id) { rememberNativeSheetDrag(active = open, dismissDistance = 56.dp, onDismiss = ::dismiss) }
     BackHandler(enabled = open) {
-        if (typingMode) {
-            focusManager.clearFocus(force = true)
-            keyboard?.hide()
-        } else {
-            onClose()
-        }
+        if (typingMode) hideKeyboard() else dismiss()
     }
 
     AnimatedVisibility(visible = open, enter = EnterTransition.None, exit = ExitTransition.None) {
@@ -435,16 +434,14 @@ internal fun ItemsEventEditSheet(
                     Modifier
                         .fillMaxSize()
                         .animateEnterExit(enter = itemsScrimEnter(reduced), exit = itemsScrimExit(reduced))
+                        .graphicsLayer { alpha = drag.scrimFraction }
                         .background(Color.Black.copy(alpha = dimAlpha))
                         .then(
                             if (showDimOverlay) {
-                                Modifier.pointerInput(typingMode) {
+                                Modifier.pointerInput(typingMode, open) {
                                     detectTapGestures {
-                                        if (typingMode) {
-                                            focusManager.clearFocus(force = true)
-                                            keyboard?.hide()
-                                        } else {
-                                            onClose()
+                                        if (open) {
+                                            if (typingMode) hideKeyboard() else dismiss()
                                         }
                                     }
                                 }
@@ -468,7 +465,7 @@ internal fun ItemsEventEditSheet(
                     .padding(start = 10.dp, end = 10.dp, bottom = 10.dp)
                     .navigationBarsPadding()
                     .imePadding()
-                    .graphicsLayer { translationY = (dragY * 0.65f).coerceAtLeast(0f) }
+                    .graphicsLayer { translationY = drag.offsetPx }
                     .pointerInput(item.id) { detectTapGestures(onTap = {}) }
                     .testTag("items-edit-sheet"),
             ) {
@@ -482,29 +479,23 @@ internal fun ItemsEventEditSheet(
                         Modifier
                             .fillMaxWidth()
                             .height(22.dp)
-                            .pointerInput(item.id) {
-                                detectVerticalDragGestures(
-                                    onDragEnd = {
-                                        if (dragY > 56.dp.toPx()) onClose()
-                                        else scope.launch { animate(dragY, 0f, animationSpec = spring(0.8f, 420f)) { v, _ -> dragY = v } }
-                                    },
-                                    onDragCancel = { scope.launch { animate(dragY, 0f, animationSpec = spring(0.8f, 420f)) { v, _ -> dragY = v } } },
-                                ) { ch, dragAmount ->
-                                    ch.consume()
-                                    dragY = (dragY + dragAmount).coerceAtLeast(0f)
-                                }
-                            }
+                            .nativeSheetDragHandle(drag, open)
                             .clickable(
+                                enabled = open,
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null,
-                            ) { onClose() }
+                                onClick = ::dismiss,
+                            )
                             .semantics { contentDescription = "收起编辑" },
                         contentAlignment = Alignment.Center,
                     ) {
                         Box(Modifier.size(36.dp, 4.dp).clip(Capsule()).background(c.ink.copy(alpha = 0.20f)))
                     }
 
-                    Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())) {
+                    Column(
+                        Modifier.weight(1f, fill = false).nativeSheetDragContent(drag, open)
+                            .verticalScroll(rememberScrollState()),
+                    ) {
                         Row(
                             Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically,
@@ -771,9 +762,7 @@ internal fun ItemsEventEditSheet(
                         }
                         ItemsSheetPrimaryButton("完成编辑", Modifier.testTag("items-edit-done")) {
                             submitHaptic()
-                            focusManager.clearFocus(force = true)
-                            keyboard?.hide()
-                            onClose()
+                            dismiss()
                         }
                     }
                 }
@@ -1042,14 +1031,12 @@ internal fun ItemsQuickAddSheet(
     val reduced = LocalLiquidGlassReducedMotion.current
     val tick = nSelectionFeedback()
     val submitHaptic = nHapticFeedback(NativeButtonHaptic.Submit.release)
-    val scope = rememberCoroutineScope()
     val keyboard = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
     val titleFocus = remember { FocusRequester() }
     val noteFocus = remember { FocusRequester() }
     val onDismissLatest by rememberUpdatedState(onDismiss)
     var pickerOpen by remember { mutableStateOf(false) }
-    var dragY by remember { mutableFloatStateOf(0f) }
 
     fun dismiss() {
         focusManager.clearFocus(force = true)
@@ -1057,13 +1044,13 @@ internal fun ItemsQuickAddSheet(
         onDismissLatest()
     }
 
+    val drag = rememberNativeSheetDrag(active = visible, dismissDistance = 56.dp, onDismiss = ::dismiss)
     BackHandler(enabled = visible) {
         if (pickerOpen) pickerOpen = false else dismiss()
     }
 
     LaunchedEffect(visible) {
         if (visible) {
-            dragY = 0f
             pickerOpen = false
             withFrameNanos { }
             runCatching { titleFocus.requestFocus() }
@@ -1114,8 +1101,9 @@ internal fun ItemsQuickAddSheet(
                 Modifier
                     .fillMaxSize()
                     .animateEnterExit(enter = itemsScrimEnter(reduced), exit = itemsScrimExit(reduced))
+                    .graphicsLayer { alpha = drag.scrimFraction }
                     .background(Color.Black.copy(alpha = 0.28f))
-                    .pointerInput(Unit) { detectTapGestures { dismiss() } },
+                    .pointerInput(visible) { detectTapGestures { if (visible) dismiss() } },
             )
             LiquidDialogSurface(
                 backdrop = backdrop,
@@ -1128,9 +1116,7 @@ internal fun ItemsQuickAddSheet(
                     .padding(start = 8.dp, end = 8.dp, bottom = 8.dp)
                     .navigationBarsPadding()
                     .imePadding()
-                    .graphicsLayer {
-                        translationY = (dragY * 0.65f).coerceAtLeast(0f)
-                    }
+                    .graphicsLayer { translationY = drag.offsetPx }
                     .pointerInput(Unit) { detectTapGestures(onTap = {}) }
                     .testTag("items-quick-add"),
             ) {
@@ -1139,19 +1125,9 @@ internal fun ItemsQuickAddSheet(
                         Modifier
                             .fillMaxWidth()
                             .height(22.dp)
-                            .pointerInput(Unit) {
-                                detectVerticalDragGestures(
-                                    onDragEnd = {
-                                        if (dragY > 56.dp.toPx()) dismiss()
-                                        else scope.launch { animate(dragY, 0f, animationSpec = spring(0.8f, 420f)) { v, _ -> dragY = v } }
-                                    },
-                                    onDragCancel = { scope.launch { animate(dragY, 0f, animationSpec = spring(0.8f, 420f)) { v, _ -> dragY = v } } },
-                                ) { ch, dragAmount ->
-                                    ch.consume()
-                                    dragY = (dragY + dragAmount).coerceAtLeast(0f)
-                                }
-                            }
+                            .nativeSheetDragHandle(drag, visible)
                             .clickable(
+                                enabled = visible,
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null,
                                 role = Role.Button,
@@ -1162,7 +1138,10 @@ internal fun ItemsQuickAddSheet(
                         Box(Modifier.size(36.dp, 4.dp).clip(Capsule()).background(c.ink.copy(alpha = 0.20f)))
                     }
 
-                    Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())) {
+                    Column(
+                        Modifier.weight(1f, fill = false).nativeSheetDragContent(drag, visible)
+                            .verticalScroll(rememberScrollState()),
+                    ) {
                         BasicTextField(
                             value = draftTitle,
                             onValueChange = { next ->

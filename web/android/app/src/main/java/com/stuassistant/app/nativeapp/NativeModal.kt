@@ -6,7 +6,6 @@ import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.MutableTransitionState
-import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
@@ -15,8 +14,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -42,13 +39,12 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.State
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -75,9 +71,6 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.util.VelocityTracker
-import androidx.compose.ui.input.pointer.util.addPointerInputChange
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.dialog
@@ -93,8 +86,6 @@ import com.kyant.shapes.RoundedCornerStyle
 import com.kyant.shapes.UnevenRoundedRectangle
 import com.stuassistant.app.glass.LiquidDialogSurface
 import com.stuassistant.app.glass.LocalLiquidGlassReducedMotion
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
 
 /** The interaction contract follows web/src/components/Sheet.tsx, in the same Compose window. */
 private class NativeSheetEntry(
@@ -390,49 +381,14 @@ private fun NativeDialogLayer(
 private fun NativeSheetLayer(entry: NativeSheetEntry, active: Boolean, backdrop: Backdrop, requestDismiss: () -> Unit, onHidden: () -> Unit) {
     val colors = LocalNativeColors.current
     val focusManager = LocalFocusManager.current
-    val scope = rememberCoroutineScope()
-    val density = LocalDensity.current
     val reducedMotion = LocalLiquidGlassReducedMotion.current
     val onDismiss by rememberUpdatedState(requestDismiss)
-    val latestActive by rememberUpdatedState(active)
-    val latestReducedMotion by rememberUpdatedState(reducedMotion)
-    var dragDistance by remember { mutableFloatStateOf(0f) }
-    var settling by remember { mutableStateOf<Job?>(null) }
-    val distanceThreshold = with(density) { 110.dp.toPx() }
-    val velocityThreshold = with(density) { 600.dp.toPx() }
     val requested = entry.requested
+    val drag = rememberNativeSheetDrag(active = active, open = requested, onDismiss = onDismiss)
     val visibility = remember { MutableTransitionState(false).apply { targetState = requested } }
     SideEffect { visibility.targetState = requested }
     LaunchedEffect(requested, visibility.isIdle, visibility.currentState) {
         if (!requested && visibility.isIdle && !visibility.currentState) onHidden()
-    }
-
-    fun settle() {
-        settling?.cancel()
-        if (!latestActive) return
-        if (latestReducedMotion) {
-            dragDistance = 0f
-        } else {
-            settling = scope.launch {
-                // SHEET: stiffness 360, damping 30, mass .9 -> unit-mass Compose spring.
-                animate(
-                    initialValue = dragDistance,
-                    targetValue = 0f,
-                    animationSpec = spring(dampingRatio = .8333333f, stiffness = 400f),
-                ) { value, _ -> dragDistance = value }
-            }
-        }
-    }
-
-    LaunchedEffect(active, requested) {
-        if (!active) {
-            settling?.cancel()
-            // A dismissed drag keeps its actual elastic offset as the exit begins.
-            if (requested) dragDistance = 0f
-        }
-    }
-    LaunchedEffect(reducedMotion) {
-        if (reducedMotion) { settling?.cancel(); dragDistance = 0f }
     }
 
     AnimatedVisibility(visibleState = visibility, enter = EnterTransition.None, exit = ExitTransition.None, label = "native sheet") {
@@ -445,7 +401,10 @@ private fun NativeSheetLayer(entry: NativeSheetEntry, active: Boolean, backdrop:
     val scrimProgress = transition.animateFloat(
         transitionSpec = { if (reducedMotion) snap() else tween(200) }, label = "sheet scrim",
     ) { if (it == EnterExitState.Visible) 1f else 0f }
-    SideEffect { entry.scrimProgress = scrimProgress }
+    val displayedScrim = remember(scrimProgress, drag) {
+        derivedStateOf { scrimProgress.value * drag.scrimFraction }
+    }
+    SideEffect { entry.scrimProgress = displayedScrim }
     BoxWithConstraints(
         Modifier.fillMaxSize().then(if (active) Modifier else Modifier.clearAndSetSemantics {}.blockSheetPointers()),
     ) {
@@ -465,8 +424,7 @@ private fun NativeSheetLayer(entry: NativeSheetEntry, active: Boolean, backdrop:
                 backdrop,
                 modifier = Modifier.align(Alignment.BottomCenter)
                     // Include IME padding in the layer's own-height exit distance.
-                    // Motion's lower elastic bound is .6; thresholds use raw pointer distance.
-                    .graphicsLayer { translationY = (1f - panelProgress) * size.height + dragDistance * .6f }
+                    .graphicsLayer { translationY = (1f - panelProgress) * size.height + drag.offsetPx }
                     .imePadding()
                     .widthIn(max = 600.dp).fillMaxWidth().heightIn(max = maxHeight * .88f)
                     .focusProperties {
@@ -516,35 +474,7 @@ private fun NativeSheetLayer(entry: NativeSheetEntry, active: Boolean, backdrop:
             ) {
                 Box(
                     Modifier.fillMaxWidth().height(24.dp).clearAndSetSemantics {}
-                        .pointerInput(active, density) {
-                            if (!active) return@pointerInput
-                            val tracker = VelocityTracker()
-                            detectDragGestures(
-                                orientationLock = Orientation.Vertical,
-                                onDragStart = { down, slopTrigger, overSlop ->
-                                    settling?.cancel()
-                                    tracker.resetTracking()
-                                    tracker.addPointerInputChange(down)
-                                    // Include the distance used for recognition in the 110dp test.
-                                    dragDistance = (dragDistance + slopTrigger.position.y - down.position.y - overSlop.y).coerceAtLeast(0f)
-                                },
-                                onDrag = { change, amount ->
-                                    // This helper reconstructs absolute deltas even as the panel
-                                    // moves, and includes historical input samples.
-                                    tracker.addPointerInputChange(change)
-                                    dragDistance = (dragDistance + amount.y).coerceAtLeast(0f)
-                                    change.consume()
-                                },
-                                onDragEnd = { up ->
-                                    tracker.addPointerInputChange(up)
-                                    val velocity = tracker.calculateVelocity().y
-                                    if (latestActive && (dragDistance > distanceThreshold || velocity > velocityThreshold)) {
-                                        onDismiss()
-                                    } else settle()
-                                },
-                                onDragCancel = { settle() },
-                            )
-                        },
+                        .nativeSheetDragHandle(drag, active),
                     contentAlignment = Alignment.Center,
                 ) {
                     Box(Modifier.size(40.dp, 5.dp).background(colors.border, RoundedRectangle(3.dp)))
@@ -559,7 +489,8 @@ private fun NativeSheetLayer(entry: NativeSheetEntry, active: Boolean, backdrop:
                 val contentScroll = rememberScrollState()
                 Column(
                     Modifier.fillMaxWidth().weight(1f, fill = false)
-                        .nativeTopSoftEdge(contentScroll).verticalScroll(contentScroll).navigationBarsPadding()
+                        .nativeTopSoftEdge(contentScroll).nativeSheetDragContent(drag, active)
+                        .verticalScroll(contentScroll).navigationBarsPadding()
                         .padding(start = 20.dp, end = 20.dp, bottom = 32.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {

@@ -16,7 +16,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.BasicText
@@ -38,6 +40,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -194,6 +197,60 @@ class NativeCardSheetMotionInstrumentedTest {
         }
     }
 
+    @Test fun pullingTheContentAtTopMovesTheSheetAndLightensTheScrim() {
+        val fixture = installModal(bodyHeight = 460.dp)
+        openFirst(fixture)
+        val title = settledBounds(FIRST_TITLE)
+        val body = settledBounds(FIRST_TARGET)
+        val density = instrumentation.targetContext.resources.displayMetrics.density
+        val x = body.exactCenterX()
+        val y = body.exactCenterY()
+        val distance = 150f * density
+        val screen = screenBounds()
+
+        fun backdropRed(): Int {
+            val screenshot = checkNotNull(instrumentation.uiAutomation.takeScreenshot())
+            return try {
+                android.graphics.Color.red(screenshot.getPixel(screen.left + 12, screen.top + (80 * density).toInt()))
+            } finally {
+                screenshot.recycle()
+            }
+        }
+
+        fun pull(downTime: Long) {
+            inject(MotionEvent.ACTION_DOWN, downTime, x, y)
+            repeat(5) { index ->
+                SystemClock.sleep(24)
+                inject(MotionEvent.ACTION_MOVE, downTime, x, y + distance * (index + 1) / 5f)
+            }
+        }
+
+        val initialRed = backdropRed()
+        var downTime = SystemClock.uptimeMillis()
+        try {
+            pull(downTime)
+            awaitCondition("A pull on the sheet body should move the panel") {
+                (boundsOf(FIRST_TITLE)?.top ?: title.top) > title.top + 48f * density
+            }
+            assertTrue("The shared scrim must lighten during the pull", backdropRed() > initialRed + 10)
+            inject(MotionEvent.ACTION_CANCEL, downTime, x, y + distance)
+            awaitCondition("Cancelling a pull on the content should return the sheet") {
+                val restored = boundsOf(FIRST_TITLE)
+                restored != null && kotlin.math.abs(restored.top - title.top) <= 2f * density
+            }
+            assertEquals(0, fixture.firstDismissals.get())
+
+            downTime = SystemClock.uptimeMillis()
+            pull(downTime)
+            inject(MotionEvent.ACTION_UP, downTime, x, y + distance)
+            awaitCondition("Releasing a long pull on the content should dismiss the sheet") {
+                fixture.firstDismissals.get() == 1 && entryCount(fixture.sheets) == 0
+            }
+        } finally {
+            runCatching { inject(MotionEvent.ACTION_CANCEL, downTime, x, y + distance) }
+        }
+    }
+
     @Test fun stackedSheetExitRestoresLowerFocusBeforeRestoringTheBackground() {
         val fixture = installModal()
         enterKeyboardMode(fixture)
@@ -268,7 +325,11 @@ class NativeCardSheetMotionInstrumentedTest {
         lateinit var inputModeManager: InputModeManager
     }
 
-    private fun installModal(reducedMotion: Boolean = false, probeExitPointers: Boolean = false): ModalFixture {
+    private fun installModal(
+        reducedMotion: Boolean = false,
+        probeExitPointers: Boolean = false,
+        bodyHeight: Dp = 0.dp,
+    ): ModalFixture {
         val fixture = ModalFixture(probeExitPointers)
         setFixture(fixture.sheets, reducedMotion) {
             val view = LocalView.current
@@ -292,6 +353,7 @@ class NativeCardSheetMotionInstrumentedTest {
             }) {
                 NButton(FIRST_TARGET, {}, modifier = Modifier.semantics { contentDescription = FIRST_TARGET }
                     .focusRequester(fixture.firstFocus).onFocusChanged { fixture.firstFocused.set(it.isFocused) })
+                if (bodyHeight > 0.dp) Spacer(Modifier.height(bodyHeight))
                 if (second) NSheet(SECOND_TITLE, {
                     fixture.secondDismissals.incrementAndGet()
                     fixture.second.value = false
