@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { motion } from "motion/react";
-import { IS_NATIVE, api, apiBase, setToken } from "../lib/api";
+import { IS_NATIVE, api, apiBase, getToken, setToken, type TodayExportTicket } from "../lib/api";
+import { openTodayDeepLink, todayExportErrorText } from "../lib/today-export";
+import { TodayExportSheet } from "../components/TodayExportSheet";
 import { clearAllSchool, clearSchool, readSchool } from "../lib/school";
 import {
   APP_VERSION_NAME,
@@ -54,7 +56,27 @@ export function MeScreen({ onSignOut }: { onSignOut: () => void }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [exportingToday, setExportingToday] = useState(false);
+  const [exportTodayError, setExportTodayError] = useState<string | null>(null);
+  const [exportTicket, setExportTicket] = useState<TodayExportTicket | null>(null);
   const signedIn = store.mode !== "preview";
+  const canExportToday =
+    signedIn && Boolean(getToken()) && !store.sample && Boolean(store.timetable && store.timetable.courses.length > 0);
+
+  const handleExportToToday = async () => {
+    if (exportingToday) return;
+    setExportingToday(true);
+    setExportTodayError(null);
+    try {
+      const ticket = await api.exportToday(store.timetable?.semester || undefined);
+      setExportTicket(ticket);
+      openTodayDeepLink(ticket.deep_link);
+    } catch (exc) {
+      setExportTodayError(todayExportErrorText(exc));
+    } finally {
+      setExportingToday(false);
+    }
+  };
 
   const sync = async () => {
     setMsg(null);
@@ -218,6 +240,28 @@ export function MeScreen({ onSignOut }: { onSignOut: () => void }) {
               </div>
             )}
             <TimetableSourceActions onGo={go} />
+            {canExportToday && (
+              <button
+                type="button"
+                className="cta today-export-cta"
+                disabled={exportingToday}
+                onClick={() => void handleExportToToday()}
+              >
+                <span className="cta__icon" aria-hidden="true">
+                  <Icon name="external" size={20} />
+                </span>
+                <span className="cta__text">
+                  <b>{exportingToday ? "正在生成 today 导入码…" : "导入到 today"}</b>
+                  <small>一键同步当前课表到 today 安排表（支持本部、医学院与手动课表）</small>
+                </span>
+                <Icon name="chevron-right" size={18} />
+              </button>
+            )}
+            {exportTodayError && !exportTicket && (
+              <p className="field__error" role="alert">
+                {exportTodayError}
+              </p>
+            )}
           </Section>
         </>
       )}
@@ -394,6 +438,15 @@ export function MeScreen({ onSignOut }: { onSignOut: () => void }) {
             </button>
           )}
         </div>
+      )}
+      {exportTicket && (
+        <TodayExportSheet
+          ticket={exportTicket}
+          busy={exportingToday}
+          error={exportTodayError}
+          onRegenerate={() => void handleExportToToday()}
+          onClose={() => setExportTicket(null)}
+        />
       )}
     </>
   );

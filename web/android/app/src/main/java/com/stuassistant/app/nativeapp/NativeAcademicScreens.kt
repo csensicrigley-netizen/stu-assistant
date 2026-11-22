@@ -1433,14 +1433,10 @@ fun NativeWeekScreen(store: NativeStore, s: NativeState, onNavigate: (String) ->
     var showWeekSpectrum by rememberSaveable { mutableStateOf(false) }
     val doc = remember(s.timetable) { AcademicTimetable.normalize(s.timetable) }
     val colors = LocalNativeColors.current
-    val context = LocalContext.current
     val reduced = LocalLiquidGlassReducedMotion.current
     val scope = rememberCoroutineScope()
     val selectionFeedback by rememberUpdatedState(nSelectionFeedback())
     var swiping by remember(pager) { mutableStateOf(false) }
-    var exportingToday by remember { mutableStateOf(false) }
-    var exportTodayError by remember { mutableStateOf<String?>(null) }
-    var todayFallbackTicket by remember { mutableStateOf<NativeTodayExportTicket?>(null) }
 
     LaunchedEffect(pager) {
         pager.interactionSource.interactions.collect { interaction ->
@@ -1466,33 +1462,6 @@ fun NativeWeekScreen(store: NativeStore, s: NativeState, onNavigate: (String) ->
     }
 
     NPage("课表", term.label, actions = { AcademicMode(store, s, onConnect) }) {
-        if (!s.sample && doc != null && doc.courses.isNotEmpty()) {
-            AcademicCta(
-                title = if (exportingToday) "正在生成 today 导入码…" else "导入到 today",
-                subtitle = "一键同步课表到 today 安排表（支持本部、医学院与手动课表）",
-                icon = "external",
-                onClick = {
-                    if (exportingToday) return@AcademicCta
-                    scope.launch {
-                        exportingToday = true
-                        exportTodayError = null
-                        try {
-                            val ticket = store.exportTodayTimetable(doc.semester.takeIf { it.isNotBlank() })
-                            if (!openTodayImportDeepLink(context, ticket.deepLink)) {
-                                todayFallbackTicket = ticket
-                            }
-                        } catch (e: CancellationException) {
-                            throw e
-                        } catch (e: Exception) {
-                            exportTodayError = academicError(e)
-                        } finally {
-                            exportingToday = false
-                        }
-                    }
-                },
-            )
-            NError(exportTodayError)
-        }
         if (!s.sample && doc == null) {
             AcademicEmpty(
                 if (s.syncing || s.loading) "正在读取课表…" else "还没有课表",
@@ -1720,9 +1689,6 @@ fun NativeWeekScreen(store: NativeStore, s: NativeState, onNavigate: (String) ->
         }
     }
     open?.let { AcademicCourseSheet(it, now) { open = null } }
-    todayFallbackTicket?.let { ticket ->
-        NativeTodayExportFallbackDialog(ticket = ticket, onDismiss = { todayFallbackTicket = null })
-    }
 }
 
 private data class AcademicCourseSelection(val block: AcademicBlock, val date: String)

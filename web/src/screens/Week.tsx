@@ -150,24 +150,6 @@ export function WeekScreen() {
         </div>
       )}
 
-      {!fromToday && canExport && (
-        <button
-          type="button"
-          className="cta today-export-cta"
-          disabled={exporting}
-          onClick={() => void handleExportToToday()}
-        >
-          <span className="cta__icon" aria-hidden="true">
-            <Icon name="external" size={20} />
-          </span>
-          <span className="cta__text">
-            <b>{exporting ? "正在生成 today 导入码…" : "导入到 today"}</b>
-            <small>一键同步当前课表到 today 安排表（支持本部、医学院与手动课表）</small>
-          </span>
-          <Icon name="chevron-right" size={18} />
-        </button>
-      )}
-
       {exportError && !exportTicket && (
         <p className="field__error" role="alert">
           {exportError}

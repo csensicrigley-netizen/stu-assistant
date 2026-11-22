@@ -1,13 +1,13 @@
 {
   "channel": "product",
-  "versionName": "1.1.9",
-  "versionCode": 65,
+  "versionName": "1.1.10",
+  "versionCode": 66,
   "apk": "/download/stu-assistant.apk",
   "notes": [
-    "修复在其他设备退出登录后 App 卡在 token_revoked 的问题，自动平滑引导重新登录",
-    "完整整合新版「事项」日程与编辑体验、双材质外观切换与「导入到 today」同步功能"
+    "将「导入到 today」入口从课表页顶部移至「我的 → 我的课表」分组下，保持课表页清爽聚焦",
+    "修复在其他设备退出登录后 App 卡在 token_revoked 的问题，自动平滑引导重新登录"
   ],
   "mandatory": false,
-  "releasedAt": "2026-11-22T23:48:00+08:00",
+  "releasedAt": "2026-11-23T00:08:00+08:00",
   "minSupported": "1.0.0"
 }

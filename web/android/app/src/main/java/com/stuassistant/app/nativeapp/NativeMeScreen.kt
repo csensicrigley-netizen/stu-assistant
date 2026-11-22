@@ -67,6 +67,9 @@ fun NativeMeScreen(
     var message by remember { mutableStateOf<String?>(null) }
     var confirmDelete by remember { mutableStateOf(false) }
     var panel by rememberSaveable { mutableStateOf("main") }
+    var exportingToday by remember { mutableStateOf(false) }
+    var exportTodayError by remember { mutableStateOf<String?>(null) }
+    var todayFallbackTicket by remember { mutableStateOf<NativeTodayExportTicket?>(null) }
     val signedIn = s.token != null && !s.preview
     val bound = academicStrings(s.user?.optJSONArray("bound"))
     val sourceNames = mapOf("public" to "学校官网通知", "jw" to "教务系统", "mystu" to "MySTU")
@@ -140,6 +143,9 @@ fun NativeMeScreen(
                 s = s,
                 signedIn = signedIn,
                 connected = connected,
+                hasTimetable = hasTimetable,
+                exportingToday = exportingToday,
+                exportTodayError = exportTodayError,
                 expiredCount = expired.size,
                 sourceNames = sourceNames,
                 bound = bound,
@@ -149,6 +155,33 @@ fun NativeMeScreen(
                 onConnect = onConnect,
                 onNavigate = onNavigate,
                 onOpenPanel = { panel = it },
+                onExportToday = {
+                    if (exportingToday) return@NativeMeOverview
+                    scope.launch {
+                        exportingToday = true
+                        exportTodayError = null
+                        try {
+                            val semester = s.timetable?.optString("semester")?.trim()?.takeIf { it.isNotBlank() }
+                            val ticket = store.exportTodayTimetable(semester)
+                            if (!openTodayImportDeepLink(context, ticket.deepLink)) {
+                                todayFallbackTicket = ticket
+                            }
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            exportTodayError = when ((e as? NativeApiError)?.code) {
+                                "network", "timeout" -> "服务器没有及时响应，检查网络后再试。"
+                                "invalid_token", "token_revoked" -> "登录状态已失效，请重新登录。"
+                                "not_signed_in" -> "请先登录助手账号后再操作。"
+                                "no_timetable" -> "当前还没有可导出的课表，请先同步或手动导入课表。"
+                                "too_many_attempts" -> "操作太频繁了，请稍后再试。"
+                                else -> (e as? NativeApiError)?.detail?.ifEmpty { null } ?: e.message ?: "生成导入码失败，请重试。"
+                            }
+                        } finally {
+                            exportingToday = false
+                        }
+                    }
+                },
                 onLogout = { action { store.logout(); onSignOut() } },
                 onDeleteAccount = {
                     action {
@@ -481,6 +514,9 @@ fun NativeMeScreen(
             }
         }
     }
+    todayFallbackTicket?.let { ticket ->
+        NativeTodayExportFallbackDialog(ticket = ticket, onDismiss = { todayFallbackTicket = null })
+    }
 }
 
 @Composable
@@ -489,6 +525,9 @@ private fun NativeMeOverview(
     s: NativeState,
     signedIn: Boolean,
     connected: Boolean?,
+    hasTimetable: Boolean,
+    exportingToday: Boolean,
+    exportTodayError: String?,
     expiredCount: Int,
     sourceNames: Map<String, String>,
     bound: List<String>,
@@ -498,6 +537,7 @@ private fun NativeMeOverview(
     onConnect: () -> Unit,
     onNavigate: (String) -> Unit,
     onOpenPanel: (String) -> Unit,
+    onExportToday: () -> Unit,
     onLogout: () -> Unit,
     onDeleteAccount: () -> Unit,
 ) {
@@ -622,7 +662,17 @@ private fun NativeMeOverview(
                 leadingIcon = "shield",
                 onClick = { onNavigate("medical") },
             )
+            if (signedIn && hasTimetable) {
+                NDivider()
+                NRow(
+                    title = if (exportingToday) "正在生成 today 导入码…" else "导入到 today",
+                    subtitle = "一键同步当前课表到 today 安排表",
+                    leadingIcon = "external",
+                    onClick = onExportToday,
+                )
+            }
         }
+        NError(exportTodayError)
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
