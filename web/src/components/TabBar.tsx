@@ -86,21 +86,33 @@ export function SideNav({
   onChange,
   badges = {},
   footer,
+  onGoHome,
 }: {
   current: TabKey;
   onChange: (key: TabKey) => void;
   badges?: Partial<Record<TabKey, number>>;
   footer?: React.ReactNode;
+  onGoHome?: () => void;
 }) {
   return (
     <aside className="side" aria-label="侧边导航">
-      <div className="side__brand">
-        <Logo size={36} />
-        <div>
-          <p className="side__name">STU 事项助手</p>
-          <p className="side__tag">汕头大学 · 学生自用</p>
+      {onGoHome ? (
+        <button type="button" className="side__brand side__brand--btn" onClick={onGoHome} title="返回官网主页">
+          <Logo size={36} />
+          <div>
+            <p className="side__name">STU 事项助手</p>
+            <p className="side__tag">返回官网主页</p>
+          </div>
+        </button>
+      ) : (
+        <div className="side__brand">
+          <Logo size={36} />
+          <div>
+            <p className="side__name">STU 事项助手</p>
+            <p className="side__tag">汕头大学 · 学生自用</p>
+          </div>
         </div>
-      </div>
+      )}
       <nav className="side__nav" aria-label="主导航" data-haptic="selection">
         {TABS.map((tab) => {
           const on = tab.key === navigationTab(current);
@@ -131,6 +143,12 @@ export function SideNav({
       </nav>
       <div className="side__foot">
         <ModePill />
+        {onGoHome && (
+          <button type="button" className="btn btn--quiet btn--block side__home" onClick={onGoHome}>
+            <Icon name="chevron-left" size={16} />
+            退出示例 · 返回主页
+          </button>
+        )}
         {footer}
       </div>
     </aside>

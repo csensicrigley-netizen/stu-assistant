@@ -1,12 +1,20 @@
 import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
+import { api, getToken, type TodayExportTicket } from "../lib/api";
 import { useShell, useStore } from "../lib/store";
 import { addDaysIso, monthDaySlash, spanText, useNow, WEEKDAY_SHORT, weekdayCn } from "../lib/clock";
 import { currentOrNextTerm, dateOf, mondayOf, phaseOf, termPosition } from "../lib/calendar";
 import { planFor } from "../lib/plan";
 import { gapsBetween, minutesOf, periodsText, type Block } from "../lib/timetable";
+import {
+  clearFromTodayFlag,
+  isFromToday,
+  openTodayDeepLink,
+  todayExportErrorText,
+} from "../lib/today-export";
 import { DayRibbon } from "../components/DayRibbon";
 import { CourseSheet } from "../components/CourseSheet";
+import { TodayExportSheet } from "../components/TodayExportSheet";
 import { Icon } from "../components/Icon";
 import { PILL, rise } from "../lib/motion";
 import { useHorizontalSwipe } from "../lib/useHorizontalSwipe";
@@ -24,6 +32,10 @@ export function WeekScreen() {
   const [day, setDay] = useState(pos ? now.weekday : 1);
   const [dir, setDir] = useState(0);
   const [open, setOpen] = useState<Block | null>(null);
+  const [fromToday, setFromToday] = useState(() => isFromToday());
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const [exportTicket, setExportTicket] = useState<TodayExportTicket | null>(null);
 
   const plans = useMemo(
     () => Array.from({ length: 7 }, (_, i) => planFor(store.timetable, dateOf(term, week, i + 1))),
@@ -36,6 +48,23 @@ export function WeekScreen() {
   const gaps = gapsBetween(sel.blocks);
   const isThisWeek = pos && week === pos.week;
   const doc = store.timetable;
+  const signedIn = Boolean(getToken());
+  const canExport = signedIn && !store.sample && Boolean(doc && doc.courses.length > 0);
+
+  const handleExportToToday = async () => {
+    if (exporting) return;
+    setExporting(true);
+    setExportError(null);
+    try {
+      const ticket = await api.exportToday(doc?.semester || undefined);
+      setExportTicket(ticket);
+      openTodayDeepLink(ticket.deep_link);
+    } catch (exc) {
+      setExportError(todayExportErrorText(exc));
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const step = (d: number) => {
     const next = Math.min(term.totalWeeks, Math.max(1, week + d));
@@ -53,6 +82,97 @@ export function WeekScreen() {
   return (
     <>
       <PageHead eyebrow={term.label} title="课表" aside={<ModePill />} />
+
+      {fromToday && (
+        <div className="today-bridge" role="region" aria-label="来自 today 的课表联动">
+          <div className="today-bridge__head">
+            <span className="today-bridge__badge">
+              <Icon name="spark" size={14} /> 来自 today
+            </span>
+            <button
+              type="button"
+              className="icon-btn today-bridge__close"
+              aria-label="收起来自 today 的提示"
+              onClick={() => {
+                clearFromTodayFlag();
+                setFromToday(false);
+              }}
+            >
+              <Icon name="close" size={16} />
+            </button>
+          </div>
+          {!signedIn ? (
+            <>
+              <p className="today-bridge__title">登录后一键把课表同步回 today 安排表</p>
+              <p className="today-bridge__sub">支持汕大本部、汕大医学院与手动导入课表，登录后会自动回到这里。</p>
+              <div className="row-actions">
+                <button type="button" className="btn btn--primary btn--sm" onClick={shell.connect}>
+                  <Icon name="arrow-right" size={16} /> 登录并继续
+                </button>
+              </div>
+            </>
+          ) : canExport && doc ? (
+            <>
+              <p className="today-bridge__title">一键把课表同步回 today 安排表</p>
+              <p className="today-bridge__sub">
+                已就绪：{doc.semester || term.id} · {doc.courses.length} 门课（仅同步课表快照，不含账号密码）
+              </p>
+              <div className="row-actions">
+                <button
+                  type="button"
+                  className="btn btn--primary btn--sm"
+                  disabled={exporting}
+                  onClick={() => void handleExportToToday()}
+                >
+                  <Icon name="external" size={16} /> {exporting ? "正在生成导入码…" : "一键同步回 today"}
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="today-bridge__title">
+                {store.syncing || store.loading ? "正在读取你的课表…" : "先准备好课表，再一键同步回 today"}
+              </p>
+              <p className="today-bridge__sub">
+                {store.syncing || store.loading
+                  ? "读取完成后即可直接点击按钮把课表同步回 today 安排表。"
+                  : "请先连接本部教务、绑定医学院教务或手动导入课表。"}
+              </p>
+              {!store.syncing && !store.loading && (
+                <div className="row-actions">
+                  <button type="button" className="btn btn--primary btn--sm" onClick={() => shell.go("me")}>
+                    <Icon name="refresh" size={16} /> 去「我的」配置课表
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {!fromToday && canExport && (
+        <button
+          type="button"
+          className="cta today-export-cta"
+          disabled={exporting}
+          onClick={() => void handleExportToToday()}
+        >
+          <span className="cta__icon" aria-hidden="true">
+            <Icon name="external" size={20} />
+          </span>
+          <span className="cta__text">
+            <b>{exporting ? "正在生成 today 导入码…" : "导入到 today"}</b>
+            <small>一键同步当前课表到 today 安排表（支持本部、医学院与手动课表）</small>
+          </span>
+          <Icon name="chevron-right" size={18} />
+        </button>
+      )}
+
+      {exportError && !exportTicket && (
+        <p className="field__error" role="alert">
+          {exportError}
+        </p>
+      )}
 
       {!store.sample && !doc && (
         <Empty icon={<Icon name="week" size={22} />} title={store.syncing || store.loading ? "正在读取课表…" : "还没有课表"}>
@@ -263,6 +383,19 @@ export function WeekScreen() {
             weekday={now.weekday}
             nowMin={now.minutes}
             onClose={() => setOpen(null)}
+          />
+        )}
+        {exportTicket && (
+          <TodayExportSheet
+            key={exportTicket.code}
+            ticket={exportTicket}
+            busy={exporting}
+            error={exportError}
+            onRegenerate={() => void handleExportToToday()}
+            onClose={() => {
+              setExportTicket(null);
+              setExportError(null);
+            }}
           />
         )}
       </AnimatePresence>

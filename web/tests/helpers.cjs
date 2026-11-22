@@ -10,6 +10,7 @@ const compiled = new Map();
 // Vite's build-time API base are replaced; no product function is stubbed.
 exports.harness = ({ native = false, timeoutMs = 25 } = {}) => {
   const storage = new Map();
+  const session = new Map();
   const events = [];
   const state = { fetch: async () => { throw new Error('Unexpected HTTP'); } };
   const cache = new Map();
@@ -20,6 +21,11 @@ exports.harness = ({ native = false, timeoutMs = 25 } = {}) => {
       getItem: key => storage.get(key) ?? null,
       setItem: (key, value) => storage.set(key, String(value)),
       removeItem: key => storage.delete(key),
+    },
+    sessionStorage: {
+      getItem: key => session.get(key) ?? null,
+      setItem: (key, value) => session.set(key, String(value)),
+      removeItem: key => session.delete(key),
     },
     window: {
       setTimeout: (fn, ms) => setTimeout(fn, Math.min(ms, timeoutMs)),
@@ -48,5 +54,5 @@ exports.harness = ({ native = false, timeoutMs = 25 } = {}) => {
       .runInContext(context)(localRequire, module, module.exports);
     return module.exports;
   }
-  return { load, state, events, storage };
+  return { load, state, events, storage, session };
 };

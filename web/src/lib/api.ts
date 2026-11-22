@@ -91,6 +91,15 @@ export interface ChargingState {
   };
 }
 
+export interface TodayExportTicket {
+  code: string;
+  expires_in: number;
+  deep_link: string;
+  semester: string;
+  campus: "main" | "med" | "manual";
+  course_count: number;
+}
+
 export const SYNC_SOURCES = "public,jw,mystu";
 
 /* -------------------------------------------------------------- endpoints */
@@ -190,6 +199,17 @@ export const api = {
   // 课表整份文档在慢网（iOS + 5G 切 Wi-Fi）上很容易超过 15 秒，单独放宽到 40 秒
   timetable: (semester = "") =>
     request<Record<string, unknown>>(`/v1/timetable?semester=${encodeURIComponent(semester)}`, {}, 40_000),
+
+  /** 生成一次性导出码，供 today 安排表提取课表快照（不含任何账号凭据）。 */
+  exportToday: (semester?: string) =>
+    request<TodayExportTicket>(
+      "/v1/export/today",
+      {
+        method: "POST",
+        body: JSON.stringify(semester ? { semester } : {}),
+      },
+      30_000,
+    ),
 
   feed: (kinds = "", limit = 100) =>
     request<{ items: FeedItem[]; count: number }>(`/v1/feed?kinds=${encodeURIComponent(kinds)}&limit=${limit}`, {}, 30_000),
@@ -317,6 +337,7 @@ export function errorText(exc: unknown): string {
       invalid_token: "登录状态过期了，请重新登录。",
       invalid_input: "填写的内容格式不对，检查一下邮箱和口令（至少 8 位）。",
       account_disabled: "这个账号已停用。",
+      no_timetable: "当前还没有可导出的课表，请先同步教务、连接医学院或手动导入课表。",
       timeout: "服务器没有及时响应，稍后再试。",
       network: "连不上助手服务器，检查一下网络或服务器地址。",
     }[code] ?? `没有成功（${code}）`

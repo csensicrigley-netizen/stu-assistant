@@ -47,7 +47,7 @@ function hostOf(base: string): string {
 
 export function MeScreen({ onSignOut }: { onSignOut: () => void }) {
   const store = useStore();
-  const { connect, go } = useShell();
+  const { connect, go, exitPreview } = useShell();
   const { pref, choose } = useTheme();
   const { palette, choose: choosePalette } = usePalette();
   const [remembered, setRemembered] = useState(() => readSchool() !== null);
@@ -108,10 +108,16 @@ export function MeScreen({ onSignOut }: { onSignOut: () => void }) {
               <Icon name="shield" size={24} />
             </div>
             <h2 className="connect__title">登录后换成你自己的课表</h2>
-            <p className="connect__text">现在看到的是一份真实课表快照和示例作业、成绩。创建账号并连接校园账号后，课表、作业、考试和成绩都会换成你的。</p>
+            <p className="connect__text">现在看到的是一份虚构示例课表和示例作业、成绩。创建账号并连接校园账号后，课表、作业、考试和成绩都会换成你的。</p>
             <button type="button" className="btn btn--primary btn--block" onClick={connect}>
               登录 / 注册
             </button>
+            {exitPreview && (
+              <button type="button" className="btn btn--quiet btn--block" onClick={exitPreview}>
+                <Icon name="chevron-left" size={16} />
+                退出示例 · 返回主页
+              </button>
+            )}
           </motion.section>
           <Section title="数据来源">
             <TimetableSourceActions onGo={go} />

@@ -381,7 +381,7 @@ export function PlanScreen() {
                       value={draft.title}
                       maxLength={200}
                       autoFocus
-                      placeholder="例如：复习细胞生物学"
+                      placeholder="例如：复习数据结构"
                       onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))}
                     />
                     <span className="field__hint">1–200 个字，写清楚一点，回头一眼能认出来。</span>

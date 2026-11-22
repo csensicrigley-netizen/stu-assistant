@@ -99,15 +99,15 @@ const WEEK_COLUMNS: readonly WeekColumn[] = [
     weekday: 1,
     label: "周一",
     slots: [
-      { course: "生物信息学", room: "1–2节 · D206", tone: "sky", span: "std" },
-      { course: "细胞生物学", room: "6–7节 · E104", tone: "mint", span: "std" },
+      { course: "微积分（二）", room: "1–2节 · A201", tone: "sky", span: "std" },
+      { course: "大学英语写作", room: "6–7节 · B108", tone: "mint", span: "std" },
     ],
   },
   {
     weekday: 2,
     label: "周二",
     slots: [
-      { course: "生物统计学", room: "3–5节 · E305", tone: "ocean", span: "tall" },
+      { course: "数据结构与算法", room: "3–5节 · C304", tone: "ocean", span: "tall" },
     ],
     freeLabel: "下午自习",
   },
@@ -115,23 +115,23 @@ const WEEK_COLUMNS: readonly WeekColumn[] = [
     weekday: 3,
     label: "周三",
     slots: [
-      { course: "基因组学", room: "3–4节 · D302", tone: "violet", span: "std" },
-      { course: "学术英语", room: "8–9节 · C201", tone: "sky", span: "std" },
+      { course: "人机交互设计", room: "3–5节 · 工坊202", tone: "violet", span: "std" },
+      { course: "现代设计史", room: "11–13节 · 阶梯三", tone: "sky", span: "std" },
     ],
   },
   {
     weekday: 4,
     label: "周四",
     slots: [
-      { course: "表观遗传学", room: "1–2节 · E208", tone: "amber", span: "std" },
-      { course: "生信实验", room: "6–9节 · 实验B", tone: "rose", span: "tall" },
+      { course: "信息可视化", room: "3–5节 · C412", tone: "amber", span: "std" },
+      { course: "前端工程实践", room: "6–9节 · 数媒508", tone: "rose", span: "tall" },
     ],
   },
   {
     weekday: 5,
     label: "周五",
     slots: [
-      { course: "基因组学", room: "3–4节 · 研习室", tone: "teal", span: "std" },
+      { course: "数据库原理", room: "3–5节 · C208", tone: "teal", span: "std" },
     ],
     freeLabel: "下午无课",
   },
@@ -522,11 +522,11 @@ export function LandingHeroWindow({
                           </span>
                           <span className="ld-today__hop">
                             <Icon name="walk" size={13} strokeWidth={1.9} />
-                            <span>D座206 → E305</span>
+                            <span>致知楼C304 → 明理楼A305</span>
                           </span>
                         </div>
 
-                        <p className="ld-today__title">生物统计学 · 桑浦山 E305</p>
+                        <p className="ld-today__title">数据结构与算法 · 致知楼 C304</p>
                         <p className="ld-today__sub">10:00–12:35 · 第二大节 155 分钟</p>
                       </div>
                     </motion.div>
@@ -569,7 +569,7 @@ export function LandingHeroWindow({
                       >
                         <Icon name="items" size={15} strokeWidth={1.9} />
                         <span className="ld-today__pill-text">
-                          生物信息学作业 · 23:59 截止
+                          数据结构实验 · 23:59 截止
                         </span>
                       </motion.div>
                       <motion.div

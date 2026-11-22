@@ -136,7 +136,7 @@ async function main() {
   await clickText(".tabbar__btn", "学业");
   check((await text()).includes("第二次作业"), "学业 · 作业 from server");
   await clickText(".seg__btn", "考试");
-  check((await text()).includes("生物信息学") && (await text()).includes("2027-01-12"), "学业 · 考试 from server");
+  check((await text()).includes("数据结构与算法") && (await text()).includes("2027-01-12"), "学业 · 考试 from server");
   await clickText(".seg__btn", "成绩");
   check((await text()).includes("加权均分"), "学业 · 成绩 from server");
 

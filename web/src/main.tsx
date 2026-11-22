@@ -9,6 +9,7 @@ import "./styles/emboss.css";
 import "./styles/fan.css";
 import "./styles/landing.css";
 import "./styles/app.css";
+import "./styles/refresh.css";
 
 /**
  * ?frame=1 means "running inside the phone shell on the demo page". A real

@@ -127,61 +127,61 @@ const WEEK_SCHEDULES: Record<WeekFilter, readonly DayColumn[]> = {
   w9: [
     {
       day: "周一",
-      am: { title: "生物信息学", room: "E305", tone: "rose", span: "long" },
-      pm: { title: "学术英语", room: "D104", tone: "sky", span: "short" },
+      am: { title: "数据结构与算法", room: "C304", tone: "rose", span: "long" },
+      pm: { title: "大学英语写作", room: "B108", tone: "sky", span: "short" },
     },
     {
       day: "周二",
-      am: { title: "基因组学", room: "D206", tone: "mint", span: "short" },
-      pm: { title: "生物统计学", room: "E302", tone: "violet", span: "long" },
+      am: { title: "概率论与统计", room: "A305", tone: "mint", span: "short" },
+      pm: { title: "信息可视化", room: "C412", tone: "violet", span: "long" },
     },
     {
       day: "周三",
       am: null,
-      pm: { title: "细胞生物学", room: "科报厅", tone: "amber", span: "long" },
+      pm: { title: "人机交互设计", room: "工坊202", tone: "amber", span: "long" },
     },
     {
       day: "周四",
-      am: { title: "生物信息实验", room: "机房B2", tone: "sky", span: "long" },
-      pm: { title: "表观遗传学", room: "淑德书院", tone: "rose", span: "short" },
+      am: { title: "前端工程实践", room: "数媒508", tone: "sky", span: "long" },
+      pm: { title: "现代设计史", room: "文澜阶三", tone: "rose", span: "short" },
     },
     {
       day: "周五",
-      am: { title: "基因组学", room: "D206", tone: "mint", span: "short" },
+      am: { title: "数据库原理", room: "C208", tone: "mint", span: "short" },
       pm: null,
     },
   ],
   w10: [
     {
       day: "周一",
-      am: { title: "生物信息学", room: "E305", tone: "rose", span: "long" },
+      am: { title: "数据结构与算法", room: "C304", tone: "rose", span: "long" },
       pm: null,
     },
     {
       day: "周二",
-      am: { title: "基因组学", room: "D206", tone: "mint", span: "short" },
-      pm: { title: "生物统计学", room: "E305", tone: "violet", span: "long" },
+      am: { title: "概率论与统计", room: "A305", tone: "mint", span: "short" },
+      pm: { title: "信息可视化", room: "C412", tone: "violet", span: "long" },
     },
     {
       day: "周三",
-      am: { title: "分子诊断导论", room: "医学院201", tone: "sky", span: "short" },
-      pm: { title: "细胞生物学", room: "科报厅", tone: "amber", span: "long" },
+      am: { title: "产品原型工坊", room: "创客301", tone: "sky", span: "short" },
+      pm: { title: "人机交互设计", room: "工坊202", tone: "amber", span: "long" },
     },
     {
       day: "周四",
       am: null,
-      pm: { title: "表观遗传研讨", room: "淑德书院", tone: "rose", span: "long" },
+      pm: { title: "跨学科研讨课", room: "研讨105", tone: "rose", span: "long" },
     },
     {
       day: "周五",
       am: { title: "体育与健康", room: "综合馆", tone: "mint", span: "short" },
-      pm: { title: "文献阅读组会", room: "E410", tone: "violet", span: "short" },
+      pm: { title: "项目复盘组会", room: "C208", tone: "violet", span: "short" },
     },
   ],
   exam: [
     {
       day: "周一",
-      am: { title: "生物统计期末", room: "E302·021座", tone: "violet", span: "long" },
+      am: { title: "数据结构期末", room: "C304·028座", tone: "violet", span: "long" },
       pm: null,
     },
     {
@@ -191,17 +191,17 @@ const WEEK_SCHEDULES: Record<WeekFilter, readonly DayColumn[]> = {
     },
     {
       day: "周三",
-      am: { title: "基因组学闭卷", room: "D104·015座", tone: "mint", span: "long" },
+      am: { title: "概率统计闭卷", room: "A305·106座", tone: "mint", span: "long" },
       pm: null,
     },
     {
       day: "周四",
       am: null,
-      pm: { title: "细胞生物考试", room: "E201·008座", tone: "amber", span: "long" },
+      pm: { title: "数据库考试", room: "C208·015座", tone: "amber", span: "long" },
     },
     {
       day: "周五",
-      am: { title: "生信报告答辩", room: "机房B2", tone: "rose", span: "short" },
+      am: { title: "交互项目答辩", room: "工坊202", tone: "rose", span: "short" },
       pm: null,
     },
   ],
@@ -217,19 +217,19 @@ interface DemoTask {
 const DEMO_TASKS: readonly DemoTask[] = [
   {
     id: "t1",
-    title: "生物信息学 · 序列比对实验报告",
+    title: "数据结构与算法 · 二叉树遍历实验",
     source: "MySTU",
     due: "今天 23:59",
   },
   {
     id: "t2",
-    title: "基因组学 · 第 10 周随堂测验",
+    title: "概率论与数理统计 · 第 10 周随堂测验",
     source: "雨课堂",
     due: "3 天内",
   },
   {
     id: "t3",
-    title: "生物统计学 · R 语言回归练习",
+    title: "人机交互设计 · 校园导览交互草图",
     source: "MySTU",
     due: "3 天内",
   },
@@ -630,7 +630,7 @@ export function LandingGallery({
                       transition={SPRING}
                       className="ld-prev-mini-course__title"
                     >
-                      生物统计学 · 第二大节
+                      数据结构与算法 · 第二大节
                     </motion.div>
                     <motion.div
                       layout={!reduceMotion ? "position" : false}
@@ -638,7 +638,7 @@ export function LandingGallery({
                       className="ld-prev-mini-course__meta"
                     >
                       <span className="ld-prev-mini-course__note-wrap">
-                        <span>桑浦山 E座305 · </span>
+                        <span>致知楼 C304 · </span>
                         <AnimatePresence mode="wait" initial={false}>
                           <motion.span
                             key={activeSetting}
@@ -1044,8 +1044,8 @@ export function LandingGallery({
                       <span className="ld-prev-muted">期末考场与座次</span>
                       <span className="ld-prev-tag">第 19 周</span>
                     </div>
-                    <span className="ld-prev-label">生物统计学 · 闭卷笔试</span>
-                    <span className="ld-prev-muted">桑浦山 E座302 · 021座</span>
+                    <span className="ld-prev-label">概率论与数理统计 · 闭卷笔试</span>
+                    <span className="ld-prev-muted">明理楼 A305 · 106座</span>
                   </div>
 
                   <div className="ld-prev-stat">

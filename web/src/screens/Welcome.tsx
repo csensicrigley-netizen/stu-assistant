@@ -14,50 +14,41 @@ import { Landing } from "../components/Landing";
 
 export type Step = "hello" | "account" | "bind";
 
-
-
-/** Matches the CSS breakpoint where the welcome screen splits in two. */
-function useWide(query = "(min-width: 960px)"): boolean {
-  const [wide, setWide] = useState(() => window.matchMedia(query).matches);
-  useEffect(() => {
-    const mq = window.matchMedia(query);
-    const on = () => setWide(mq.matches);
-    mq.addEventListener("change", on);
-    return () => mq.removeEventListener("change", on);
-  }, [query]);
-  return wide;
-}
-
 /**
  * First run, sign-in, and connecting the campus account.
- *   phone:   hello → account → bind, one surface at a time
- *   desktop: the introduction stays on the left; the form is on the right
  */
 export function Welcome({
   start,
   notice,
+  fromToday,
   onPreview,
+  onHome,
   onDone,
   onCancel,
 }: {
   start?: Step;
   notice?: string;
+  fromToday?: boolean;
   onPreview?: () => void;
+  onHome?: () => void;
   onDone: () => void;
   onCancel?: () => void;
 }) {
-  const wide = useWide();
   const [step, setStep] = useState<Step>(start ?? "hello");
   /* 2026-10-31：旧的逻辑是"宽屏跳过 hello，直接进表单"——那是左右分栏时代的设计
      （左栏当介绍、右栏当表单）。现在 hello 自己就是全宽舞台，
      宽屏也该先看到它，否则用户打开就是一张注册表单。 */
   const shown: Step = step;
 
+  useEffect(() => {
+    if (start) setStep(start);
+  }, [start]);
+
   useEffect(
     () =>
       onBack(() => {
         if (shown === "bind" && !start) return false; // already signed in; back leaves
-        if (shown === "account" && !wide) {
+        if (shown === "account") {
           if (onCancel) onCancel();
           else setStep("hello");
           return true;
@@ -68,7 +59,7 @@ export function Welcome({
         }
         return false;
       }),
-    [shown, wide, start, onCancel],
+    [shown, start, onCancel],
   );
 
   /* 参考图的版式是**全宽居中**：大标题居中、六张卡横排居中、按钮居中。
@@ -81,6 +72,11 @@ export function Welcome({
   if (shown === "hello") {
     return <Landing onStart={() => setStep("account")} onPreview={onPreview} />;
   }
+
+  const goHome = () => {
+    if (onHome) onHome();
+    setStep("hello");
+  };
 
   return (
     <div className="welcome">
@@ -96,9 +92,14 @@ export function Welcome({
           {shown === "account" && (
             <Account
               notice={notice}
-              onBack={onCancel ?? (() => setStep("hello"))}
+              backLabel={onCancel ? "返回" : "返回主页"}
+              onBack={onCancel ?? goHome}
+              onHome={onCancel ? goHome : undefined}
               onPreview={onPreview}
-              onDone={() => setStep("bind")}
+              onDone={(mode) => {
+                if (fromToday && mode === "login") onDone();
+                else setStep("bind");
+              }}
             />
           )}
           {shown === "bind" && <Bind onDone={onDone} onCancel={onCancel} />}
@@ -121,14 +122,18 @@ function hostOf(base: string): string {
 
 function Account({
   notice,
+  backLabel = "返回",
   onBack: back,
+  onHome,
   onPreview,
   onDone,
 }: {
   notice?: string;
+  backLabel?: string;
   onBack?: () => void;
+  onHome?: () => void;
   onPreview?: () => void;
-  onDone: () => void;
+  onDone: (mode: "login" | "register") => void;
 }) {
   const [mode, setMode] = useState<"login" | "register">(notice ? "login" : "register");
   const [email, setEmail] = useState("");
@@ -165,7 +170,7 @@ function Account({
       } catch {
         /* 隐私模式 */
       }
-      onDone();
+      onDone(mode);
     } catch (exc) {
       setError(errorText(exc));
     } finally {
@@ -175,11 +180,20 @@ function Account({
 
   return (
     <form className="form" onSubmit={submit}>
-      {back && (
-        <button type="button" className="back" onClick={back}>
-          <Icon name="chevron-left" size={18} />
-          返回
-        </button>
+      {(back || onHome) && (
+        <div className="form__nav">
+          {back && (
+            <button type="button" className="back" onClick={back}>
+              <Icon name="chevron-left" size={18} />
+              {backLabel}
+            </button>
+          )}
+          {onHome && (
+            <button type="button" className="link-btn" onClick={onHome}>
+              返回主页
+            </button>
+          )}
+        </div>
       )}
       <div style={{ marginBottom: 14 }}>
         <Logo size={52} />

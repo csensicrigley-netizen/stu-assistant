@@ -21,6 +21,7 @@ import { useTheme } from "./lib/useTheme";
 import { AUTH_LOST, getToken, setToken } from "./lib/api";
 import { pageVariants } from "./lib/motion";
 import { initNative, onBack } from "./lib/native";
+import { captureFromTodayFlag, isFromToday } from "./lib/today-export";
 
 import { PREVIEW_KEY, ShellCtx, StoreProvider, useStore } from "./lib/store";
 import { dueBucket } from "./lib/records";
@@ -55,6 +56,7 @@ function initialTab(): TabKey {
   } catch {
     /* no location */
   }
+  if (isFromToday()) return "week";
   return "today";
 }
 
@@ -79,7 +81,18 @@ type Gate = { kind: "welcome"; step?: Step; notice?: string } | { kind: "app" };
 
 export default function App() {
   useTheme();
-  const [gate, setGate] = useState<Gate>(() => (getToken() || hasPreviewFlag() ? { kind: "app" } : { kind: "welcome" }));
+  const [fromToday] = useState(() => captureFromTodayFlag());
+  const [gate, setGate] = useState<Gate>(() => {
+    if (getToken() || hasPreviewFlag()) return { kind: "app" };
+    if (fromToday) {
+      return {
+        kind: "welcome",
+        step: "account",
+        notice: "来自 today · 登录 STU 小助手账号后将自动前往课表页，一键同步回 today 安排表。",
+      };
+    }
+    return { kind: "welcome" };
+  });
   const [epoch, setEpoch] = useState(0);
 
   useEffect(() => initNative(), []);
@@ -102,16 +115,32 @@ export default function App() {
     setGate({ kind: "app" });
   }, []);
 
+  const exitPreview = useCallback(() => {
+    setPreviewFlag(false);
+    try {
+      const url = new URL(location.href);
+      if (url.searchParams.has("preview")) {
+        url.searchParams.delete("preview");
+        history.replaceState(null, "", url.pathname + url.search + url.hash);
+      }
+    } catch {
+      /* ignore */
+    }
+    setGate({ kind: "welcome", step: "hello" });
+  }, []);
+
   if (gate.kind === "welcome") {
     return (
       <MotionConfig reducedMotion="user">
         <Welcome
           start={gate.step}
           notice={gate.notice}
+          fromToday={fromToday || isFromToday()}
           onPreview={() => {
             setPreviewFlag(true);
             setGate({ kind: "app" });
           }}
+          onHome={exitPreview}
           onDone={enterApp}
           onCancel={getToken() || hasPreviewFlag() ? () => setGate({ kind: "app" }) : undefined}
         />
@@ -130,7 +159,17 @@ export default function App() {
             setEpoch((n) => n + 1);
             setGate({ kind: "welcome" });
           }}
-          onConnect={() => setGate({ kind: "welcome", step: getToken() ? "bind" : "account" })}
+          onExitPreview={exitPreview}
+          onConnect={() =>
+            setGate({
+              kind: "welcome",
+              step: getToken() ? "bind" : "account",
+              notice:
+                !getToken() && isFromToday()
+                  ? "来自 today · 登录 STU 小助手账号后将自动返回课表页，一键同步回 today 安排表。"
+                  : undefined,
+            })
+          }
         />
         <UpdateBanner />
       </StoreProvider>
@@ -138,7 +177,15 @@ export default function App() {
   );
 }
 
-function Shell({ onSignOut, onConnect }: { onSignOut: () => void; onConnect: () => void }) {
+function Shell({
+  onSignOut,
+  onExitPreview,
+  onConnect,
+}: {
+  onSignOut: () => void;
+  onExitPreview: () => void;
+  onConnect: () => void;
+}) {
   /*
    * 页面与方向放在同一份 state 里：setTab 与 dir 必须同一次提交，
    * 否则退场那一帧会拿到上一次的方向，旧页会朝"进来的方向"退出去 —— 看起来像倒放。
@@ -211,7 +258,14 @@ function Shell({ onSignOut, onConnect }: { onSignOut: () => void; onConnect: () 
   }).length;
   const badges = { study: urgent, me: store.needsReconnect.length || undefined };
 
-  const shell = useMemo(() => ({ go, connect: onConnect }), [go, onConnect]);
+  const shell = useMemo(
+    () => ({
+      go,
+      connect: onConnect,
+      exitPreview: store.mode === "preview" ? onExitPreview : undefined,
+    }),
+    [go, onConnect, onExitPreview, store.mode],
+  );
 
   return (
     <ShellCtx.Provider value={shell}>
@@ -219,7 +273,12 @@ function Shell({ onSignOut, onConnect }: { onSignOut: () => void; onConnect: () 
         <a className="skip" href="#main">
           跳到主要内容
         </a>
-        <SideNav current={tab} onChange={go} badges={badges} />
+        <SideNav
+          current={tab}
+          onChange={go}
+          badges={badges}
+          onGoHome={store.mode === "preview" ? onExitPreview : undefined}
+        />
         {/*
           popLayout 而不是 wait：切页时旧页面立刻退场（120ms 纯透明度 + 14px 反向位移），
           新页面同时用弹簧从它那一侧落位。wait 会先等旧页退干净再让新页进，

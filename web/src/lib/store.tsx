@@ -397,6 +397,8 @@ export interface ShellActions {
   go: (tab: "today" | "plan" | "week" | "study" | "campus" | "me" | "import" | "medbind",
        sub?: string) => void;
   connect: () => void;
+  /** 退出示例预览，回到官网主页 */
+  exitPreview?: () => void;
 }
 
 export const ShellCtx = createContext<ShellActions>({ go: () => undefined, connect: () => undefined });

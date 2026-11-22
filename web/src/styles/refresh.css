@@ -1,0 +1,170 @@
+/* ==========================================================================
+   主界面外壳 · 2026-11 视觉对齐
+   --------------------------------------------------------------------------
+   跟 Compose 原生版用同一套语言：底下有很淡的氛围光，导航是浮起来的玻璃
+   胶囊，板块标题带一枚主色标记。只作用于 .app（登录后 / 示例模式的主界面），
+   官网落地页、登录页和弹层都不在这个容器里，不受影响。
+   颜色全部取自 tokens.css 的语义令牌，6 套色系和深浅模式自动跟随。
+   ========================================================================== */
+
+/* ---- 氛围光：三团色光垫在最底下，半透明卡片才有东西可透 ---- */
+.app {
+  position: relative;
+  isolation: isolate;
+}
+
+.app::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(62% 44% at 6% -6%, color-mix(in oklch, var(--sea) 22%, transparent), transparent 70%),
+    radial-gradient(54% 40% at 106% 10%, color-mix(in oklch, var(--brand-glow-a) 40%, transparent), transparent 72%),
+    radial-gradient(72% 46% at 50% 110%, color-mix(in oklch, var(--brand-glow-b) 36%, transparent), transparent 70%);
+}
+
+[data-theme="dark"] .app::before {
+  opacity: 0.62;
+}
+
+/* ---- 卡片：边线退后一档，靠一圈柔和的投影浮起来 ---- */
+.app .card {
+  border-color: color-mix(in oklch, var(--line) 64%, transparent);
+  box-shadow:
+    inset 0 1px 0 var(--glass-rim),
+    var(--shadow-1),
+    0 14px 30px -24px color-mix(in oklch, var(--ink) 38%, transparent);
+}
+
+/* ---- 板块标题：左侧一枚主色标记 ---- */
+.app .sec__title {
+  position: relative;
+  padding-left: 13px;
+}
+
+.app .sec__title::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 4px;
+  height: 0.95em;
+  border-radius: var(--r-full);
+  background: var(--sea);
+  transform: translateY(-50%);
+}
+
+/* ---- 页头的数据状态胶囊 ---- */
+.app .head .pill {
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid color-mix(in oklch, currentColor 16%, transparent);
+  box-shadow: inset 0 1px 0 var(--glass-rim), var(--shadow-1);
+}
+
+/* ---- 分段控件：整条胶囊 ---- */
+.app .seg {
+  border-radius: var(--r-full);
+  background: color-mix(in oklch, var(--surface-2) 80%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--line) 56%, transparent);
+}
+
+.app .seg__btn,
+.app .seg__pill {
+  border-radius: var(--r-full);
+}
+
+/* ---- 手机 / 平板：浮起的玻璃底栏 ---- */
+@media (max-width: 1079px) {
+  :root:not([data-native-navigation="true"]) {
+    /* 60 的栏 + 12 的悬浮间距 + 8 的呼吸，页面底部留白按这个数让位 */
+    --tabbar-h: 80px;
+  }
+
+  .app .tabbar {
+    left: max(12px, var(--safe-l));
+    right: max(12px, var(--safe-r));
+    bottom: max(calc(var(--safe-b) + 6px), 12px);
+    max-width: 480px;
+    margin: 0 auto;
+    padding-bottom: 0;
+    border: 1px solid color-mix(in oklch, var(--line) 72%, transparent);
+    border-radius: var(--r-full);
+    box-shadow:
+      inset 0 1px 0 var(--glass-rim),
+      0 2px 6px color-mix(in oklch, var(--ink) 8%, transparent),
+      0 16px 36px -16px color-mix(in oklch, var(--ink) 42%, transparent);
+  }
+
+  .app .tabbar__row {
+    max-width: none;
+    height: 60px;
+    padding: 0 5px;
+  }
+
+  /* 选中态是整格的胶囊（原来只垫在图标后面），跟原生底栏一致 */
+  .app .tabbar__btn {
+    position: relative;
+    border-radius: var(--r-full);
+  }
+
+  .app .tabbar__icon {
+    position: static;
+    height: 24px;
+  }
+
+  .app .tabbar__pill {
+    inset: 5px 1px;
+    box-shadow: inset 0 1px 0 var(--glass-rim);
+  }
+
+  .app .tabbar__label {
+    position: relative;
+  }
+
+  .app .tabbar__badge {
+    top: 6px;
+    left: calc(50% + 6px);
+    box-shadow: 0 0 0 2px var(--bar-bg);
+  }
+}
+
+/* ---- 桌面：浮起的玻璃侧栏 ---- */
+@media (min-width: 1080px) {
+  :root {
+    --side-w: 280px;
+  }
+
+  .app .side {
+    inset: 12px auto 12px 12px;
+    width: 256px;
+    padding-top: calc(var(--safe-t) + var(--s-5));
+    padding-bottom: var(--s-5);
+    border: 1px solid color-mix(in oklch, var(--line) 72%, transparent);
+    border-radius: var(--r-xl);
+    background: var(--bar-bg);
+    backdrop-filter: saturate(1.4) blur(18px);
+    -webkit-backdrop-filter: saturate(1.4) blur(18px);
+    box-shadow:
+      inset 0 1px 0 var(--glass-rim),
+      0 2px 6px color-mix(in oklch, var(--ink) 6%, transparent),
+      0 24px 48px -28px color-mix(in oklch, var(--ink) 40%, transparent);
+  }
+
+  .app .side__item,
+  .app .side__pill {
+    border-radius: var(--r-full);
+  }
+
+  .app .side__item {
+    padding: 0 var(--s-4);
+  }
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .app .side {
+    background: var(--surface);
+  }
+}

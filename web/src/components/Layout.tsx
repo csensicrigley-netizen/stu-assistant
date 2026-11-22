@@ -72,7 +72,7 @@ export function Section({
  */
 export function ModePill() {
   const { mode, sample, syncedAt, loading, syncing, refresh } = useStore();
-  const { connect } = useShell();
+  const { connect, exitPreview } = useShell();
 
   if (syncing || loading) {
     return (
@@ -84,13 +84,28 @@ export function ModePill() {
   }
   if (sample) {
     return (
-      <button type="button" className="pill-btn" onClick={connect} aria-label="当前是示例数据，点按连接校园账号">
-        <span className="pill pill--sample">
-          <span className="pill__dot" aria-hidden="true" />
-          示例数据
-          <Icon name="chevron-right" size={14} strokeWidth={2.2} />
-        </span>
-      </button>
+      <span className="mode-pills">
+        {mode === "preview" && exitPreview && (
+          <button
+            type="button"
+            className="pill-btn mode-pills__home"
+            onClick={exitPreview}
+            aria-label="退出示例预览并返回主页"
+          >
+            <span className="pill pill--home">
+              <Icon name="chevron-left" size={14} strokeWidth={2.2} />
+              主页
+            </span>
+          </button>
+        )}
+        <button type="button" className="pill-btn" onClick={connect} aria-label="当前是示例数据，点按连接校园账号">
+          <span className="pill pill--sample">
+            <span className="pill__dot" aria-hidden="true" />
+            示例数据
+            <Icon name="chevron-right" size={14} strokeWidth={2.2} />
+          </span>
+        </button>
+      </span>
     );
   }
   const label =

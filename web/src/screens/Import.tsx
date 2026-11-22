@@ -438,7 +438,7 @@ function StepMethod({
                   value={text}
                   onChange={(e) => onText(e.target.value)}
                   spellCheck={false}
-                  placeholder={"细胞生物学实验 | 周四 6-9节 | 1-16周 | 何昭明 | 桑浦山-细胞生物学实验室-理433\n高等数学 | 周一 1-2节,周三 3-4节 | 1-16周 | 张三 | 桑浦山-E305"}
+                  placeholder={"前端工程实践 | 周四 6-9节 | 1-16周 | 沈清扬 | 实验楼-数字媒体室508\n高等数学 | 周一 1-2节,周三 3-4节 | 1-16周 | 林致远 | 明理楼-A201"}
                 />
                 <span className="field__hint">一行一门课，竖线或制表符分隔。从 Excel 直接复制也行。</span>
               </label>
@@ -521,8 +521,8 @@ function HowToFill() {
           <p className="field__label">① 一行一课（推荐）</p>
           <pre className="pre">
             {`课程名 | 时间 | 周次 | 教师 | 地点
-细胞生物学实验 | 周四 6-9节 | 1-16周 | 何昭明 | 桑浦山-理433
-高等数学 | 周一 1-2节,周三 3-4节 | 1-16周 | 张三 | 桑浦山-E305`}
+前端工程实践 | 周四 6-9节 | 1-16周 | 沈清扬 | 实验楼-508
+高等数学 | 周一 1-2节,周三 3-4节 | 1-16周 | 林致远 | 明理楼-A201`}
           </pre>
           <p className="muted">竖线换成制表符（Tab）也行。时间和周次能省，但课程名必须有。</p>
         </div>
@@ -530,7 +530,7 @@ function HowToFill() {
           <p className="field__label">② 从 Excel 直接复制</p>
           <pre className="pre">
             {`课程名称\t星期\t节次\t周次\t教师\t地点
-细胞生物学实验\t四\t6-9\t1-16\t何昭明\t理433`}
+前端工程实践\t四\t6-9\t1-16\t沈清扬\t实验楼-508`}
           </pre>
           <p className="muted">
             表头认这些写法：课程名称/课程名/课程、星期/周几、节次/节/时间、周次/周、教师/老师、地点/教室。
@@ -599,7 +599,7 @@ function ManualForm({ onSubmit }: { onSubmit: (drafts: Draft[]) => void }) {
       <div className="card card--pad stack-4">
         <label className="field">
           <span className="field__label">课程名</span>
-          <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="细胞生物学实验" />
+          <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="前端工程实践" />
         </label>
 
         <div className="field">
@@ -672,7 +672,7 @@ function ManualForm({ onSubmit }: { onSubmit: (drafts: Draft[]) => void }) {
 
         <label className="field">
           <span className="field__label">教师</span>
-          <input className="input" value={teacher} onChange={(e) => setTeacher(e.target.value)} placeholder="何昭明" />
+          <input className="input" value={teacher} onChange={(e) => setTeacher(e.target.value)} placeholder="沈清扬" />
         </label>
         <label className="field">
           <span className="field__label">地点</span>
@@ -680,7 +680,7 @@ function ManualForm({ onSubmit }: { onSubmit: (drafts: Draft[]) => void }) {
             className="input"
             value={location}
             onChange={(e) => setLocation(e.target.value)}
-            placeholder="桑浦山-细胞生物学实验室-理433"
+            placeholder="实验楼-数字媒体室508"
           />
         </label>
 

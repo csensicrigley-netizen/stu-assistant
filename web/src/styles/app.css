@@ -4304,67 +4304,20 @@ p.hint {
   color: var(--sea);
 }
 
-/* 宽屏：只有"表单页"分两栏（左介绍 / 右表单）。
-   舞台页（hello）必须整屏居中——之前这条规则无条件生效，
-   把舞台塞进 420px 的左栏，看起来就是"标题把下面截掉"。 */
+/* 宽屏表单页：始终居中卡片布局，绝不再用旧的左右两栏拆分把表单挤到最左侧；
+   同时保留返回按钮，确保用户随时能从登录/注册页退回主页或示例页。 */
 @media (min-width: 960px) {
   .welcome:not(.is-stage) {
-    grid-template-columns: minmax(420px, 1.05fr) minmax(460px, 1fr);
-    place-items: stretch;
-    padding: 0;
-  }
-
-  .welcome__brand {
-    /* 两栏共用同一张舞台底，只用一条发丝线分隔 */
-    position: relative;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 56px clamp(32px, 5vw, 84px);
-    overflow: visible;
-    color: var(--ink);
-    background: transparent;
-  }
-
-  /* 分栏线：一条 1px 的极淡竖线，比整块色差安静得多 */
-  .welcome__brand::before {
-    content: "";
-    position: absolute;
-    top: 8%;
-    bottom: 8%;
-    right: 0;
-    width: 1px;
-    background: linear-gradient(
-      to bottom,
-      transparent,
-      oklch(100% 0 0 / 0.09) 18%,
-      oklch(100% 0 0 / 0.09) 82%,
-      transparent
-    );
-  }
-
-  .welcome__brand::after {
-    /* a faint route line echoing the logo */
-    content: "";
-    position: absolute;
-    right: -120px;
-    bottom: -140px;
-    width: 520px;
-    height: 520px;
-    border: 46px solid oklch(100% 0 0 / 0.03);
-    border-radius: 50%;
-  }
-
-  .welcome__main {
-    padding: 48px;
+    gap: var(--s-5);
+    padding: calc(var(--safe-t) + var(--s-8)) var(--gutter) calc(var(--safe-b) + var(--s-8));
   }
 
   .welcome__inner {
-    max-width: 400px;
-  }
-
-  .form .back {
-    display: none;
+    max-width: 440px;
   }
 }
 
@@ -7931,4 +7884,198 @@ html {
 
 .confirm-pill:active {
   transform: scale(0.95);
+}
+
+/* today 课表一键联动卡片与一次性导入码面板 */
+.today-bridge {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  margin-bottom: var(--s-4);
+  padding: var(--s-4);
+  border-radius: var(--r-lg);
+  background: var(--sea-soft);
+  border: 1px solid color-mix(in oklch, var(--sea) 28%, transparent);
+}
+
+.today-bridge__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-2);
+}
+
+.today-bridge__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: var(--r-full);
+  background: var(--sea);
+  color: var(--sea-ink);
+  font-size: var(--fs-12);
+  font-weight: 700;
+}
+
+.today-bridge__close {
+  width: 32px;
+  height: 32px;
+  color: var(--sea-soft-ink);
+}
+
+.today-bridge__title {
+  font-size: var(--fs-15, 0.9375rem);
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.today-bridge__sub {
+  font-size: var(--fs-13);
+  color: var(--sea-soft-ink);
+}
+
+.today-export-cta {
+  margin-bottom: var(--s-4);
+}
+
+.today-export-cta:disabled {
+  opacity: 0.72;
+  cursor: wait;
+}
+
+.today-code {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin: var(--s-4) 0;
+  padding: var(--s-4) var(--s-3);
+  border-radius: var(--r-lg);
+  background: var(--surface-2);
+  border: 1px dashed var(--line-strong);
+  text-align: center;
+}
+
+.today-code__label {
+  font-size: var(--fs-12);
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+.today-code__value {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--ink);
+  user-select: all;
+}
+
+.today-code__meta {
+  font-size: var(--fs-12);
+  color: var(--ink-2);
+}
+
+/* ============================================================================
+   2026-11-22 Web App Polish + Centered Auth Card + Preview Return-Home Controls
+   ============================================================================ */
+
+.welcome:not(.is-stage) {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-5);
+  min-height: 100dvh;
+  padding: calc(var(--safe-t) + var(--s-8)) var(--gutter) calc(var(--safe-b) + var(--s-8));
+  background:
+    radial-gradient(64% 46% at 10% -4%, color-mix(in oklch, var(--sea) 20%, transparent), transparent 72%),
+    radial-gradient(54% 42% at 96% 8%, color-mix(in oklch, var(--brand-glow-a) 34%, transparent), transparent 74%),
+    radial-gradient(66% 44% at 50% 108%, color-mix(in oklch, var(--brand-glow-b) 28%, transparent), transparent 72%),
+    var(--bg);
+}
+
+.welcome:not(.is-stage) .welcome__inner {
+  width: 100%;
+  max-width: 440px;
+  padding: clamp(24px, 4vw, 36px);
+  border-radius: var(--r-xl);
+  background: color-mix(in oklch, var(--surface) 92%, transparent);
+  border: 1px solid color-mix(in oklch, var(--line) 74%, transparent);
+  box-shadow:
+    inset 0 1px 0 var(--glass-rim),
+    var(--shadow-2),
+    0 24px 64px -32px color-mix(in oklch, var(--ink) 45%, transparent);
+  backdrop-filter: saturate(1.35) blur(18px);
+  -webkit-backdrop-filter: saturate(1.35) blur(18px);
+}
+
+.welcome:not(.is-stage) .welcome__credits {
+  margin: 0;
+  text-align: center;
+}
+
+.welcome .seg {
+  border-radius: var(--r-full);
+  background: color-mix(in oklch, var(--surface-2) 82%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--line) 60%, transparent);
+}
+
+.welcome .seg__btn,
+.welcome .seg__pill {
+  border-radius: var(--r-full);
+}
+
+.form__nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  margin-bottom: var(--s-2);
+}
+
+.form__nav .back {
+  margin: 0;
+}
+
+.mode-pills {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pill--home {
+  background: color-mix(in oklch, var(--surface-2) 86%, transparent);
+  color: var(--ink-2);
+}
+
+.side__foot .mode-pills__home {
+  display: none;
+}
+
+.side__brand--btn {
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  border-radius: var(--r-lg);
+  transition: background var(--t-fast) var(--ease-std), transform var(--t-fast) var(--ease-std);
+}
+
+.side__brand--btn:hover {
+  background: color-mix(in oklch, var(--surface-2) 72%, transparent);
+}
+
+.side__brand--btn:active {
+  transform: scale(0.98);
+}
+
+.side__home {
+  margin-top: var(--s-2);
+  font-size: var(--fs-13);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .welcome:not(.is-stage) .welcome__inner {
+    background: var(--surface);
+  }
 }
