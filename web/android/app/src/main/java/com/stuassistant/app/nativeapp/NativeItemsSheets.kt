@@ -829,8 +829,6 @@ internal fun ItemsContextualSheetHost(
     onQuickAddForCourse: (AcademicBlock, String) -> Unit,
     onQuickAddAllDay: (String) -> Unit,
 ) {
-    val dark = LocalLiquidGlassDarkTheme.current == true
-    val palette = LocalNativePalette.current
     var childTask by remember(modal) { mutableStateOf<AcademicTask?>(null) }
     val homeworkSheet: @Composable (AcademicTask, () -> Unit) -> Unit = { task, close ->
         ItemsHomeworkSheet(
@@ -850,23 +848,10 @@ internal fun ItemsContextualSheetHost(
     when (modal) {
         is ItemsContextModal.Course -> {
             val block = modal.block
-            val pos = AcademicCalendar.position(modal.date)
             val relatedHomework = tasks.filter { it.course == block.course.title }
-            val (doneCount, totalCount) = AcademicTimetable.progress(block.course, pos?.week ?: 0, now.weekday, now.minutes)
-            val swatch = nativeCourseSwatch(block.course.hue, dark, palette)
 
             NSheet(block.course.title, onDismiss) {
-                NText(
-                    "${AcademicClock.monthDay(modal.date)} ${AcademicClock.weekdayText(block.weekday)} ${block.start}–${block.end}",
-                    13,
-                    muted = true,
-                    tabularNums = true,
-                )
-                NRow("地点", block.location.ifEmpty { "教务未标注地点" }, leadingIcon = "pin", leadingTint = swatch.mark)
-                NRow("教师", block.teacher.ifEmpty { block.course.teacher }.ifEmpty { "未标注" }, leadingIcon = "me", leadingTint = swatch.mark)
-                if (totalCount > 0) {
-                    NRow("本学期进度", trailing = "$doneCount / $totalCount 次")
-                }
+                AcademicCourseSheetSummary(block, modal.date, now)
                 if (relatedHomework.isNotEmpty()) {
                     NText("本课程作业", 14, bold = true, muted = true)
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {

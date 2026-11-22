@@ -558,7 +558,7 @@ fun NativeTodayScreen(store: NativeStore, s: NativeState, onNavigate: (String) -
         .take(4)
     val notices = s.notices.map(AcademicRecords::notice).sortedByDescending { it.publishedMs ?: 0 }.take(4)
     val milestones = AcademicCalendar.milestones(now.date, 2)
-    var open by remember { mutableStateOf<AcademicBlock?>(null) }
+    var open by remember { mutableStateOf<AcademicCourseSelection?>(null) }
     val scope = rememberCoroutineScope()
     var error by remember { mutableStateOf<String?>(null) }
 
@@ -624,7 +624,9 @@ fun NativeTodayScreen(store: NativeStore, s: NativeState, onNavigate: (String) -
                 NButton("手动导入课表", { onNavigate("import") }, haptic = NativeButtonHaptic.Navigation)
             }
         } else {
-            AcademicNowCard(current, next, later, blocks, now.minutes, plan.status) { open = it }
+            AcademicNowCard(current, next, later, blocks, now.minutes, plan.status) {
+                open = AcademicCourseSelection(it, plan.date)
+            }
         }
 
         NError(error)
@@ -632,7 +634,7 @@ fun NativeTodayScreen(store: NativeStore, s: NativeState, onNavigate: (String) -
 
         if (blocks.isNotEmpty()) AcademicSection("今天的时间") {
             NCard { AcademicRibbon(blocks, now.minutes) }
-            AcademicAgenda(blocks, now.minutes, compact = true) { open = it }
+            AcademicAgenda(blocks, now.minutes, compact = true) { open = AcademicCourseSelection(it, plan.date) }
         }
 
         AcademicSection("快到期", action = if (tasks.isNotEmpty()) "全部作业" else null, onAction = { onNavigate("items:school") }) {
@@ -661,7 +663,7 @@ fun NativeTodayScreen(store: NativeStore, s: NativeState, onNavigate: (String) -
             notices.forEach { notice -> AcademicNoticePreview(notice) }
         }
     }
-    open?.let { AcademicCourseSheet(it, pos?.week ?: 0, now.weekday, now.minutes) { open = null } }
+    open?.let { AcademicCourseSheet(it, now) { open = null } }
 }
 
 private data class AcademicNowContent(
@@ -1186,7 +1188,7 @@ fun NativeWeekScreen(store: NativeStore, s: NativeState, onNavigate: (String) ->
     }
     val week = pager.settledPage + 1
     var day by rememberSaveable(term.id) { mutableStateOf(if (position != null) now.weekday else 1) }
-    var open by remember { mutableStateOf<AcademicBlock?>(null) }
+    var open by remember { mutableStateOf<AcademicCourseSelection?>(null) }
     val doc = remember(s.timetable) { AcademicTimetable.normalize(s.timetable) }
     val colors = LocalNativeColors.current
     val reduced = LocalLiquidGlassReducedMotion.current
@@ -1395,7 +1397,7 @@ fun NativeWeekScreen(store: NativeStore, s: NativeState, onNavigate: (String) ->
                                 selected.status.kind == "closed" -> AcademicEmpty("${selected.status.label} · 停课", "按教务处校历，这一天不上课。")
                                 selected.blocks.isEmpty() -> AcademicEmpty("这天没有理论课", "实验课和临时调课以学院通知为准。")
                                 else -> AcademicAgenda(selected.blocks, -1) { block ->
-                                    if (selectedDay == day) open = block
+                                    if (selectedDay == day) open = AcademicCourseSelection(block, selected.date)
                                 }
                             }
                         }
@@ -1415,21 +1417,35 @@ fun NativeWeekScreen(store: NativeStore, s: NativeState, onNavigate: (String) ->
         }
         NText("只含教务系统里的理论课。节次时刻按教务处作息表：第二、四、五大节各 155 分钟，晚课 19:20 开始。", 12, muted = true)
     }
-    open?.let { AcademicCourseSheet(it, position?.week ?: 0, now.weekday, now.minutes) { open = null } }
+    open?.let { AcademicCourseSheet(it, now) { open = null } }
+}
+
+private data class AcademicCourseSelection(val block: AcademicBlock, val date: String)
+
+@Composable
+internal fun AcademicCourseSheetSummary(block: AcademicBlock, date: String, now: AcademicMoment) {
+    val mark = academicCourseColor(block.course.hue)
+    val currentWeek = AcademicCalendar.position(now.date)?.week ?: 0
+    val (done, total) = AcademicTimetable.progress(block.course, currentWeek, now.weekday, now.minutes)
+    val day = AcademicClock.weekdayText(AcademicClock.weekday(date))
+    NText(
+        "${AcademicClock.monthDay(date)} $day · ${block.start}–${block.end} · ${AcademicClock.span(block.span)}",
+        13, muted = true, tabularNums = true,
+    )
+    NRow("地点", block.location.ifEmpty { "教务未标注地点" }, leadingIcon = "pin", leadingTint = mark)
+    NRow("教师", block.teacher.ifEmpty { block.course.teacher }.ifEmpty { "未标注" }, leadingIcon = "me", leadingTint = mark)
+    if (total > 0) {
+        NRow("本学期进度", trailing = "$done / $total 次")
+        AcademicProgress(done.toFloat() / total, mark)
+    }
 }
 
 @Composable
-private fun AcademicCourseSheet(block: AcademicBlock, week: Int, weekday: Int, minute: Int, onDismiss: () -> Unit) {
+private fun AcademicCourseSheet(selection: AcademicCourseSelection, now: AcademicMoment, onDismiss: () -> Unit) {
+    val block = selection.block
     val slots = AcademicTimetable.slots(block.course)
-    val (done, total) = AcademicTimetable.progress(block.course, week, weekday, minute)
     NSheet(block.course.title, onDismiss) {
-        NText("${AcademicClock.weekdayText(block.weekday)} ${block.start}–${block.end} · ${AcademicClock.span(block.span)}", 13, muted = true, tabularNums = true)
-        NRow("地点", block.location.ifEmpty { "教务未标注地点" }, leadingIcon = "pin")
-        NRow("教师", block.teacher.ifEmpty { block.course.teacher }.ifEmpty { "未标注" }, leadingIcon = "me")
-        if (total > 0) {
-            NRow("本学期进度", trailing = "$done / $total 次")
-            AcademicProgress(done.toFloat() / total, academicCourseColor(block.course.hue))
-        }
+        AcademicCourseSheetSummary(block, selection.date, now)
         NText("每周安排", 16, bold = true)
         slots.forEach { slot ->
             NCard {
