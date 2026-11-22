@@ -10,6 +10,7 @@ import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
@@ -41,6 +42,7 @@ class NativeStore internal constructor(
     private val jobs = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val refreshMutex = Mutex()
     private val planMutex = Mutex()
+    private val calendarWriteMutex = Mutex()
     private var generation = 0L
     private var planVersion = 0L
     private var planReadVersion = 0L
@@ -120,13 +122,39 @@ class NativeStore internal constructor(
 
     fun calendarAccount(): String = synchronized(lock) { calendarKey() }
 
-    suspend fun toggleCalendar(id: String, expectedAccount: String) = withContext(Dispatchers.IO) {
+    /** Keep local item writes ordered, including Undo, if the user leaves the tab while saving. */
+    internal fun queueCalendarWrite(onFinished: (Exception?) -> Unit, write: suspend (String) -> Unit) {
+        val account = calendarAccount()
+        jobs.launch(start = CoroutineStart.UNDISPATCHED) {
+            val failure = try {
+                calendarWriteMutex.withLock { write(account) }
+                null
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                error
+            }
+            withContext(Dispatchers.Main.immediate) { onFinished(failure) }
+        }
+    }
+
+    suspend fun toggleCalendar(id: String, expectedAccount: String) =
+        updateCalendarDone(id, expectedAccount) { !it }
+
+    internal suspend fun setCalendarDone(id: String, done: Boolean, expectedAccount: String) =
+        updateCalendarDone(id, expectedAccount) { done }
+
+    private suspend fun updateCalendarDone(id: String, expectedAccount: String, change: (Boolean) -> Boolean) = withContext(Dispatchers.IO) {
         synchronized(lock) {
             val key = calendarKey()
             if (key != expectedAccount) throw NativeApiError("account_changed")
             val document = secure.readCache(key) ?: return@synchronized
-            academicObjects(document.optJSONArray("items")).firstOrNull { it.optString("id") == id }
-                ?.let { it.put("done", !it.optBoolean("done")) }
+            val record = academicObjects(document.optJSONArray("items"))
+                .firstOrNull { it.optString("id") == id } ?: return@synchronized
+            val old = record.optBoolean("done")
+            val next = change(old)
+            if (old == next) return@synchronized
+            record.put("done", next)
             secure.writeCache(key, document)
             mutableState.value = state.value.copy(calendarRevision = state.value.calendarRevision + 1)
         }
@@ -140,6 +168,52 @@ class NativeStore internal constructor(
             if (!removeCalendarRecordFromDocument(document, id)) return@synchronized
             secure.writeCache(key, document)
             mutableState.value = state.value.copy(calendarRevision = state.value.calendarRevision + 1)
+        }
+    }
+
+    suspend fun updateCalendarDraft(id: String, draft: JSONObject, expectedAccount: String) = withContext(Dispatchers.IO) {
+        synchronized(lock) {
+            val key = calendarKey()
+            if (key != expectedAccount) throw NativeApiError("account_changed", 0, "账号已切换，请重新打开")
+            require(id.isNotBlank() && draft.optString("title").isNotBlank())
+            val document = secure.readCache(key) ?: return@synchronized
+            val items = academicObjects(document.optJSONArray("items"))
+            var updated = false
+            val next = items.map { row ->
+                if (row.optString("id") == id) {
+                    updated = true
+                    copy(row).put("draft", copy(draft))
+                } else row
+            }
+            if (!updated) return@synchronized
+            secure.writeCache(key, document.put("items", JSONArray(next)))
+            mutableState.value = state.value.copy(calendarRevision = state.value.calendarRevision + 1)
+        }
+    }
+
+    suspend fun upsertCalendarRecord(record: JSONObject, index: Int? = null, expectedAccount: String) = withContext(Dispatchers.IO) {
+        synchronized(lock) {
+            val key = calendarKey()
+            if (key != expectedAccount) throw NativeApiError("account_changed", 0, "账号已切换，请重新打开")
+            val id = record.optString("id")
+            require(id.isNotBlank() && (record.optJSONObject("draft")?.optString("title")?.isNotBlank() == true))
+            val document = secure.readCache(key) ?: JSONObject().put("items", JSONArray())
+            val items = academicObjects(document.optJSONArray("items")).toMutableList()
+            val existingIdx = items.indexOfFirst { it.optString("id") == id }
+            val clean = copy(record)
+            if (existingIdx >= 0) {
+                items[existingIdx] = clean
+            } else if (index != null) {
+                items.add(index.coerceIn(0, items.size), clean)
+            } else {
+                items.add(clean)
+            }
+            secure.writeCache(key, document.put("items", JSONArray(items)))
+            val focus = clean.optJSONObject("draft")?.let(CalendarDrafts::date) ?: state.value.calendarFocusDate
+            mutableState.value = state.value.copy(
+                calendarRevision = state.value.calendarRevision + 1,
+                calendarFocusDate = focus,
+            )
         }
     }
 
@@ -263,11 +337,18 @@ class NativeStore internal constructor(
         }
     }
 
-    fun toggleTask(id: String) {
+    fun toggleTask(id: String) = updateTaskDone(id) { !it }
+
+    internal fun setTaskDone(id: String, done: Boolean) = updateTaskDone(id) { done }
+
+    private fun updateTaskDone(id: String, change: (Boolean) -> Boolean) {
         synchronized(lock) {
             if (closed || id.isBlank()) return
+            val wasDone = id in state.value.done
+            val isDone = change(wasDone)
+            if (isDone == wasDone) return
             val owner = session()
-            val done = state.value.done.toMutableSet().apply { if (!add(id)) remove(id) }
+            val done = if (isDone) state.value.done + id else state.value.done - id
             val next = copy(raw).put("done", JSONArray(done.toList()))
             commit(owner, next)
         }

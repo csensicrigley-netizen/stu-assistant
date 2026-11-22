@@ -10,16 +10,21 @@ import androidx.compose.foundation.background
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalDensity
@@ -140,14 +145,19 @@ class NativeActivity:ComponentActivity() {
     val page=rememberLayerBackdrop()
     val combined=rememberCombinedBackdrop(base,page)
     val sheets=remember {NativeSheetController()}
+    val barSuppressor = remember { NativeBottomBarSuppressor() }
+    val itemsViewState = key(s.server, s.user?.optString("id"), s.preview) {
+        rememberSaveableStateHolder()
+    }
     val density=LocalDensity.current
     val bottom=with(density){WindowInsets.navigationBars.getBottom(this).toDp().value}
     val ime=WindowInsets.ime.getBottom(density)>0
-    val showBottomNavigation=ready&&!needsWelcome&&!connect&&(!ime||calendarOpen)
+    val showBottomNavigation = ready && !needsWelcome && !connect
+    val retractBottomNavigation = barSuppressor.suppressed || (ime && !calendarOpen)
     LaunchedEffect(s.hapticStrength) {if(s.hapticStrength==0)feedback.cancel()}
     BackHandler {activity.moveTaskToBack(true)}
     BackHandler(enabled=!needsWelcome&&!connect&&route!="today"&&sheets.entries.isEmpty()) {route=if(route=="import"||route=="medical")"me"else"today"}
-    CompositionLocalProvider(LocalCalendarComposer provides {calendarOpen=true},LocalNativeColors provides colors,LocalNativePalette provides s.palette,LocalNativeForegroundEpoch provides resumeEpoch,LocalNativeBackdrop provides base,LocalNativeFeedback provides feedback,LocalNativeStrength provides s.hapticStrength,LocalNativeConnect provides onConnect,LocalNativeSheets provides sheets,LocalLiquidGlassDarkTheme provides dark,LocalLiquidGlassAccentColor provides colors.brand,LocalLiquidGlassReducedMotion provides reduced,LocalLiquidGlassThemeProgress provides themeProgress) {
+    CompositionLocalProvider(LocalCalendarComposer provides {calendarOpen=true},LocalNativeColors provides colors,LocalNativePalette provides s.palette,LocalNativeForegroundEpoch provides resumeEpoch,LocalNativeBackdrop provides base,LocalNativeFeedback provides feedback,LocalNativeStrength provides s.hapticStrength,LocalNativeConnect provides onConnect,LocalNativeSheets provides sheets,LocalNativeBottomBarSuppressor provides barSuppressor,LocalLiquidGlassDarkTheme provides dark,LocalLiquidGlassAccentColor provides colors.brand,LocalLiquidGlassReducedMotion provides reduced,LocalLiquidGlassThemeProgress provides themeProgress) {
         Box(Modifier.fillMaxSize().background(if(launchState.active) launchStageColor(dark) else colors.bg)) {
             Box(Modifier.fillMaxSize().background(colors.bg).launchIrisRevealEffect(launchState,dark=dark)) {
                 val orbPrimary = colors.brand.copy(alpha = 0.15f + 0.07f * themeProgress)
@@ -186,7 +196,9 @@ class NativeActivity:ComponentActivity() {
                         when {
                             snapshot.route=="today"->NativeTodayScreen(store,s,navigate,onConnect)
                             snapshot.route=="week"->NativeWeekScreen(store,s,navigate,onConnect)
-                            snapshot.route.startsWith("items")->NativeCalendarItemsScreen(store,s,onConnect)
+                            snapshot.route.startsWith("items")->itemsViewState.SaveableStateProvider("items") {
+                                NativeCalendarItemsScreen(store, s, onConnect, route = snapshot.route)
+                            }
                             snapshot.route.startsWith("campus")->NativeCampusScreen(store,s,snapshot.campusView,onConnect,{campusView=it})
                             snapshot.route=="me"->NativeMeScreen(store,s,onConnect,{connect=false;route="today"},navigate)
                             snapshot.route=="medical"->NativeMedicalScreen(store,s,navigate)
@@ -195,18 +207,33 @@ class NativeActivity:ComponentActivity() {
                         }
                     }
                 }
-                // Keep the same bar mounted behind the full-screen modal. A sheet
-                // covers it normally without owning its visibility or lifetime.
+                // Keep one dock through sheet and IME transitions so it always returns
+                // from its previous animated position.
                 if(showBottomNavigation) {
                     val current=if(route=="import"||route=="medical")"me"else route.substringBefore(':')
                     val urgent=s.tasks.map(AcademicRecords::task).count {it.id !in s.done&&AcademicRecords.bucket(it) in listOf("today","overdue")}
                     val reconnect=s.sources.count {it.optString("state")=="need_login"&&it.optString("source") in academicStrings(s.user?.optJSONArray("bound"))}
                     val tabs=listOf(GlassNavigationTab("today","今天"),GlassNavigationTab("week","课表"),GlassNavigationTab("items","事项",urgent),GlassNavigationTab("campus","校园"),GlassNavigationTab("me","我的",reconnect))
-                    Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height((104+bottom).dp).nativeSheetBackground(sheets)
-                        .then(if(calendarOpen) Modifier.clearAndSetSemantics {} else Modifier)) {
+                    val navRetract by animateFloatAsState(
+                        targetValue = if (retractBottomNavigation) 1f else 0f,
+                        animationSpec = when {
+                            reduced -> snap()
+                            retractBottomNavigation -> tween(200, easing = CubicBezierEasing(.32f, 0f, .67f, 1f))
+                            else -> spring(dampingRatio = .86f, stiffness = 460f)
+                        },
+                        label = "itemsNavRetract",
+                    )
+                    Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height((104+bottom).dp)
+                        .graphicsLayer {
+                            val progress = navRetract.coerceIn(0f, 1f)
+                            translationY = progress * size.height
+                            alpha = 1f - progress
+                        }
+                        .nativeSheetBackground(sheets)
+                        .then(if(calendarOpen||retractBottomNavigation) Modifier.clearAndSetSemantics {} else Modifier)) {
                         LiquidGlassBottomBar(GlassNavigationState(current,tabs,dark,s.palette,s.hapticStrength,bottom,reduced),combined) {next->
                             // Also reject a selection queued before the sheet opened.
-                            if(sheets.entries.isEmpty()&&!calendarOpen) {
+                            if(sheets.entries.isEmpty()&&!calendarOpen&&!retractBottomNavigation) {
                                 if(next!=current){feedback.play("navigation",s.hapticStrength);route=next}
                                 else if(route=="import"||route=="medical"){route="me"}
                             }

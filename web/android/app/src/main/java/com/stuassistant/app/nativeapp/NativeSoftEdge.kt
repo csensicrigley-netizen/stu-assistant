@@ -5,6 +5,7 @@ import android.graphics.RuntimeShader
 import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -30,7 +31,17 @@ import androidx.compose.ui.unit.dp
  * and the GPU shader uses a precomputed 11-tap separable Gaussian kernel with cached RenderEffect instances.
  */
 @Composable
-internal fun Modifier.nativeTopSoftEdge(scroll: ScrollState, depth: Dp = 36.dp): Modifier {
+internal fun Modifier.nativeTopSoftEdge(scroll: ScrollState, depth: Dp = 36.dp): Modifier =
+    nativeTopSoftEdge(depth) { scroll.value.toFloat() }
+
+@Composable
+internal fun Modifier.nativeTopSoftEdge(scroll: LazyListState, depth: Dp = 36.dp): Modifier =
+    nativeTopSoftEdge(depth) {
+        if (scroll.firstVisibleItemIndex > 0) Float.POSITIVE_INFINITY else scroll.firstVisibleItemScrollOffset.toFloat()
+    }
+
+@Composable
+private fun Modifier.nativeTopSoftEdge(depth: Dp, scrollOffsetPx: () -> Float): Modifier {
     val density = LocalDensity.current
     val activationPx = with(density) { 24.dp.toPx() }.coerceAtLeast(1f)
     val depthPx = with(density) { depth.toPx() }
@@ -48,7 +59,7 @@ internal fun Modifier.nativeTopSoftEdge(scroll: ScrollState, depth: Dp = 36.dp):
         .graphicsLayer {
             val vp = viewport
             val band = depthPx.coerceAtMost(vp.height * 0.25f)
-            val amount = (scroll.value / activationPx).coerceIn(0f, 1f)
+            val amount = (scrollOffsetPx() / activationPx).coerceIn(0f, 1f)
             clip = true
             if (amount > 0f && band > 0f && vp.width > 0 && vp.height > 0) {
                 compositingStrategy = CompositingStrategy.Offscreen
@@ -66,7 +77,7 @@ internal fun Modifier.nativeTopSoftEdge(scroll: ScrollState, depth: Dp = 36.dp):
             drawContent()
             if (Build.VERSION.SDK_INT < 33 || renderer == null) {
                 val band = depthPx.coerceAtMost(size.height * 0.25f)
-                val amount = (scroll.value / activationPx).coerceIn(0f, 1f)
+                val amount = (scrollOffsetPx() / activationPx).coerceIn(0f, 1f)
                 if (amount > 0f && band > 0f) {
                     drawRect(fallbackCache.mask(band, amount), blendMode = BlendMode.DstIn)
                 }
