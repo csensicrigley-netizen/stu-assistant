@@ -2,6 +2,13 @@ package com.stuassistant.app.nativeapp
 
 import android.animation.ValueAnimator
 import android.os.Build
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
@@ -14,6 +21,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -32,6 +40,9 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerDefaults
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
@@ -39,14 +50,18 @@ import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -73,6 +88,7 @@ import com.kyant.shapes.RoundedRectangle
 import com.stuassistant.app.glass.LocalLiquidGlassReducedMotion
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import java.util.Locale
 import kotlin.math.PI
@@ -1089,11 +1105,41 @@ fun NativeWeekScreen(store: NativeStore, s: NativeState, onNavigate: (String) ->
     val now = academicNow()
     val position = AcademicCalendar.position(now.date)
     val term = position?.term ?: AcademicCalendar.currentOrNext(now.date)
-    var week by rememberSaveable(term.id) { mutableStateOf(position?.week ?: 1) }
+    val pager = key(term.id) {
+        rememberPagerState(initialPage = (position?.week ?: 1) - 1) { term.totalWeeks }
+    }
+    val week = pager.settledPage + 1
     var day by rememberSaveable(term.id) { mutableStateOf(if (position != null) now.weekday else 1) }
     var open by remember { mutableStateOf<AcademicBlock?>(null) }
     val doc = remember(s.timetable) { AcademicTimetable.normalize(s.timetable) }
     val colors = LocalNativeColors.current
+    val reduced = LocalLiquidGlassReducedMotion.current
+    val scope = rememberCoroutineScope()
+    val selectionFeedback by rememberUpdatedState(nSelectionFeedback())
+    var swiping by remember(pager) { mutableStateOf(false) }
+
+    LaunchedEffect(pager) {
+        pager.interactionSource.interactions.collect { interaction ->
+            when (interaction) {
+                is DragInteraction.Start -> swiping = true
+                is DragInteraction.Cancel -> swiping = false
+            }
+        }
+    }
+    LaunchedEffect(pager) {
+        snapshotFlow { pager.settledPage }.drop(1).collect {
+            if (swiping) selectionFeedback()
+            swiping = false
+        }
+    }
+
+    fun goToPage(page: Int) {
+        if (page !in 0 until term.totalWeeks) return
+        swiping = false
+        scope.launch {
+            if (reduced) pager.scrollToPage(page) else pager.animateScrollToPage(page)
+        }
+    }
 
     NPage("课表", term.label, actions = { AcademicMode(store, s, onConnect) }) {
         if (!s.sample && doc == null) {
@@ -1109,14 +1155,7 @@ fun NativeWeekScreen(store: NativeStore, s: NativeState, onNavigate: (String) ->
         }
 
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .ergonomicHorizontalSwipe(
-                    canSwipePrevious = week > 1,
-                    canSwipeNext = week < term.totalWeeks,
-                    onSwipePrevious = { week = (week - 1).coerceAtLeast(1) },
-                    onSwipeNext = { week = (week + 1).coerceAtMost(term.totalWeeks) },
-                ),
+            modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             val headerPlans = remember(doc, term.id, week) {
@@ -1132,26 +1171,34 @@ fun NativeWeekScreen(store: NativeStore, s: NativeState, onNavigate: (String) ->
                 order = week.toLong(),
                 previousLabel = "上一周",
                 nextLabel = "下一周",
-                canPrevious = week > 1,
-                canNext = week < term.totalWeeks,
-                onPrevious = { week = (week - 1).coerceAtLeast(1) },
-                onNext = { week = (week + 1).coerceAtMost(term.totalWeeks) },
+                canPrevious = pager.targetPage > 0,
+                canNext = pager.targetPage < term.totalWeeks - 1,
+                onPrevious = { goToPage(pager.targetPage - 1) },
+                onNext = { goToPage(pager.targetPage + 1) },
                 idleSubtitle = (if (isCurrent) "本周 · $rangeText" else rangeText) +
                     (if (total > 0) " · ${AcademicClock.span(total)}" else " · 左右轻滑切换周次"),
                 resetLabel = if (position != null && !isCurrent) "回到本周" else null,
                 resetPrefix = if (position != null && !isCurrent) rangeText else null,
-                onReset = if (position != null && !isCurrent) ({ week = position.week; day = now.weekday }) else null,
+                onReset = if (position != null && !isCurrent) ({
+                    day = now.weekday
+                    goToPage(position.week - 1)
+                }) else null,
             )
 
-            NativeDirectionalContent(
-                targetState = week,
-                orderOf = { it },
-                label = "week-spectrum-pager",
-            ) { targetWeek ->
+            HorizontalPager(
+                state = pager,
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.Top,
+                flingBehavior = PagerDefaults.flingBehavior(
+                    state = pager,
+                    snapPositionalThreshold = 0.28f,
+                    snapAnimationSpec = if (reduced) snap() else spring(dampingRatio = 0.88f, stiffness = 370f),
+                ),
+            ) { page ->
+                val targetWeek = page + 1
                 val plans = remember(doc, term.id, targetWeek) {
                     (1..7).map { AcademicTimetable.planFor(doc, AcademicCalendar.dateOf(term, targetWeek, it)) }
                 }
-                val selected = plans[day - 1]
                 val targetIsCurrent = position?.week == targetWeek
                 Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     Column(
@@ -1176,11 +1223,16 @@ fun NativeWeekScreen(store: NativeStore, s: NativeState, onNavigate: (String) ->
                             val wd = index + 1
                             val on = day == wd
                             val isTodayRow = targetIsCurrent && wd == now.weekday
+                            val emphasis by animateFloatAsState(
+                                targetValue = if (on) 1f else 0f,
+                                animationSpec = if (reduced) snap() else tween(150),
+                                label = "selected weekday",
+                            )
                             Row(
                                 Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedRectangle(14.dp))
-                                    .background(if (on) colors.brand.copy(alpha = .11f) else Color.Transparent)
+                                    .drawBehind { drawRect(colors.brand.copy(alpha = 0.11f * emphasis)) }
                                     .selectable(selected = on, role = Role.RadioButton, onClick = { if (!on) day = wd })
                                     .semantics {
                                         contentDescription = "${AcademicClock.weekdayText(wd)} ${AcademicClock.slash(plan.date)}，${
@@ -1203,7 +1255,7 @@ fun NativeWeekScreen(store: NativeStore, s: NativeState, onNavigate: (String) ->
                                         listOf("一", "二", "三", "四", "五", "六", "日")[index],
                                         14,
                                         bold = true,
-                                        color = if (on || isTodayRow) colors.brand else colors.ink,
+                                        color = if (isTodayRow) colors.brand else lerp(colors.ink, colors.brand, emphasis),
                                         maxLines = 1,
                                         softWrap = false,
                                     )
@@ -1243,20 +1295,33 @@ fun NativeWeekScreen(store: NativeStore, s: NativeState, onNavigate: (String) ->
                                             .fillMaxWidth()
                                             .fillMaxHeight(barFraction)
                                             .clip(Capsule())
-                                            .background(if (on) colors.brand else colors.muted.copy(alpha = 0.7f)),
+                                            .background(lerp(colors.muted.copy(alpha = 0.7f), colors.brand, emphasis)),
                                     )
                                 }
                             }
                         }
                     }
-                    AcademicSection(
-                        "${AcademicClock.weekdayText(day)} ${AcademicClock.slash(selected.date)}",
-                        if (selected.blocks.isNotEmpty()) "${selected.blocks.size} 节 · ${AcademicClock.span(AcademicTimetable.minutes(selected.blocks))}" else "",
-                    ) {
-                        when {
-                            selected.status.kind == "closed" -> AcademicEmpty("${selected.status.label} · 停课", "按教务处校历，这一天不上课。")
-                            selected.blocks.isEmpty() -> AcademicEmpty("这天没有理论课", "实验课和临时调课以学院通知为准。")
-                            else -> AcademicAgenda(selected.blocks, -1) { open = it }
+                    AnimatedContent(
+                        targetState = day,
+                        transitionSpec = {
+                            if (reduced) (EnterTransition.None togetherWith ExitTransition.None).using(null)
+                            else (fadeIn(tween(150)) togetherWith fadeOut(tween(110)))
+                                .using(SizeTransform { _, _ -> tween(180) })
+                        },
+                        label = "weekday agenda",
+                    ) { selectedDay ->
+                        val selected = plans[selectedDay - 1]
+                        AcademicSection(
+                            "${AcademicClock.weekdayText(selectedDay)} ${AcademicClock.slash(selected.date)}",
+                            if (selected.blocks.isNotEmpty()) "${selected.blocks.size} 节 · ${AcademicClock.span(AcademicTimetable.minutes(selected.blocks))}" else "",
+                        ) {
+                            when {
+                                selected.status.kind == "closed" -> AcademicEmpty("${selected.status.label} · 停课", "按教务处校历，这一天不上课。")
+                                selected.blocks.isEmpty() -> AcademicEmpty("这天没有理论课", "实验课和临时调课以学院通知为准。")
+                                else -> AcademicAgenda(selected.blocks, -1) { block ->
+                                    if (selectedDay == day) open = block
+                                }
+                            }
                         }
                     }
                 }
