@@ -348,12 +348,18 @@ fun NPage(
                         ).using(SizeTransform(clip = false))
                     },
                     label = "npage-subcontent",
-                ) {
-                    Column(
-                        Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(18.dp),
-                        content = content,
-                    )
+                ) { state ->
+                    // Key the sub-composition by the animated target. Without it both sides of
+                    // the transition render the same composition, which lint reports as
+                    // UnusedContentLambdaTargetStateParameter and which also makes the slide
+                    // animate two identical frames.
+                    key(state) {
+                        Column(
+                            Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(18.dp),
+                            content = content,
+                        )
+                    }
                 }
             }
         }
