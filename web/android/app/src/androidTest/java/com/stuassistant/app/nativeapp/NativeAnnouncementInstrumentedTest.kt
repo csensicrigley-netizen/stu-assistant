@@ -269,7 +269,7 @@ class NativeAnnouncementInstrumentedTest {
                         Box(Modifier.align(androidx.compose.ui.Alignment.BottomCenter).fillMaxWidth().height(128.dp).nativeSheetBackground(fixture.controller)) {
                             com.stuassistant.app.LiquidGlassBottomBar(com.stuassistant.app.GlassNavigationState(
                                 "today",listOf(com.stuassistant.app.GlassNavigationTab("today","今天"),com.stuassistant.app.GlassNavigationTab("week","课表"),com.stuassistant.app.GlassNavigationTab("items","事项"),com.stuassistant.app.GlassNavigationTab("campus","校园"),com.stuassistant.app.GlassNavigationTab("me","我的")),
-                                dark,"sweet",0,24f,true),combined) {}
+                                dark = dark,palette = "sweet",strength = 0,bottomInset = 24f,reducedMotion = true),combined) {}
                         }
                         if (fixture.shown.value) NativeAnnouncementDialog(content, onDismiss = { dontRemind ->
                             fixture.optedOut.set(dontRemind)
