@@ -40,7 +40,7 @@ def test_default_stars_official_repo_without_auth(config_file):
     entries = result.json()["announcements"]
     assert len(entries) == 1
     assert entries[0]["id"] == "github-star"
-    assert entries[0]["display"] == "once"
+    assert entries[0]["display"] == "always"
     assert entries[0]["action_url"] == "https://github.com/csensicrigley-netizen/stu-assistant"
     assert "platforms" not in entries[0]
 

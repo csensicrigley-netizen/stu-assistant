@@ -11,7 +11,7 @@
       "image_alt": "",
       "action_label": "去 GitHub 点亮 Star",
       "action_url": "https://github.com/csensicrigley-netizen/stu-assistant",
-      "display": "once",
+      "display": "always",
       "priority": 0,
       "enabled": true,
       "platforms": [

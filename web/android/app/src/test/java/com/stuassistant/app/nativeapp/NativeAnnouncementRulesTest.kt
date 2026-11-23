@@ -104,7 +104,7 @@ class NativeAnnouncementRulesTest {
             listOf("UTC", "America/Los_Angeles", "Asia/Tokyo").forEach { zone ->
                 TimeZone.setDefault(TimeZone.getTimeZone(zone))
                 assertTrue(NativeAnnouncementRules.eligible("once", 0, midnight))
-                assertFalse(NativeAnnouncementRules.eligible("once", beforeMidnight, midnight))
+                assertTrue(NativeAnnouncementRules.eligible("once", beforeMidnight, midnight))
                 assertTrue(NativeAnnouncementRules.eligible("daily", 0, midnight))
                 assertFalse(NativeAnnouncementRules.eligible("daily", beforeMidnight - 1000, beforeMidnight))
                 assertTrue(NativeAnnouncementRules.eligible("daily", beforeMidnight, midnight))
@@ -113,6 +113,15 @@ class NativeAnnouncementRulesTest {
                 assertFalse(NativeAnnouncementRules.eligible("unknown", 0, midnight))
             }
         } finally { TimeZone.setDefault(previousZone) }
+    }
+
+    @Test fun onlyExplicitOptOutHidesMessagesAcrossOpeningsIncludingLegacyOnce() {
+        val now = Instant.parse("2026-11-15T16:00:00Z").toEpochMilli()
+        for (display in listOf("once", "daily", "always")) {
+            assertFalse("Opt-out overrides $display", NativeAnnouncementRules.eligible(display, 0, now, optedOut = true))
+            assertFalse("Opt-out persists beyond daily boundary", NativeAnnouncementRules.eligible(display, now, now + 86_400_000, optedOut = true))
+        }
+        assertTrue("Old automatic receipts are not opt-outs", NativeAnnouncementRules.eligible("once", now - 1000, now))
     }
 
     @Test fun explicitGithubAppTargetRequiresTheExactTrustedHost() {
