@@ -210,13 +210,3 @@ python tests/check_sync.py
 其他日历布局和手势参考项目、固定源码版本及取舍见 [DESIGN.md](DESIGN.md)。
 
 本项目使用 [MIT License](LICENSE)。
-
-## 支持这个项目
-
-[![爱发电](https://img.shields.io/badge/爱发电-支持作者-946ce6?style=flat-square)](https://afdian.com/a/oyishi)
-
-服务器、域名、证书、外部识别调用都是我自掏腰包在扛，站内没有广告，也不会拿你的课表作业数据换钱。
-
-如果它让你少迟到过一次、少错过一次作业，可以到 **[爱发电](https://afdian.com/a/oyishi)** 请我喝杯咖啡；不赞助也完全不影响使用，功能一点不少给。赞助的同学提需求，我会优先排期。
-
-> 入驻公告：https://github.com/csensicrigley-netizen/afdian
