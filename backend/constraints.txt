@@ -37,7 +37,7 @@ pydantic==2.14.1
 pydantic_core==2.50.1
 PyJWT==2.15.1
 PyOTP==2.10.0
-pypdf==6.21.3
+pypdf==6.21.4
 python-multipart==0.0.32
 qrcode==8.2
 referencing==0.37.0
