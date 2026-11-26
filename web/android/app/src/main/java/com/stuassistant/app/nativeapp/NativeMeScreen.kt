@@ -40,7 +40,6 @@ import com.kyant.shapes.Capsule
 import com.kyant.shapes.RoundedRectangle
 import com.stuassistant.app.glass.LocalLiquidGlassReducedMotion
 import com.stuassistant.app.glass.liquidGlassThemeProgress
-import java.net.URI
 import kotlin.math.roundToInt
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -48,7 +47,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
-/** Native counterpart of Me.tsx and FeedbackSettings.tsx with grouped overview and sub-panels. */
+/** Pure-local Me screen: local source management, appearance, privacy disclosure and local reset. */
 @Composable
 @OptIn(ExperimentalLayoutApi::class)
 fun NativeMeScreen(
@@ -65,30 +64,40 @@ fun NativeMeScreen(
     val toggleFeedback = nHapticFeedback("toggle")
     var busy by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
-    var confirmDelete by remember { mutableStateOf(false) }
+    var actionError by remember { mutableStateOf<String?>(null) }
+    var confirmReset by remember { mutableStateOf(false) }
     var panel by rememberSaveable { mutableStateOf("main") }
     var exportingToday by remember { mutableStateOf(false) }
     var exportTodayError by remember { mutableStateOf<String?>(null) }
     var todayFallbackTicket by remember { mutableStateOf<NativeTodayExportTicket?>(null) }
-    val signedIn = s.token != null && !s.preview
-    val bound = academicStrings(s.user?.optJSONArray("bound"))
-    val sourceNames = mapOf("public" to "学校官网通知", "jw" to "教务系统", "mystu" to "MySTU")
+
+    val bound = remember(s.boundSources, s.user) {
+        s.boundSources.ifEmpty { academicStrings(s.user?.optJSONArray("bound")).toSet() }
+    }
+    val sourceNames = mapOf(
+        "public" to "学校官网通知（公开）",
+        "jw" to "本部教务（本机直连）",
+        "mystu" to "MySTU（本机直连）",
+        "med" to "医学院教务（本机直连）",
+        "manual" to "手动导入课表（本机）",
+    )
+    val shortSourceNames = mapOf(
+        "jw" to "教务",
+        "mystu" to "MySTU",
+        "med" to "医学院",
+        "manual" to "手动课表",
+    )
     val sourceStates = mapOf(
         "ok" to "正常",
         "maintenance" to "学校系统暂不可达",
         "need_login" to "登录已过期",
         "failed" to "读取失败",
-        "keystore" to "服务器密钥异常",
         "running" to "正在同步",
         "never" to "还没同步过",
         "unknown" to "尚未同步",
     )
-    val hasTimetable = !s.sample && (s.timetable?.optJSONArray("courses")?.length() ?: 0) > 0
-    val connected: Boolean? = if (s.user?.has("bound") == true) {
-        bound.any { it == "jw" || it == "mystu" } || hasTimetable
-    } else {
-        null
-    }
+    val hasTimetable = !s.preview && !s.sample && (s.timetable?.optJSONArray("courses")?.length() ?: 0) > 0
+    val connected = !s.preview && (bound.any { it in setOf("jw", "mystu", "med", "manual") } || hasTimetable)
     val expired = s.sources.filter {
         it.optString("state") == "need_login" && it.optString("source") in bound
     }
@@ -97,13 +106,14 @@ fun NativeMeScreen(
         if (busy) return
         busy = true
         message = null
+        actionError = null
         scope.launch {
             try {
                 block()
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
-                message = if (error is NativeApiError) error.detail else error.message ?: "没有完成，请重试"
+                actionError = formatLocalError(error)
             } finally {
                 busy = false
             }
@@ -141,17 +151,18 @@ fun NativeMeScreen(
         when (panel) {
             "main" -> NativeMeOverview(
                 s = s,
-                signedIn = signedIn,
                 connected = connected,
                 hasTimetable = hasTimetable,
                 exportingToday = exportingToday,
                 exportTodayError = exportTodayError,
                 expiredCount = expired.size,
-                sourceNames = sourceNames,
+                shortSourceNames = shortSourceNames,
                 bound = bound,
                 busy = busy,
-                confirmDelete = confirmDelete,
-                onConfirmDelete = { confirmDelete = it },
+                statusMessage = message,
+                statusError = actionError,
+                confirmReset = confirmReset,
+                onConfirmReset = { confirmReset = it },
                 onConnect = onConnect,
                 onNavigate = onNavigate,
                 onOpenPanel = { panel = it },
@@ -169,52 +180,55 @@ fun NativeMeScreen(
                         } catch (e: CancellationException) {
                             throw e
                         } catch (e: Exception) {
-                            exportTodayError = when ((e as? NativeApiError)?.code) {
-                                "network", "timeout" -> "服务器没有及时响应，检查网络后再试。"
-                                "invalid_token", "token_revoked" -> "登录状态已失效，请重新登录。"
-                                "not_signed_in" -> "请先登录助手账号后再操作。"
-                                "no_timetable" -> "当前还没有可导出的课表，请先同步或手动导入课表。"
-                                "too_many_attempts" -> "操作太频繁了，请稍后再试。"
-                                else -> (e as? NativeApiError)?.detail?.ifEmpty { null } ?: e.message ?: "生成导入码失败，请重试。"
-                            }
+                            exportTodayError = formatLocalError(e)
                         } finally {
                             exportingToday = false
                         }
                     }
                 },
-                onLogout = { action { store.logout(); onSignOut() } },
-                onDeleteAccount = {
+                onExitPreview = {
                     action {
-                        store.deleteAccount()
-                        confirmDelete = false
+                        store.exitPreview()
+                        onSignOut()
+                    }
+                },
+                onClearCredentials = {
+                    action {
+                        store.clearCampusCredentials()
+                        message = "已清除本机保存的校园密码与登录会话，已缓存的课表和个人事项已保留。"
+                    }
+                },
+                onResetAll = {
+                    action {
+                        store.resetAllLocalData()
+                        confirmReset = false
                         onSignOut()
                     }
                 },
             )
 
             "sources" -> {
-                if (!signedIn) {
+                if (s.preview) {
                     NCard {
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            NIconBadge("person", sizeDp = 44, iconDp = 22, filled = true)
+                            NIconBadge("shield", sizeDp = 44, iconDp = 22, filled = true)
                             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                NText("登录后换成你自己的课表", 19, bold = true)
-                                NText("连接教务与 MySTU，实时跟进课程与死线", 13, muted = true, maxLines = 1, softWrap = false)
+                                NText("当前为示例模式", 19, bold = true)
+                                NText("无需注册账号，直接连接你自己的课表", 13, muted = true, maxLines = 1, softWrap = false)
                             }
                         }
-                        NText("现在看到的是一份虚构示例课表和示例作业、成绩。创建账号并连接校园账号后，课表、作业、考试和成绩都会换成你的。", 14, muted = true)
-                        NButton("登录 / 注册", onConnect, primary = true, modifier = Modifier.fillMaxWidth(), haptic = NativeButtonHaptic.Navigation)
+                        NText("现在看到的是一份虚构示例课表和作业。连接本部校园账号、医学院教务或手动导入后，全部数据将仅保存在你的这台手机里。", 14, muted = true)
+                        NButton("本地连接本部校园账号", onConnect, primary = true, modifier = Modifier.fillMaxWidth(), haptic = NativeButtonHaptic.Navigation)
                     }
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        MeSectionHeader("数据来源", "refresh")
+                        MeSectionHeader("其他课表来源", "refresh")
                         NativeMeTimetableSourceActions(onNavigate)
                     }
                 } else {
                     NCard {
-                        val email = s.user?.optString("email")?.takeIf { it.isNotBlank() }
                         Row(
                             Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically,
@@ -232,15 +246,7 @@ fun NativeMeScreen(
                                     ),
                                 contentAlignment = Alignment.Center,
                             ) {
-                                NText(
-                                    (email ?: "S").take(1).uppercase(),
-                                    22,
-                                    bold = true,
-                                    color = c.onBrand,
-                                    maxLines = 1,
-                                    softWrap = false,
-                                    align = TextAlign.Center,
-                                )
+                                NativeIcon("shield", c.onBrand, size = 24.dp, strokeWidth = 2.0f)
                             }
                             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                                 Row(
@@ -249,22 +255,21 @@ fun NativeMeScreen(
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
                                     Box(Modifier.weight(1f)) {
-                                        NText(email ?: "已登录", 17, bold = true, maxLines = 1, softWrap = false)
+                                        val identity = when {
+                                            s.schoolId.isNotBlank() -> "学号 ${s.schoolId}"
+                                            s.medName.isNotBlank() -> s.medName
+                                            s.medUsername.isNotBlank() -> "医学院 ${s.medUsername}"
+                                            else -> "纯本地模式"
+                                        }
+                                        NText(identity, 17, bold = true, maxLines = 1, softWrap = false)
                                     }
-                                    when (connected) {
-                                        true -> NTag("已连接", tones.leaf)
-                                        false -> NTag("待绑定", c.brand)
-                                        null -> Unit
-                                    }
+                                    NTag(if (connected) "本机直连" else "待连接", if (connected) tones.leaf else c.brand)
                                 }
-                                val accountStatus = when (connected) {
-                                    true -> "已绑定 ${bound.filter { it == "jw" || it == "mystu" }.joinToString("、") { sourceNames[it] ?: it }}"
-                                    false -> "还没有连接校园账号"
-                                    null -> "正在读取账号信息"
-                                }
-                                val host = runCatching { URI(s.server).host }.getOrNull() ?: s.server
+                                val boundLabels = listOf("jw", "mystu", "med", "manual")
+                                    .filter { it in bound }
+                                    .mapNotNull { shortSourceNames[it] }
                                 NText(
-                                    accountStatus + if (s.server.isNotEmpty()) " · $host" else "",
+                                    if (boundLabels.isNotEmpty()) "本机已连：${boundLabels.joinToString("、")}" else "尚未连接课表源 · 数据仅留在本机",
                                     13,
                                     muted = true,
                                     maxLines = 1,
@@ -273,24 +278,63 @@ fun NativeMeScreen(
                             }
                         }
                     }
-                    if (connected == false) {
-                        NativeMeConnectCard("连接校园账号", "读取你的课表、作业、考试和成绩", onConnect)
+
+                    if (s.availableTimetableSources.size > 1) {
+                        NCard {
+                            NText("当前显示的课表来源", 15, bold = true)
+                            NText("你同时保存了多份本地课表，可随时切换当前在「今天」和「课表」页展示的一份。", 13, muted = true)
+                            val options = s.availableTimetableSources.map { key ->
+                                key to (shortSourceNames[key] ?: key)
+                            }
+                            NChips(
+                                options = options,
+                                value = s.activeTimetableSource ?: s.availableTimetableSources.first(),
+                                onSelect = {
+                                    store.selectTimetableSource(it)
+                                    toggleFeedback()
+                                },
+                                haptic = "toggle",
+                            )
+                        }
+                    }
+
+                    if (!connected) {
+                        NativeMeConnectCard("本地连接本部校园账号", "直连学校官网读取课表、作业、考试和成绩", onConnect)
                     }
                     if (expired.isNotEmpty()) {
+                        val expiredSources = expired.map { it.optString("source") }
+                        val needCampus = expiredSources.any { it == "jw" || it == "mystu" }
+                        val needMed = "med" in expiredSources
                         NCard {
                             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                                 NIconBadge("info", tint = c.danger)
                                 Box(Modifier.weight(1f)) {
                                     NText(
-                                        "${expired.joinToString("、") { sourceNames[it.optString("source")] ?: it.optString("source") }}的学校登录已过期，请重新连接。",
+                                        "${expiredSources.joinToString("、") { shortSourceNames[it] ?: it }}的本机登录会话已过期，当前显示的是上次缓存，请重新连接。",
                                         14,
                                         bold = true,
                                     )
                                 }
                             }
-                            NButton("重新连接", onConnect, primary = true, haptic = NativeButtonHaptic.Navigation)
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                if (needCampus) {
+                                    NButton("重新连接本部账号", onConnect, primary = true, haptic = NativeButtonHaptic.Navigation)
+                                }
+                                if (needMed) {
+                                    NButton(
+                                        "重新连接医学院教务",
+                                        { onNavigate("medical") },
+                                        primary = !needCampus,
+                                        haptic = NativeButtonHaptic.Navigation,
+                                    )
+                                }
+                            }
                         }
                     }
+
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Row(
                             Modifier.fillMaxWidth(),
@@ -310,23 +354,28 @@ fun NativeMeScreen(
                                 onClick = {
                                     action {
                                         store.refresh("force")
-                                        message = "同步结束，下面是每个来源这次的结果。为了不打扰学校系统，同一来源一分钟内只同步一次。"
+                                        message = "本机直连同步已完成，下面是各个来源本次的状态。"
                                     }
                                 },
                                 haptic = NativeButtonHaptic.Submit,
                             )
                         }
-                        s.syncedAt?.let { NText("${AcademicClock.ago(it)}读取", 13, muted = true, tabularNums = true) }
+                        s.syncedAt?.let { NText("${AcademicClock.ago(it)}更新", 13, muted = true, tabularNums = true) }
                         message?.let { NText(it, 13, muted = true) }
-                        NError(s.error)
+                        NError(actionError ?: s.error)
                         NCard {
-                            val rows = s.sources
-                                .ifEmpty { listOf("public", "jw", "mystu").map { JSONObject().put("source", it).put("state", "never") } }
-                                .filter { it.optString("source") == "public" || it.optString("source") in bound }
+                            val watched = buildList {
+                                add("public")
+                                listOf("jw", "mystu", "med", "manual").forEach { if (it in bound) add(it) }
+                            }
+                            val bySource = s.sources.associateBy { it.optString("source") }
+                            val rows = watched.map { key ->
+                                bySource[key] ?: JSONObject().put("source", key).put("state", if (key == "manual") "ok" else "never")
+                            }
                             rows.forEachIndexed { index, source ->
                                 if (index > 0) NDivider()
                                 val stateCode = source.optString("state")
-                                val status = if (source.optBoolean("queued")) "排队中" else sourceStates[stateCode] ?: stateCode
+                                val status = sourceStates[stateCode] ?: stateCode
                                 val at = source.optDouble("at", Double.NaN)
                                 Row(
                                     Modifier.fillMaxWidth().heightIn(min = 48.dp),
@@ -335,7 +384,7 @@ fun NativeMeScreen(
                                 ) {
                                     val dotColor = when (stateCode) {
                                         "ok" -> tones.leaf
-                                        "need_login", "failed", "keystore" -> c.danger
+                                        "need_login", "failed" -> c.danger
                                         else -> c.muted
                                     }
                                     Box(Modifier.size(8.dp).background(dotColor, CircleShape))
@@ -352,7 +401,7 @@ fun NativeMeScreen(
                                         text = status + if (at.isFinite() && at > 0) " · ${AcademicClock.ago((at * 1000).toLong())}" else "",
                                         size = 13,
                                         muted = stateCode == "ok" || stateCode == "never" || stateCode == "unknown",
-                                        color = if (stateCode in setOf("need_login", "failed", "keystore")) c.danger else null,
+                                        color = if (stateCode in setOf("need_login", "failed")) c.danger else null,
                                         maxLines = 1,
                                         softWrap = false,
                                         tabularNums = true,
@@ -360,8 +409,8 @@ fun NativeMeScreen(
                                 }
                             }
                         }
-                        if (connected == true) {
-                            NativeMeConnectCard("重新连接校园账号", "教务或 MySTU 掉线时，重新登录一次就能接着读。", onConnect)
+                        if (connected) {
+                            NativeMeConnectCard("重新连接本部校园账号", "教务或 MySTU 掉线时，在本机直连重新登录即可。", onConnect)
                         }
                         if (s.rememberSchool) {
                             NCard {
@@ -371,7 +420,7 @@ fun NativeMeScreen(
                                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                                 ) {
                                     Box(Modifier.weight(1f)) {
-                                        NText("已在这台设备记住学校密码，教务过期会自动重连。", 13, muted = true)
+                                        NText("已在本机 Android Keystore 加密记住校园密码，会话过期时由本机直连重连，可随时清除。", 13, muted = true)
                                     }
                                     NButton(
                                         label = "清除",
@@ -381,6 +430,7 @@ fun NativeMeScreen(
                                                 if (store.state.value.rememberSchool) {
                                                     throw NativeApiError("secure_storage", 0, store.state.value.error ?: "本机学校密码未能清除")
                                                 }
+                                                message = "已清除本机保存的校园密码。"
                                             }
                                         },
                                         enabled = !busy,
@@ -482,20 +532,26 @@ fun NativeMeScreen(
                 MeSectionHeader("隐私", "shield")
                 NCard {
                     NRow(
-                        title = "学校凭据与会话",
-                        subtitle = "连接资料交给你选择的服务器，服务器会保存学校凭据及会话用于续连。本机“记住”仅控制本机加密副本。",
+                        title = "本机加密存储与备份边界",
+                        subtitle = "学号、可选记住的校园密码、教务/MySTU/医学院业务会话、课表、成绩、作业与个人事项仅通过 Android Keystore AES-256-GCM 加密保存在本机私有目录；已禁用系统云备份（allowBackup=false）；中央统一认证（SSO）Cookie 仅在登录瞬间驻留内存，用后即清且不落盘。",
                         leadingIcon = "shield",
                     )
                     NDivider()
                     NRow(
-                        title = "只读，不代办",
-                        subtitle = "不提交作业、不签到、不缴费、不报修。学校作业勾选完成只记在这台设备上。",
-                        leadingIcon = "check",
+                        title = "直连学校官方域名",
+                        subtitle = "个人课表与学业数据均由本机直接请求学校域名：https://sso.stu.edu.cn、http://jw.stu.edu.cn、https://my.stu.edu.cn、https://sso.med.stu.edu.cn、https://jwgl.med.stu.edu.cn。因本部教务 CAS 回调固定使用 HTTP，网络配置仅对 jw.stu.edu.cn 单域放行明文（不含子域），Cookie 按域严格隔离，密码仅经 HTTPS 提交。",
+                        leadingIcon = "campus",
                     )
                     NDivider()
                     NRow(
-                        title = "随时删除",
-                        subtitle = "删除账号会清空服务器上你的会话和缓存数据。",
+                        title = "发往 stu.oyishi.asia 的公开请求",
+                        subtitle = "向 stu.oyishi.asia 仅发送不带身份凭据的公开请求：公开通知、校园公交、充电桩、应用公告与版本更新检查。仅在你主动点击「导入到 today」时，通过公开导出接口临时中转剥离个人身份信息的课表快照（5 分钟失效、单次消费）。",
+                        leadingIcon = "info",
+                    )
+                    NDivider()
+                    NRow(
+                        title = "只读边界与本地清理",
+                        subtitle = "应用保持只读，不提交作业、不签到、不选课、不缴费。可随时在「我的」中清除校园凭据或重置本机全部数据；学校认证服务器侧仍会按校方策略留存正常登录日志。",
                         leadingIcon = "trash",
                     )
                 }
@@ -508,7 +564,7 @@ fun NativeMeScreen(
                     NText("教务处 2026–2027 学年教学校历（2026-05-20 发布）", 13, muted = true)
                     NDivider()
                     NOpenLink("学校数据读取", "https://github.com/0error0warning/stu-mcp")
-                    NText("开源 stu-mcp v0.7.3，MIT 许可", 13, muted = true)
+                    NText("参考开源 stu-mcp v0.7.3 协议，MIT 许可", 13, muted = true)
                 }
                 NText("个人项目，与学校官方无关。学校原文和通知始终优先。", 13, muted = true)
             }
@@ -523,33 +579,41 @@ fun NativeMeScreen(
 @OptIn(ExperimentalLayoutApi::class)
 private fun NativeMeOverview(
     s: NativeState,
-    signedIn: Boolean,
-    connected: Boolean?,
+    connected: Boolean,
     hasTimetable: Boolean,
     exportingToday: Boolean,
     exportTodayError: String?,
     expiredCount: Int,
-    sourceNames: Map<String, String>,
-    bound: List<String>,
+    shortSourceNames: Map<String, String>,
+    bound: Set<String>,
     busy: Boolean,
-    confirmDelete: Boolean,
-    onConfirmDelete: (Boolean) -> Unit,
+    statusMessage: String?,
+    statusError: String?,
+    confirmReset: Boolean,
+    onConfirmReset: (Boolean) -> Unit,
     onConnect: () -> Unit,
     onNavigate: (String) -> Unit,
     onOpenPanel: (String) -> Unit,
     onExportToday: () -> Unit,
-    onLogout: () -> Unit,
-    onDeleteAccount: () -> Unit,
+    onExitPreview: () -> Unit,
+    onClearCredentials: () -> Unit,
+    onResetAll: () -> Unit,
 ) {
     val c = LocalNativeColors.current
     val tones = currentNativeSemanticTones()
-    val email = s.user?.optString("email")?.takeIf { it.isNotBlank() }
+    val boundLabels = listOf("jw", "mystu", "med", "manual").filter { it in bound }.mapNotNull { shortSourceNames[it] }
+    val headline = when {
+        s.preview -> "体验模式 · 示例数据"
+        s.schoolId.isNotBlank() -> "学号 ${s.schoolId}"
+        s.medName.isNotBlank() -> s.medName
+        s.medUsername.isNotBlank() -> "医学院 ${s.medUsername}"
+        else -> "纯本地模式"
+    }
     val statusText = when {
-        !signedIn -> "未登录 · 示例数据"
-        expiredCount > 0 -> "登录已过期，点击重连"
-        connected == true -> "已绑定 ${bound.filter { it == "jw" || it == "mystu" }.joinToString("、") { sourceNames[it] ?: it }}"
-        connected == false -> "未绑定校园账号"
-        else -> "正在读取状态"
+        s.preview -> "免注册登录 · 点击连接你自己的课表"
+        expiredCount > 0 -> "本机校园会话已过期，点击重连"
+        boundLabels.isNotEmpty() -> "纯本地模式 · 数据仅留在本机 · 已连 ${boundLabels.joinToString(" / ")}"
+        else -> "纯本地模式 · 数据仅留在本机"
     }
 
     val profileInteraction = remember { MutableInteractionSource() }
@@ -567,7 +631,7 @@ private fun NativeMeOverview(
                 indication = null,
                 role = Role.Button,
             ) {
-                if (!signedIn || connected == false || expiredCount > 0) {
+                if (s.preview || (!connected && expiredCount == 0)) {
                     onConnect()
                 } else {
                     onOpenPanel("sources")
@@ -594,36 +658,23 @@ private fun NativeMeOverview(
                 ),
             contentAlignment = Alignment.Center,
         ) {
-            if (signedIn && email != null) {
-                NText(
-                    email.take(1).uppercase(),
-                    28,
-                    bold = true,
-                    color = c.onBrand,
-                    align = TextAlign.Center,
-                )
-            } else {
-                NativeIcon("person", c.onBrand, size = 30.dp, strokeWidth = 2.0f)
-            }
+            NativeIcon(if (s.preview) "person" else "shield", c.onBrand, size = 30.dp, strokeWidth = 2.0f)
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             NText(
-                text = if (signedIn) (email ?: "我的账号") else "连接我的校园",
+                text = headline,
                 size = 20,
                 bold = true,
                 maxLines = 1,
                 softWrap = false,
             )
-            NText(statusText, 13, muted = true, maxLines = 1, softWrap = false)
+            NText(statusText, 13, muted = true, maxLines = 2)
         }
-        if (!signedIn) {
-            NTag("去登录", c.brand, filled = true)
-        } else if (expiredCount > 0) {
-            NTag("需重连", c.danger)
-        } else if (connected == true) {
-            NTag("已连接", tones.leaf)
-        } else {
-            NativeIcon("chevron-right", c.muted, size = 18.dp)
+        when {
+            s.preview -> NTag("连接", c.brand, filled = true)
+            expiredCount > 0 -> NTag("需重连", c.danger)
+            connected -> NTag("纯本地", tones.leaf)
+            else -> NativeIcon("chevron-right", c.muted, size = 18.dp)
         }
     }
 
@@ -640,10 +691,10 @@ private fun NativeMeOverview(
         NCard {
             NRow(
                 title = "课表与账号",
-                subtitle = if (signedIn) {
-                    s.syncedAt?.let { "${AcademicClock.ago(it)}同步" } ?: "同步状态与绑定设置"
+                subtitle = if (connected) {
+                    s.syncedAt?.let { "${AcademicClock.ago(it)}本机同步" } ?: "管理本地课表源与直连状态"
                 } else {
-                    "连接教务与 MySTU 自动同步"
+                    "本机直连教务与 MySTU，数据仅留本机"
                 },
                 leadingIcon = "refresh",
                 onClick = { onOpenPanel("sources") },
@@ -651,22 +702,22 @@ private fun NativeMeOverview(
             NDivider()
             NRow(
                 title = "手动导入课表",
-                subtitle = "粘贴文字、导入 CSV 或逐条添加",
+                subtitle = "离线粘贴文字、导入 CSV 或逐条添加",
                 leadingIcon = "spark",
                 onClick = { onNavigate("import") },
             )
             NDivider()
             NRow(
                 title = "医学院教务",
-                subtitle = "用医学院账号同步课表与考试",
+                subtitle = "本机直连医学院教务同步课表",
                 leadingIcon = "shield",
                 onClick = { onNavigate("medical") },
             )
-            if (signedIn && hasTimetable) {
+            if (hasTimetable) {
                 NDivider()
                 NRow(
                     title = if (exportingToday) "正在生成 today 导入码…" else "导入到 today",
-                    subtitle = "一键同步当前课表到 today 安排表",
+                    subtitle = "发送脱敏课表换取 5 分钟一次性导入码（不含账号）",
                     leadingIcon = "external",
                     onClick = onExportToday,
                 )
@@ -687,33 +738,45 @@ private fun NativeMeOverview(
             NDivider()
             NRow(
                 title = "关于 STU 助手",
-                subtitle = "版本更新 · 反馈群 · 隐私与数据依据",
+                subtitle = "版本更新 · 反馈群 · 隐私与数据说明",
                 leadingIcon = "info",
                 onClick = { onOpenPanel("about") },
             )
         }
     }
 
-    if (signedIn) {
+    statusMessage?.let { NText(it, 13, muted = true) }
+    NError(statusError)
+
+    if (s.preview) {
+        NButton(
+            label = "退出示例，进入纯本地模式",
+            onClick = onExitPreview,
+            enabled = !busy,
+            primary = true,
+            modifier = Modifier.fillMaxWidth(),
+            haptic = NativeButtonHaptic.Navigation,
+        )
+    } else {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             NButton(
-                label = "退出登录",
-                onClick = onLogout,
+                label = "清除校园登录凭据",
+                onClick = onClearCredentials,
                 enabled = !busy,
                 modifier = Modifier.fillMaxWidth(),
                 haptic = NativeButtonHaptic.Destructive,
             )
-            if (confirmDelete) {
+            if (confirmReset) {
                 NCard {
-                    NText("删除后服务器上的会话、课表和缓存会被清空，无法恢复。", 14, bold = true)
+                    NText("将彻底清空本机保存的课表、作业、考试、成绩、个人事项、计划与校园登录凭据，且无法恢复。", 14, bold = true)
                     FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         CompositionLocalProvider(LocalNativeColors provides c.copy(brand = c.danger)) {
                             NButton(
-                                label = if (busy) "正在删除…" else "确认删除",
-                                onClick = onDeleteAccount,
+                                label = if (busy) "正在重置…" else "确认重置",
+                                onClick = onResetAll,
                                 enabled = !busy,
                                 primary = true,
                                 haptic = NativeButtonHaptic.Destructive,
@@ -721,7 +784,7 @@ private fun NativeMeOverview(
                         }
                         NButton(
                             label = "取消",
-                            onClick = { onConfirmDelete(false) },
+                            onClick = { onConfirmReset(false) },
                             enabled = !busy,
                             haptic = NativeButtonHaptic.Utility,
                         )
@@ -730,8 +793,8 @@ private fun NativeMeOverview(
             } else {
                 CompositionLocalProvider(LocalNativeColors provides c.copy(ink = c.danger)) {
                     NButton(
-                        label = "删除账号和数据",
-                        onClick = { onConfirmDelete(true) },
+                        label = "重置本机全部数据",
+                        onClick = { onConfirmReset(true) },
                         enabled = !busy,
                         modifier = Modifier.fillMaxWidth(),
                         haptic = NativeButtonHaptic.Utility,
@@ -759,14 +822,14 @@ internal fun MeSectionHeader(title: String, icon: String? = null) {
 @Composable
 private fun NativeMeTimetableSourceActions(onNavigate: (String) -> Unit) {
     NativeMeConnectCard(
-        title = "用医学院教务账号自动同步",
-        subtitle = "连一次，课表成绩考试都自己来；密码只用一次，不保存",
+        title = "用医学院教务账号本机直连同步",
+        subtitle = "本机直连医学院教务读取课表；密码仅直连校方，不上传服务器",
         icon = "shield",
         onClick = { onNavigate("medical") },
     )
     NativeMeConnectCard(
-        title = "手动导入课表",
-        subtitle = "不想连账号，或者那边密码改过：粘文字、导 CSV 或一条条加",
+        title = "手动导入课表（完全离线）",
+        subtitle = "不用连账号：粘文字、导 CSV 或一条条加，全部存在本机",
         icon = "spark",
         onClick = { onNavigate("import") },
     )

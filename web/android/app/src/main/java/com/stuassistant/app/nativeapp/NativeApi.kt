@@ -26,9 +26,18 @@ import kotlinx.coroutines.withTimeout
 import org.json.JSONArray
 import org.json.JSONObject
 
-internal data class NativeSession(val server: String, val token: String?, val generation: Long)
+/** Public-only session anchor. Carries zero auth credentials by design. */
+internal data class NativeSession(val server: String, val generation: Long = 0L)
 
-/** HTTP only. The store owns account changes, authentication expiry and cache isolation. */
+/**
+ * Strictly public-only HTTP client for `stu.oyishi.asia`.
+ *
+ * Security boundary:
+ * - Enforces a compile-time & runtime path + HTTP method allowlist limited exclusively to
+ *   anonymous public campus data, announcements, version checks, and explicit anonymous
+ *   timetable export tickets.
+ * - Never attaches an `Authorization` header or forwards user credentials/tokens.
+ */
 internal class NativeApi {
     private data class Response(val status: Int, val text: String)
 
@@ -41,9 +50,8 @@ internal class NativeApi {
         path: String,
         method: String = "GET",
         body: JSONObject? = null,
-        auth: Boolean = true,
     ): JSONObject {
-        val response = exchange(session, path, method, body, auth, "application/json")
+        val response = exchange(session, path, method, body, "application/json")
         if (response.status !in 200..299) throw httpError(response)
         return try {
             parseObject(response.text)
@@ -53,12 +61,6 @@ internal class NativeApi {
         } catch (_: Exception) {
             throw NativeApiError("invalid_json", response.status, "服务器返回的 JSON 数据无效。")
         }
-    }
-
-    suspend fun requestText(session: NativeSession, path: String): String {
-        val response = exchange(session, path, "GET", null, true, "text/csv")
-        if (response.status !in 200..299) throw httpError(response)
-        return response.text
     }
 
     fun close() {
@@ -74,31 +76,26 @@ internal class NativeApi {
         path: String,
         method: String,
         body: JSONObject?,
-        auth: Boolean,
         accept: String,
     ): Response {
         val base = normalizeServer(session.server)
         if (base.isEmpty()) throw NativeApiError("server_required")
-        val route = validatePath(path)
         val verb = method.uppercase(Locale.ROOT)
-        if (verb !in METHODS || (verb == "GET" && body != null)) {
+        val route = validatePublicRoute(verb, path)
+        if (verb == "GET" && body != null) {
             throw NativeApiError("invalid_method")
         }
         val encodedBody = body?.toString()?.toByteArray(Charsets.UTF_8)
         if (encodedBody != null && encodedBody.size > MAX_REQUEST_BYTES) {
             throw NativeApiError("request_too_large")
         }
-        val token = session.token?.takeIf { auth && it.isNotBlank() }
-        if (token != null && token.any { it <= '\u0020' || it == '\u007f' }) {
-            throw NativeApiError("invalid_token")
-        }
         val url = URL(base + path)
         val timeout = timeoutFor(route)
-        // Retry transport failures for reads only. HTTP errors and mutations are single-attempt.
+        // Retry transport failures for idempotent public reads only.
         for (attempt in 0..if (verb == "GET") 1 else 0) {
             currentCoroutineContext().ensureActive()
             try {
-                return perform(url, verb, encodedBody, token, accept, timeout)
+                return perform(url, verb, encodedBody, accept, timeout)
             } catch (error: CancellationException) {
                 throw error
             } catch (error: NativeApiError) {
@@ -113,12 +110,10 @@ internal class NativeApi {
         url: URL,
         method: String,
         body: ByteArray?,
-        token: String?,
         accept: String,
         timeoutMs: Long,
     ): Response {
         try {
-            // This bounds the complete body, including a peer that keeps sending tiny chunks.
             return withTimeout(timeoutMs) {
                 withContext(Dispatchers.IO) {
                     currentCoroutineContext().ensureActive()
@@ -129,7 +124,6 @@ internal class NativeApi {
                     }
                     try {
                         suspendCancellableCoroutine { continuation ->
-                            // Unlike a coroutine check between reads, disconnect also unblocks a pending read.
                             continuation.invokeOnCancellation { disconnectAsync(connection) }
                             try {
                                 if (!continuation.isActive) return@suspendCancellableCoroutine
@@ -140,11 +134,9 @@ internal class NativeApi {
                                 connection.readTimeout = timeoutMs.toInt()
                                 connection.setRequestProperty("Accept", accept)
                                 connection.setRequestProperty("Accept-Encoding", "identity")
-                                if (token != null) connection.setRequestProperty("Authorization", "Bearer $token")
                                 if (method != "GET") {
                                     connection.doOutput = true
                                     if (body != null) connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
-                                    // Streaming mode also prevents replaying a buffered mutation after a connection failure.
                                     connection.setFixedLengthStreamingMode(body?.size ?: 0)
                                     connection.outputStream.use { if (body != null) it.write(body) }
                                 }
@@ -191,7 +183,6 @@ internal class NativeApi {
                 }
             }
         } catch (error: TimeoutCancellationException) {
-            // An outer caller's cancellation must remain cancellation, not become a retryable timeout.
             currentCoroutineContext().ensureActive()
             throw NativeApiError("timeout")
         } catch (error: CancellationException) {
@@ -202,8 +193,11 @@ internal class NativeApi {
     private fun httpError(response: Response): NativeApiError {
         val payload = try { parseObject(response.text) } catch (_: Exception) { null }
         payload?.optJSONObject("error")?.let { error ->
-            return NativeApiError(error.optString("code", "http_${response.status}"), response.status,
-                error.optString("message", "请求未完成"))
+            return NativeApiError(
+                error.optString("code", "http_${response.status}"),
+                response.status,
+                error.optString("message", "请求未完成"),
+            )
         }
         val rawDetail = payload?.opt("detail")?.takeUnless { it === JSONObject.NULL }
         val code = when (rawDetail) {
@@ -219,8 +213,6 @@ internal class NativeApi {
 
     private fun parseObject(text: String): JSONObject? {
         val source = text.removePrefix("\uFEFF")
-        // Android's JSONObject parser accepts non-JSON syntax such as unquoted keys.
-        // Validate strictly first, including the end of the response, before constructing the object.
         JsonReader(StringReader(source)).use { parser ->
             parser.isLenient = false
             val objectRoot = parser.peek() == JsonToken.BEGIN_OBJECT
@@ -231,32 +223,8 @@ internal class NativeApi {
         return JSONObject(source)
     }
 
-    private fun validatePath(path: String): String {
-        try {
-            val uri = URI(path)
-            val decoded = uri.path ?: throw NativeApiError("invalid_path")
-            val calendar = path == "/api/calendar/v2/mobile/parse"
-            if ((!calendar && !path.startsWith("/v1/")) || uri.isAbsolute || uri.rawAuthority != null ||
-                uri.rawFragment != null || (!calendar && !decoded.startsWith("/v1/")) ||
-                path.any { it <= '\u0020' || it == '\u007f' || it == '\\' } ||
-                decoded.any { it <= '\u001f' || it == '\u007f' || it == '\\' } ||
-                decoded.split('/').any { it == "." || it == ".." }
-            ) throw NativeApiError("invalid_path")
-            return decoded
-        } catch (error: NativeApiError) {
-            throw error
-        } catch (_: Exception) {
-            throw NativeApiError("invalid_path")
-        }
-    }
-
-    private fun timeoutFor(path: String): Long = when {
-        path == "/api/calendar/v2/mobile/parse" -> 90_000L
-        path.startsWith("/v1/auth/") -> 45_000L
-        path == "/v1/relogin" -> 60_000L
-        path.startsWith("/v1/timetable") -> 40_000L
-        path.startsWith("/v1/export/") -> 30_000L
-        path == "/v1/feed" || path == "/v1/grades" -> 30_000L
+    private fun timeoutFor(path: String): Long = when (path) {
+        "/v1/public/export/today" -> 30_000L
         else -> 15_000L
     }
 
@@ -265,15 +233,61 @@ internal class NativeApi {
     }
 
     private fun disconnectAsync(connection: HttpURLConnection) {
-        // Cancellation and ViewModel.close() can originate on the main thread.
         Dispatchers.IO.dispatch(EmptyCoroutineContext, Runnable { disconnect(connection) })
     }
 
     companion object {
-        private const val MAX_REQUEST_BYTES = 1 * 1024 * 1024
+        private const val MAX_REQUEST_BYTES = 128 * 1024
         private const val MAX_RESPONSE_BYTES = 8L * 1024 * 1024
-        private val METHODS = setOf("GET", "POST", "PUT", "PATCH", "DELETE")
         private val RETRYABLE = setOf("network", "timeout")
+
+        internal val PUBLIC_GET_PATHS = setOf(
+            "/v1/public/notices",
+            "/v1/public/bus",
+            "/v1/public/charging",
+            "/v1/announcements",
+            "/v1/meta/version",
+        )
+        internal val PUBLIC_POST_PATHS = setOf(
+            "/v1/public/export/today",
+        )
+
+        /**
+         * Hard allowlist enforced before any outbound request to the public API server.
+         * Any private, account, bind, relogin, med, webvpn, academic, plan, or external parse
+         * route fails immediately with `blocked_non_public_route`.
+         */
+        internal fun validatePublicRoute(method: String, path: String): String {
+            val decoded = validatePath(path)
+            val verb = method.uppercase(Locale.ROOT)
+            val allowed = when (verb) {
+                "GET" -> decoded in PUBLIC_GET_PATHS
+                "POST" -> decoded in PUBLIC_POST_PATHS
+                else -> false
+            }
+            if (!allowed) {
+                throw NativeApiError("blocked_non_public_route", 403, "纯本地隐私模式已拦截非公开服务端请求")
+            }
+            return decoded
+        }
+
+        private fun validatePath(path: String): String {
+            try {
+                val uri = URI(path)
+                val decoded = uri.path ?: throw NativeApiError("invalid_path")
+                if (!path.startsWith("/") || uri.isAbsolute || uri.rawAuthority != null ||
+                    uri.rawFragment != null || !decoded.startsWith("/") ||
+                    path.any { it <= '\u0020' || it == '\u007f' || it == '\\' } ||
+                    decoded.any { it <= '\u001f' || it == '\u007f' || it == '\\' } ||
+                    decoded.split('/').any { it == "." || it == ".." }
+                ) throw NativeApiError("invalid_path")
+                return decoded
+            } catch (error: NativeApiError) {
+                throw error
+            } catch (_: Exception) {
+                throw NativeApiError("invalid_path")
+            }
+        }
 
         fun normalizeServer(raw: String): String {
             val value = raw.trim()
@@ -288,7 +302,6 @@ internal class NativeApi {
                 val url = URL(value)
                 if (url.userInfo != null || url.host.isNullOrEmpty()) throw NativeApiError("invalid_server")
                 val host = if (url.host.startsWith("[")) {
-                    // URI/URL validate the IPv6 literal; retain its brackets for reconstruction.
                     if (uri.host == null || '%' in url.host) throw NativeApiError("invalid_server")
                     url.host.lowercase(Locale.ROOT)
                 } else {

@@ -61,6 +61,10 @@ class Settings:
     demo: bool = field(default_factory=lambda: _bool("STU_APP_DEMO", False))
 
     @property
+    def data_dir(self) -> Path:
+        return self.root
+
+    @property
     def tenants(self) -> Path:
         return self.root / "tenants"
 

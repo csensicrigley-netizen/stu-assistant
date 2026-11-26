@@ -205,13 +205,6 @@ def _finish(user_id: str, p: _Pending) -> dict:
     with tenant_scope(user_id) as tenant:
         vault = tenant.vault()
         vault.save("webvpn", state)
-        try:
-            p_store = vault.key_store
-            if callable(p_store):
-                p_store = p_store()
-            p_store.set_password("webvpn", p.user.strip(), p.password)
-        except Exception:  # noqa: BLE001 - 存不进去不影响本次登录
-            pass
     with _lock:
         _pending.pop(user_id, None)
     p.close()
@@ -246,11 +239,13 @@ def submit_captcha(user_id: str, token: str, captcha: str) -> dict:
         raise WrongCaptcha(f"学校没接受这次登录（错误码 {error}），检查学号、密码和验证码")
     service = reply.get("NextService", "")
     if not service and error in {1, 20021}:
+        p.password = ""
         p.sid = reply.get("TwfID") or p.sid
         return _finish(user_id, p)
     if service == "auth/token" and reply.get("NextServiceSubType") == "totp":
         if reply.get("TotpStatus") != "Bind":
             raise WrongCaptcha("这个账号还没按学校流程绑定令牌，先在学校页面绑好再来")
+        p.password = ""
         p.sid = reply.get("TwfID") or p.sid
         return {"ok": False, "need": "totp", "token": p.token,
                 "hint": "打开令牌 App，把当前的六位动态码填进来"}

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 import time
 import uuid
@@ -9,9 +10,14 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Iterator
 
+from cryptography.fernet import Fernet, InvalidToken
+
+_MED_TOKEN_PREFIX = "enc:"
+
 SCHEMA = """
 PRAGMA journal_mode=WAL;
 PRAGMA foreign_keys=ON;
+PRAGMA secure_delete=ON;
 
 CREATE TABLE IF NOT EXISTS users (
   id            TEXT PRIMARY KEY,
@@ -158,9 +164,16 @@ def now() -> float:
 
 
 class DB:
-    def __init__(self, path: Path | str):
+    def __init__(self, path: Path | str, *, med_key_path: Path | str | None = None):
         self.path = str(path)
-        Path(self.path).parent.mkdir(parents=True, exist_ok=True)
+        if self.path != ":memory:":
+            Path(self.path).parent.mkdir(parents=True, exist_ok=True)
+            self.med_key_path: Path | None = (
+                Path(med_key_path) if med_key_path is not None else Path(self.path).parent / ".med_token.key"
+            )
+        else:
+            self.med_key_path = Path(med_key_path) if med_key_path is not None else None
+        self._ephemeral_med_fernet: Fernet | None = None
         with self.conn() as c:
             c.executescript(SCHEMA)
             self._migrate(c)
@@ -187,8 +200,9 @@ class DB:
     def conn(self) -> Iterator[sqlite3.Connection]:
         c = sqlite3.connect(self.path, timeout=30)
         c.row_factory = sqlite3.Row
-        # 外键开关按连接生效；不能只在建表连接上开启。
+        # 外键开关与安全擦除按连接生效；不能只在建表连接上开启。
         c.execute("PRAGMA foreign_keys=ON")
+        c.execute("PRAGMA secure_delete=ON")
         try:
             yield c
             c.commit()
@@ -522,7 +536,55 @@ class DB:
             )
             return cur.rowcount > 0
 
-    # ---------- 医学院教务会话（只有 token，没有密码） ----------
+    # ---------- 医学院教务会话（只有加密后的会话 token，没有密码） ----------
+
+    def _med_fernet(self, *, create: bool) -> Fernet | None:
+        if self.med_key_path is None:
+            if self._ephemeral_med_fernet is None:
+                if not create:
+                    return None
+                self._ephemeral_med_fernet = Fernet(Fernet.generate_key())
+            return self._ephemeral_med_fernet
+        key_path = self.med_key_path
+        if key_path.is_symlink():
+            raise RuntimeError("med_token_key_is_symlink")
+        if key_path.is_file():
+            return Fernet(key_path.read_bytes().strip())
+        if not create:
+            return None
+        key_path.parent.mkdir(parents=True, exist_ok=True)
+        key_bytes = Fernet.generate_key()
+        try:
+            fd = os.open(str(key_path), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            with os.fdopen(fd, "wb") as fh:
+                fh.write(key_bytes)
+                fh.flush()
+            if os.name != "nt":
+                os.chmod(key_path, 0o600)
+        except FileExistsError:
+            key_bytes = key_path.read_bytes().strip()
+        return Fernet(key_bytes)
+
+    def _encrypt_med_token(self, token: str) -> str:
+        if not token:
+            return ""
+        cipher = self._med_fernet(create=True)
+        assert cipher is not None
+        return _MED_TOKEN_PREFIX + cipher.encrypt(token.encode("utf-8")).decode("ascii")
+
+    def _decrypt_med_token(self, stored: str) -> str | None:
+        if not stored:
+            return ""
+        if not stored.startswith(_MED_TOKEN_PREFIX):
+            # 向后兼容历史明文行
+            return stored
+        cipher = self._med_fernet(create=False)
+        if cipher is None:
+            return None
+        try:
+            return cipher.decrypt(stored[len(_MED_TOKEN_PREFIX):].encode("ascii")).decode("utf-8")
+        except (InvalidToken, ValueError, UnicodeError):
+            return None
 
     def med_session_get(self, uid: str) -> dict | None:
         with self.conn() as c:
@@ -531,22 +593,26 @@ class DB:
             ).fetchone()
         if row is None:
             return None
+        token = self._decrypt_med_token(row["token"])
+        if token is None:
+            return None
         return {
             "username": row["username"],
             "name": row["name"],
-            "token": row["token"],
+            "token": token,
             "updated_at": row["updated_at"],
         }
 
     def med_session_save(self, uid: str, *, username: str, name: str, token: str) -> None:
         ts = now()
+        stored_token = self._encrypt_med_token(token)
         with self.conn() as c:
             c.execute(
                 "INSERT INTO med_sessions(user_id, username, name, token, updated_at) "
                 "VALUES(?,?,?,?,?) "
                 "ON CONFLICT(user_id) DO UPDATE SET username=excluded.username, "
                 "name=excluded.name, token=excluded.token, updated_at=excluded.updated_at",
-                (uid, username, name, token, ts),
+                (uid, username, name, stored_token, ts),
             )
 
     def med_session_delete(self, uid: str) -> bool:

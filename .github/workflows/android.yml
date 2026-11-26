@@ -1,4 +1,4 @@
-name: Android source checks
+name: CI and Android source checks
 
 on:
   pull_request:
@@ -10,11 +10,126 @@ permissions:
   contents: read
 
 concurrency:
-  group: android-${{ github.ref }}
+  group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  version-and-deploy-checks:
+    name: Version consistency and deploy scripts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check version consistency and deploy tests
+        run: |
+          python3 deploy/sync-version.py
+          python3 -m unittest discover -s deploy/tests -v
+      - name: Verify Linux deployment files use LF line endings
+        run: |
+          python3 - <<'PY'
+          import pathlib, sys
+          targets = [
+              pathlib.Path("deploy/stu-backup.sh"),
+              pathlib.Path("deploy/stu-assistant.service"),
+              pathlib.Path("deploy/install.sh"),
+              pathlib.Path("deploy/nginx/stu-headers.conf"),
+          ]
+          bad = [str(p) for p in targets if p.exists() and b"\r\n" in p.read_bytes()]
+          if bad:
+              print("CRLF detected in Linux deployment files:", ", ".join(bad), file=sys.stderr)
+              sys.exit(1)
+          print(f"Verified LF line endings for {len(targets)} Linux deployment files.")
+          PY
+
+  backend-tests:
+    name: Backend compile and pytest
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install backend dependencies and pytest
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -c backend/constraints.txt -r backend/requirements.txt backend/wheels/stu_mcp-0.7.3-py3-none-any.whl pytest
+      - name: Bytecode-compile backend modules
+        run: python -m py_compile backend/app/*.py backend/app/push/*.py
+      - name: Run backend security and regression test suite
+        run: |
+          python -m pytest \
+            backend/tests/test_public_endpoints.py \
+            backend/tests/test_zero_password_persistence.py \
+            backend/tests/test_today_export.py \
+            backend/tests/test_announcements.py \
+            backend/tests/test_account_cleanup.py \
+            backend/tests/test_med_regressions.py \
+            backend/tests/test_push.py -v
+
+  web-checks:
+    name: Web typecheck, tests, build and CSP hash
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install, typecheck, test and build web app
+        working-directory: web
+        run: |
+          npm ci --no-audit --no-fund
+          npm run typecheck
+          npm test
+          npm run build
+      - name: Verify inline script CSP SHA-256 hash matches Nginx headers
+        run: |
+          python3 - <<'PY'
+          import base64, hashlib, pathlib, re, sys
+
+          html_path = pathlib.Path("web/dist/index.html")
+          nginx_path = pathlib.Path("deploy/nginx/stu-headers.conf")
+
+          html = html_path.read_text(encoding="utf-8").replace("\r\n", "\n")
+          inline_scripts = re.findall(r"<script(?:\s+[^>]*)?>([\s\S]*?)</script>", html, flags=re.IGNORECASE)
+          # Exclude external <script src="..."> tags (their body is empty).
+          inline_bodies = [body for body in inline_scripts if body.strip()]
+          if len(inline_bodies) != 1:
+              print(f"Expected exactly 1 inline <script> in {html_path}, found {len(inline_bodies)}", file=sys.stderr)
+              sys.exit(1)
+
+          actual_hash = "sha256-" + base64.b64encode(
+              hashlib.sha256(inline_bodies[0].encode("utf-8")).digest()
+          ).decode("ascii")
+
+          nginx_conf = nginx_path.read_text(encoding="utf-8")
+          m = re.search(r"script-src\s+[^;]*'(sha256-[A-Za-z0-9+/=]+)'", nginx_conf)
+          if not m:
+              print(f"Could not find script-src sha256 hash in {nginx_path}", file=sys.stderr)
+              sys.exit(1)
+          expected_hash = m.group(1)
+
+          if actual_hash != expected_hash:
+              print(
+                  f"CSP inline script hash mismatch!\n"
+                  f"  web/dist/index.html:         {actual_hash}\n"
+                  f"  deploy/nginx/stu-headers.conf: {expected_hash}",
+                  file=sys.stderr,
+              )
+              sys.exit(1)
+          print(f"CSP inline script hash verified: {actual_hash}")
+          PY
+
   build-and-test:
+    name: Android zero-upload guard, build, test and lint
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -33,6 +148,160 @@ jobs:
         run: |
           python3 deploy/sync-version.py
           python3 -m unittest discover -s deploy/tests -v
+      - name: Android zero-upload and TLS static regression guard
+        run: |
+          python3 - <<'PY'
+          import pathlib, re, sys
+          import xml.etree.ElementTree as ET
+
+          java_root = pathlib.Path("web/android/app/src/main/java")
+          net_cfg_path = pathlib.Path("web/android/app/src/main/res/xml/network_security_config.xml")
+          manifest_path = pathlib.Path("web/android/app/src/main/AndroidManifest.xml")
+
+          def strip_comments_preserving_strings(src: str) -> str:
+              """Remove // and /* */ comments while preserving string literals and line count."""
+              out = []
+              i = 0
+              n = len(src)
+              while i < n:
+                  # Triple-quoted Kotlin string """..."""
+                  if src.startswith('"""', i):
+                      end = src.find('"""', i + 3)
+                      if end == -1:
+                          out.append(src[i:])
+                          break
+                      out.append(src[i:end + 3])
+                      i = end + 3
+                  # Double-quoted string "..."
+                  elif src[i] == '"':
+                      j = i + 1
+                      while j < n:
+                          if src[j] == '\\':
+                              j += 2
+                          elif src[j] == '"':
+                              j += 1
+                              break
+                          else:
+                              j += 1
+                      out.append(src[i:j])
+                      i = j
+                  # Single-quoted char literal '...'
+                  elif src[i] == "'":
+                      j = i + 1
+                      while j < n:
+                          if src[j] == '\\':
+                              j += 2
+                          elif src[j] == "'":
+                              j += 1
+                              break
+                          else:
+                              j += 1
+                      out.append(src[i:j])
+                      i = j
+                  # Line comment //
+                  elif src.startswith("//", i):
+                      end = src.find("\n", i)
+                      if end == -1:
+                          break
+                      out.append("\n")
+                      i = end + 1
+                  # Block comment /* ... */ (supports Kotlin nesting)
+                  elif src.startswith("/*", i):
+                      depth = 1
+                      j = i + 2
+                      while j < n and depth > 0:
+                          if src.startswith("/*", j):
+                              depth += 1
+                              j += 2
+                          elif src.startswith("*/", j):
+                              depth -= 1
+                              j += 2
+                          else:
+                              if src[j] == "\n":
+                                  out.append("\n")
+                              j += 1
+                      i = j
+                  else:
+                      out.append(src[i])
+                      i += 1
+              return "".join(out)
+
+          forbidden_patterns = [
+              ("TLS bypass (TrustAll)", re.compile(r"\bTrustAll\b", re.IGNORECASE)),
+              ("Custom X509TrustManager", re.compile(r"\bX509TrustManager\b")),
+              ("Custom HostnameVerifier", re.compile(r"\bHostnameVerifier\b")),
+              ("Custom sslSocketFactory", re.compile(r"\bsslSocketFactory\b")),
+              ("Authorization header", re.compile(r'"Authorization"|(?:\bsetRequestProperty|\baddRequestProperty|\bheader|\baddHeader)\s*\(\s*"(?i:authorization)"')),
+              ("Bearer auth token", re.compile(r'"Bearer\s')),
+              ("External stu-mcp.com host", re.compile(r"stu-mcp\.com", re.IGNORECASE)),
+              ("Private /v1/auth route", re.compile(r"/v1/auth\b")),
+              ("Private /v1/bind route", re.compile(r"/v1/bind\b")),
+              ("Private /v1/med route", re.compile(r"/v1/med\b")),
+              ("Private /v1/relogin route", re.compile(r"/v1/relogin\b")),
+              ("Private /v1/webvpn route", re.compile(r"/v1/webvpn\b")),
+              ("Private /v1/sync route", re.compile(r"/v1/sync\b")),
+              ("Private /v1/plan route", re.compile(r"/v1/plan\b")),
+              ("Private /v1/account route", re.compile(r"/v1/account\b")),
+              ("Private /v1/export/today route", re.compile(r"/v1/export/today\b")),
+          ]
+
+          allowed_v1_prefixes = (
+              "/v1/public/notices",
+              "/v1/public/bus",
+              "/v1/public/charging",
+              "/v1/public/export/today",
+              "/v1/announcements",
+              "/v1/meta/version",
+          )
+          any_v1_route = re.compile(r"/v1/[A-Za-z0-9_./-]+")
+
+          violations = []
+          scanned = 0
+          for path in sorted(java_root.rglob("*")):
+              if path.suffix not in {".kt", ".java"}:
+                  continue
+              scanned += 1
+              rel = path.relative_to(java_root).as_posix()
+              code = strip_comments_preserving_strings(path.read_text(encoding="utf-8"))
+              for lineno, line in enumerate(code.splitlines(), 1):
+                  for label, pat in forbidden_patterns:
+                      if pat.search(line):
+                          violations.append(f"{rel}:{lineno}: [{label}] {line.strip()}")
+                  for m in any_v1_route.finditer(line):
+                      route = m.group(0)
+                      if not any(route == p or route.startswith(p + "/") for p in allowed_v1_prefixes):
+                          violations.append(f"{rel}:{lineno}: [Non-public /v1 route '{route}'] {line.strip()}")
+
+          # Verify network_security_config.xml allows cleartext ONLY for single domain jw.stu.edu.cn.
+          net_root = ET.parse(net_cfg_path).getroot()
+          base_cfgs = net_root.findall("base-config")
+          if len(base_cfgs) != 1 or base_cfgs[0].attrib.get("cleartextTrafficPermitted") != "false":
+              violations.append(f"{net_cfg_path}: base-config must set cleartextTrafficPermitted='false'")
+          cleartext_domains = []
+          for dcfg in net_root.findall("domain-config"):
+              if dcfg.attrib.get("cleartextTrafficPermitted") == "true":
+                  for dom in dcfg.findall("domain"):
+                      cleartext_domains.append(((dom.text or "").strip(), dom.attrib.get("includeSubdomains")))
+          if cleartext_domains != [("jw.stu.edu.cn", "false")]:
+              violations.append(f"{net_cfg_path}: unexpected cleartext domains {cleartext_domains}")
+
+          # Verify AndroidManifest.xml disables backup and cleartext traffic globally.
+          manifest_text = manifest_path.read_text(encoding="utf-8")
+          for required_attr in (
+              'android:allowBackup="false"',
+              'android:usesCleartextTraffic="false"',
+              'android:networkSecurityConfig="@xml/network_security_config"',
+          ):
+              if required_attr not in manifest_text:
+                  violations.append(f"{manifest_path}: missing required attribute {required_attr}")
+
+          if violations:
+              print("Android zero-upload / TLS static guard FAILED:", file=sys.stderr)
+              for v in violations:
+                  print("  -", v, file=sys.stderr)
+              sys.exit(1)
+          print(f"Android static security guard passed ({scanned} Kotlin/Java files + manifest + network_security_config).")
+          PY
       - name: Prepare existing Capacitor build dependencies
         working-directory: web
         run: |
@@ -48,5 +317,5 @@ jobs:
         run: sdkmanager 'platforms;android-37.0' 'build-tools;36.0.0'
       - name: Compile, test and lint the native app
         working-directory: web/android
-        run: bash gradlew --no-daemon --console=plain --max-workers=2 :app:testDebugUnitTest :app:assembleHaptics :app:assembleLiveprobe :app:assembleHuaweiprobe :app:assembleVivoprobe :app:assembleVivoidentity :app:assembleVivomap :app:assembleDebugAndroidTest :app:lintHaptics :app:lintLiveprobe :app:lintHuaweiprobe :app:lintVivoprobe :app:lintVivoidentity :app:lintVivomap
+        run: bash gradlew --no-daemon --console=plain --max-workers=2 :app:testDebugUnitTest :app:compileDebugAndroidTestKotlin :app:lintVitalRelease :app:assembleHaptics :app:assembleLiveprobe :app:assembleHuaweiprobe :app:assembleVivoprobe :app:assembleVivoidentity :app:assembleVivomap :app:assembleDebugAndroidTest :app:lintHaptics :app:lintLiveprobe :app:lintHuaweiprobe :app:lintVivoprobe :app:lintVivoidentity :app:lintVivomap
       # APKs, signing material and device data are deliberately never uploaded.

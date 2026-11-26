@@ -208,7 +208,7 @@ export function Landing({
                   <Icon name="spark" size={16} />
                 </span>
                 <span className="ld-announce__text">
-                  <strong>STU 助手 v{APP_VERSION_NAME} 已发布</strong> — 六套校园色系与医学院教务自动同步
+                  <strong>STU 助手 v{APP_VERSION_NAME} 已发布</strong> — 安卓端纯本地直连学校，网页端零密码落盘
                 </span>
                 <motion.button
                   type="button"
@@ -303,7 +303,7 @@ export function Landing({
           >
             <span className="ld-hero__trustItem">
               <Icon name="shield" size={15} />
-              <span>密码由本人授权，加密存储随时可清</span>
+              <span>安卓端纯本地直连学校 · 网页版密码不落盘</span>
             </span>
             <span className="ld-hero__trustItem">
               <Icon name="check" size={15} />

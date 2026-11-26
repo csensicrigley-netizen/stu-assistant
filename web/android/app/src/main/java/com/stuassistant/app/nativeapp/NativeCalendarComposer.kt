@@ -65,7 +65,7 @@ private fun Modifier.calendarReveal(progress: Float, origin: Offset) = graphicsL
     }
 }
 
-/** Only an explicit submission calls Jev. Keyboard, header and review share one stable anchor. */
+/** Pure-local calendar composer: parses dates/times on-device with zero network uploads. */
 @Composable
 internal fun NativeCalendarComposer(
     store: NativeStore,
@@ -86,7 +86,7 @@ internal fun NativeCalendarComposer(
     var phase by rememberSaveable { mutableStateOf("input") }
     var packed by rememberSaveable { mutableStateOf("[]") }
     var selected by rememberSaveable { mutableIntStateOf(0) }
-    var day by rememberSaveable { mutableStateOf(AcademicClock.moment().date) }
+    var day by rememberSaveable { mutableStateOf(initialDraft?.date ?: AcademicClock.moment().date) }
     var reviewNeeded by rememberSaveable { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var records by remember { mutableStateOf<List<JSONObject>>(emptyList()) }
@@ -110,9 +110,9 @@ internal fun NativeCalendarComposer(
         try { records = store.calendarItems() }
         catch (e: CancellationException) { throw e }
         catch (_: Exception) { error = "本地事项读取失败，请重新打开" }
-        if (phase == "loading" && job == null) { phase = "input"; error = "上次识别已中断，可手动重试" }
+        if (phase == "loading" && job == null) { phase = "input"; error = "上次记录已中断，可重新提交" }
     }
-    LaunchedEffect(s.server, s.user?.optString("id")) { if (runCatching { store.calendarAccount() }.getOrNull() != account) close() }
+    LaunchedEffect(s.preview) { if (runCatching { store.calendarAccount() }.getOrNull() != account) close() }
     DisposableEffect(Unit) { onDispose { job?.cancel() } }
     fun back() {
         if (saving) return
@@ -125,36 +125,30 @@ internal fun NativeCalendarComposer(
     fun change(index: Int, value: JSONObject) {
         packed = JSONArray(drafts.mapIndexed { i, old -> if (i == index) value else old }).toString()
     }
-    fun submit(manual: Boolean) {
-        if (text.isBlank() || saving || phase == "loading") return
-        keyboard?.hide(); manualMenu = false; options = false; error = null; reviewNeeded = false; packed = "[]"; phase = "loading"
-        job = scope.launch {
-            try {
-                val result = if (manual) listOf(JSONObject().put("title", text.trim()).put("timezone", "Asia/Shanghai").put("reminders", JSONArray()))
-                else {
-                    val response = store.inferCalendar(text.trim())
-                    val items = academicObjects(response.optJSONArray("items"))
-                    require(items.isNotEmpty())
-                    reviewNeeded = items.any { (it.optJSONArray("issues")?.length() ?: 0) > 0 } || (response.optJSONArray("issues")?.length() ?: 0) > 0
-                    items.map { it.getJSONObject("draft") }
-                }
-                val draftsWithLocalDetails = result.mapIndexed { index, draft ->
-                    if (index == 0 && initialDraft != null) initialDraft.applyTo(draft) else draft
-                }
-                packed = JSONArray(draftsWithLocalDetails).toString(); selected = 0
-                day = CalendarDrafts.date(draftsWithLocalDetails.first()) ?: day
-                phase = "review"
-            } catch (e: CancellationException) { throw e }
-            catch (e: Exception) {
-                phase = "input"
-                error = if (e is NativeApiError) when {
-                    e.code == "timeout" || e.status == 504 -> "识别超时，结果未知；请自行决定是否重试"
-                    e.status == 401 -> "登录已过期，请重新登录"
-                    e.status == 429 -> "请求过于频繁或今日用量已达上限，请稍后再试"
-                    else -> "在线识别未完成，可重试或手动记录"
-                } else "识别未完成，可重试或手动记录"
+    fun buildLocalDraft(rawText: String, rawManual: Boolean): JSONObject {
+        val base = JSONObject().put("title", rawText).put("timezone", "Asia/Shanghai").put("reminders", JSONArray())
+        if (rawManual) return base
+        val parsed = ItemsQuickParser.parse(rawText, AcademicClock.moment().date, day)
+        var draft = base.put("title", parsed.cleanTitle.ifBlank { rawText })
+        val parsedDate = parsed.hitDate
+        if (parsedDate != null) {
+            draft = if (!parsed.isAllDay && parsed.startMin != null) {
+                ItemsDrafts.setTimed(draft, parsedDate, parsed.startMin, parsed.endMin ?: (parsed.startMin + 60))
+            } else {
+                ItemsDrafts.setAllDay(draft, parsedDate)
             }
         }
+        return draft
+    }
+    fun submit(manual: Boolean) {
+        if (text.isBlank() || saving || phase == "loading") return
+        keyboard?.hide(); manualMenu = false; options = false; error = null; reviewNeeded = false; packed = "[]"
+        val baseDraft = buildLocalDraft(text.trim(), manual)
+        val merged = if (initialDraft != null) initialDraft.applyTo(baseDraft) else baseDraft
+        packed = JSONArray(listOf(merged)).toString()
+        selected = 0
+        day = CalendarDrafts.date(merged) ?: day
+        phase = "review"
     }
     Box(Modifier.fillMaxSize().pointerInput(phase) { detectTapGestures { if (phase == "input") back() } }) {
         Box(Modifier.fillMaxSize().background(c.bg.copy(alpha = .12f)))
@@ -190,10 +184,15 @@ internal fun NativeCalendarComposer(
                     modifier = Modifier.size(48.dp).semantics { contentDescription = if (phase == "input") "提交事项" else "关闭建议" }
                         .onGloballyPositioned { origin = it.boundsInRoot().center })
             }
-            AnimatedVisibility(phase == "input" && (manualMenu || error != null), enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
-                Column(Modifier.padding(horizontal = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            AnimatedVisibility(phase == "input", enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
+                Column(Modifier.padding(horizontal = 24.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     NError(error)
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { NButton("手动记录", { submit(true) }, enabled = text.isNotBlank()) }
+                    NText("当前为纯本地零上传模式，日期时间在本机离线解析，不会上传外部 AI 服务。", 13, muted = true)
+                    if (manualMenu || error != null || text.isNotBlank()) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                            NButton("本地手动记录", { submit(true) }, enabled = text.isNotBlank())
+                        }
+                    }
                 }
             }
             AnimatedVisibility(phase != "input", modifier = Modifier.weight(1f), enter = fadeIn(tween(80)), exit = fadeOut(tween(360))) {
@@ -288,7 +287,7 @@ internal fun NativeCalendarComposer(
     val c = LocalNativeColors.current
     val loop = rememberInfiniteTransition(label = "calendar-thinking")
     val phase by loop.animateFloat(0f, 1f, infiniteRepeatable(tween(1900, easing = LinearEasing)), label = "light-orbit")
-    Column(Modifier.fillMaxWidth().semantics { contentDescription = "正在在线识别" }) {
+    Column(Modifier.fillMaxWidth().semantics { contentDescription = "正在本地解析" }) {
         Box(Modifier.fillMaxWidth().height(48.dp), contentAlignment = Alignment.Center) {
             Canvas(Modifier.size(42.dp, 16.dp)) {
                 repeat(3) { i -> drawCircle(c.brand.copy(alpha = .25f + .45f * ((sin((phase*6.28f-i).toDouble())+1)/2).toFloat()),

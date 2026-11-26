@@ -18,6 +18,8 @@ exports.harness = ({ native = false, timeoutMs = 25 } = {}) => {
     Headers, Response, AbortController, CustomEvent, URL, URLSearchParams, atob,
     location: { search: '' },
     localStorage: {
+      get length() { return storage.size; },
+      key: index => [...storage.keys()][index] ?? null,
       getItem: key => storage.get(key) ?? null,
       setItem: (key, value) => storage.set(key, String(value)),
       removeItem: key => storage.delete(key),

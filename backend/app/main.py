@@ -7,6 +7,8 @@ Design rules carried over from PLAN.md:
 """
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 import time
 import threading
@@ -30,6 +32,10 @@ from .ratelimit import (
     bind_limiter,
     login_account_limiter,
     login_ip_limiter,
+    public_bus_limiter,
+    public_charging_limiter,
+    public_notices_limiter,
+    public_today_export_limiter,
     register_limiter,
     today_claim_limiter,
     today_export_limiter,
@@ -65,13 +71,8 @@ app = FastAPI(title="STU 事项助手", version="0.2.0", docs_url="/v1/docs" if 
 # The browser version is served from this same origin and needs no CORS. Only
 # the packaged App's WebView origins are allowed; tokens travel in the
 # Authorization header, never in cookies.
-from . import keepalive as _keepalive  # noqa: E402  WebVPN 会话保活
-
-
-@app.on_event("startup")
-def _start_webvpn_keepalive() -> None:
-    """用户输过一次数盾动态码之后，靠后台巡检把 WebVPN 会话续住。"""
-    _keepalive.start()
+# WebVPN 后台保活与 TOTP 种子自动重登已停用（零服务端密码/种子落盘），不再启动后台线程。
+from . import keepalive as _keepalive  # noqa: E402  兼容 /v1/webvpn/state 只读返回
 
 
 # /v1/webvpn/state 要认人，注册在下面的 current_user 之后（不能整包吐给任意登录用户）。
@@ -177,35 +178,18 @@ class WebvpnCodeIn(BaseModel):
     code: str = Field(min_length=2, max_length=12)
 
 
-def _stored_school_account(uid: str) -> tuple[str, str] | None:
-    from .relogin import stored_accounts
-    from .tenancy import tenant_scope
-
-    with tenant_scope(uid) as tenant:
-        vault = tenant.vault()
-        for svc in ("webvpn", "jw", "mystu"):
-            accounts = stored_accounts(vault, svc)
-            if accounts:
-                return accounts[0]
-    return None
-
-
 @app.post("/v1/webvpn/login/start")
 def webvpn_login_start(body: WebvpnLoginIn, uid: str = Depends(current_user)) -> dict:
     """开始一次带人工验证的 WebVPN 登录：先给他一张图形验证码。
 
-    学号密码优先用服务器上存着的那份（绑 jw/MySTU 时存下的）；
-    没存过就必须在请求里带上，否则 409 need_credentials。
+    服务端不保存学校密码，每次发起登录必须在请求体中现传学号与密码，否则 409 need_credentials。
     """
     from . import webvpn_login as wv
 
     user = (body.student_id or "").strip()
     password = body.password or ""
     if not user or not password:
-        stored = _stored_school_account(uid)
-        if not stored:
-            raise HTTPException(409, "need_credentials")
-        user, password = stored
+        raise HTTPException(409, "need_credentials")
     try:
         info = wv.start(uid, user, password)
     except Exception:  # noqa: BLE001 - 学校入口打不开
@@ -262,72 +246,40 @@ def webvpn_login_abort(uid: str = Depends(current_user)) -> dict:
 
 
 # --------------------------------------------------------------------------
-# WebVPN 自动续期（导入数盾令牌密钥）
+# WebVPN 自动续期已下线（禁止在服务端落盘数盾 TOTP 种子或学校密码）
 # --------------------------------------------------------------------------
-
-class WebvpnSecretIn(BaseModel):
-    """数盾令牌的 otpauth 地址，或纯 Base32 密钥。"""
-
-    secret: str = Field(min_length=8, max_length=400)
-
 
 @app.get("/v1/webvpn/auto")
 def webvpn_auto_status(uid: str = Depends(current_user)) -> dict:
-    """自动续期配置状态。configured=true 表示服务器能自己滚动态码。"""
-    from stu_mcp.webvpn import WebVPNConfig
-
-    from .tenancy import tenant_scope
-
-    try:
-        with tenant_scope(uid) as tenant:
-            return WebVPNConfig(tenant.vault()).status()
-    except Exception:  # noqa: BLE001
-        return {"configured": False, "enabled": False, "status": "unknown"}
+    """已下线：服务端不再保存数盾 TOTP 种子。"""
+    raise HTTPException(410, "webvpn_auto_disabled")
 
 
 @app.post("/v1/webvpn/auto")
-def webvpn_auto_enable(body: WebvpnSecretIn, uid: str = Depends(current_user)) -> dict:
-    """把数盾令牌密钥交给服务器，之后会话过期由它自己算码续上。
-
-    这一条是「输一次就不用再管」的关键：没有密钥时，服务器过不了学校的动态码那一关，
-    每次过期都必须有人在场；有了密钥，`relogin_auto()` 就能自己滚码重登。
-    凭据用本租户的 master.key 加密，只存在这个租户自己的目录里。
-    """
-    from stu_mcp.webvpn import WebVPNConfig
-
+def webvpn_auto_enable(uid: str = Depends(current_user)) -> dict:
+    """已下线：拒绝写入数盾 TOTP 种子，并清理该租户可能遗留的历史自动续期配置。"""
     from .tenancy import tenant_scope
 
-    stored = _stored_school_account(uid)
-    if not stored:
-        raise HTTPException(409, "need_credentials")
-    user, password = stored
     try:
         with tenant_scope(uid) as tenant:
-            return WebVPNConfig(tenant.vault()).configure({
-                "enabled": True,
-                "username": user,
-                "password": password,
-                "totp": body.secret.strip(),
-                "encoding": "auto",
-            })
-    except HTTPException:
-        raise
-    except Exception as exc:  # noqa: BLE001
-        code = getattr(exc, "code", "") or "invalid_secret"
-        raise HTTPException(400, code) from None
+            tenant.purge_webvpn_auto()
+    except Exception:  # noqa: BLE001
+        pass
+    raise HTTPException(410, "webvpn_auto_disabled")
 
 
 @app.delete("/v1/webvpn/auto")
 def webvpn_auto_disable(uid: str = Depends(current_user)) -> dict:
-    from stu_mcp.webvpn import WebVPNConfig
-
+    """清理该租户遗留的历史 WebVPN 自动续期配置（幂等）。"""
     from .tenancy import tenant_scope
 
+    removed = False
     try:
         with tenant_scope(uid) as tenant:
-            return WebVPNConfig(tenant.vault()).remove()
+            removed = tenant.purge_webvpn_auto()
     except Exception:  # noqa: BLE001
-        raise HTTPException(400, "auto_remove_failed") from None
+        pass
+    return {"ok": True, "configured": False, "enabled": False, "status": "disabled", "removed": removed}
 
 
 # --------------------------------------------------------------------------
@@ -528,10 +480,6 @@ def relogin_now(body: BindIn, request: Request, uid: str = Depends(current_user)
         for service in body.services:
             try:
                 login_with(vault, service, body.student_id, body.password)
-                # 重连成功后同样把密码加密留在租户 keyring 里，下次过期服务端自己续
-                from .bind import _remember_credentials
-
-                _remember_credentials(vault, service, body.student_id, body.password)
                 done.append(service)
             except Exception as exc:  # noqa: BLE001 - report per service
                 errors[service] = getattr(exc, "code", None) or type(exc).__name__
@@ -793,9 +741,7 @@ def delete_account(uid: str = Depends(current_user)) -> dict:
 # made-up countdown must never reach a student waiting at a stop.
 # --------------------------------------------------------------------------
 
-@app.get("/v1/charging")
-def charging_overview() -> dict:
-    """Every registered device in one call, served from a shared 60 s cache."""
+def _charging_overview_payload() -> dict:
     from . import charging
 
     if not charging.has_client():
@@ -808,6 +754,12 @@ def charging_overview() -> dict:
         "method": charging.REGISTRY_METHOD,
         "provider": "第三方充电平台",
     }
+
+
+@app.get("/v1/charging")
+def charging_overview() -> dict:
+    """Every registered device in one call, served from a shared 60 s cache."""
+    return _charging_overview_payload()
 
 
 @app.get("/v1/charging/devices")
@@ -1180,6 +1132,119 @@ def export_today_claim(body: TodayClaimIn, request: Request) -> dict:
     if snapshot is None:
         raise HTTPException(404, "ticket_invalid_or_expired")
     return snapshot
+
+
+# --------------------------------------------------------------------------
+# pure-public endpoints (no auth, zero user/tenant reads, IP rate-limited)
+# --------------------------------------------------------------------------
+
+def _shape_public_notice(rec: dict, *, updated_at: float) -> dict | None:
+    if not isinstance(rec, dict):
+        return None
+    src = str(rec.get("source") or "public").strip().lower()
+    if src and src != "public":
+        return None
+    raw_id = str(rec.get("id") or rec.get("external_id") or rec.get("url") or "").strip()
+    if not raw_id:
+        sig = f"{rec.get('title', '')}|{rec.get('published_at', '')}|{rec.get('category', '')}"
+        raw_id = "public:notice:" + hashlib.sha256(sig.encode("utf-8")).hexdigest()[:24]
+    detail = {k: v for k, v in rec.items() if k not in {"external_id", "id"}}
+    detail["source"] = "public"
+    detail.setdefault("kind", "notice")
+    return {
+        "id": raw_id,
+        "kind": "notice",
+        "source": "public",
+        "title": str(rec.get("title") or ""),
+        "updated_at": updated_at,
+        "detail": detail,
+    }
+
+
+@app.get("/v1/public/notices")
+def public_notices(
+    request: Request,
+    limit: int = Query(default=30, ge=1, le=100),
+) -> dict:
+    """学校官网公开通知（免登录、零租户读取、复用全局公开缓存）。"""
+    if not public_notices_limiter.allow(_client_ip(request)):
+        raise HTTPException(429, "too_many_attempts")
+    if settings.demo:
+        ts = now()
+        records = demo.demo_notices()[:limit]
+    else:
+        from . import collectors
+
+        result = collectors.collect_public_shared(None, limit=limit)
+        ts = collectors.public_cache_timestamp() or now()
+        records = list(result.kind_records.get("notice") or [])[:limit]
+
+    items: list[dict] = []
+    for rec in records:
+        shaped = _shape_public_notice(rec, updated_at=ts)
+        if shaped is not None:
+            items.append(shaped)
+    return {"items": items, "count": len(items)}
+
+
+@app.get("/v1/public/bus")
+def public_bus(request: Request) -> dict:
+    """公共校园公交时刻与动态（免登录、按 IP 限流）。"""
+    if not public_bus_limiter.allow(_client_ip(request)):
+        raise HTTPException(429, "too_many_attempts")
+    from . import bus as buslib
+
+    return buslib.snapshot()
+
+
+@app.get("/v1/public/charging")
+def public_charging_overview(request: Request) -> dict:
+    """公共充电桩实时状态（免登录、共享缓存、按 IP 限流）。"""
+    if not public_charging_limiter.allow(_client_ip(request)):
+        raise HTTPException(429, "too_many_attempts")
+    return _charging_overview_payload()
+
+
+@app.post("/v1/public/export/today")
+async def public_export_today_create(request: Request) -> dict:
+    """匿名一次性 today 课表中转码（免登录、严格体积与白名单校验、零 PII）。"""
+    from . import today_export
+
+    if not public_today_export_limiter.allow(_client_ip(request)):
+        raise HTTPException(429, "too_many_attempts")
+
+    content_length = request.headers.get("content-length")
+    if content_length:
+        try:
+            if int(content_length) > today_export.MAX_ANONYMOUS_JSON_BYTES:
+                raise HTTPException(413, "payload_too_large")
+        except ValueError:
+            pass
+
+    chunks: list[bytes] = []
+    total_bytes = 0
+    async for chunk in request.stream():
+        total_bytes += len(chunk)
+        if total_bytes > today_export.MAX_ANONYMOUS_JSON_BYTES:
+            raise HTTPException(413, "payload_too_large")
+        chunks.append(chunk)
+    raw_bytes = b"".join(chunks)
+    if not raw_bytes.strip():
+        raise HTTPException(404, "no_timetable")
+
+    try:
+        payload = json.loads(raw_bytes.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        raise HTTPException(400, "invalid_json") from None
+
+    try:
+        ticket = today_export.create_anonymous_export_ticket(DB(settings.db_path), payload)
+    except today_export.AnonymousExportError as exc:
+        raise HTTPException(exc.status_code, exc.code) from None
+
+    if ticket is None:
+        raise HTTPException(404, "no_timetable")
+    return ticket
 
 
 @app.api_route("/v1/{rest:path}", methods=["GET", "POST", "DELETE"], include_in_schema=False)

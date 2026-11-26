@@ -14,7 +14,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { api, ApiError, getToken, type Me, type StatusSource } from "./api";
 import { nowMs } from "./clock";
-import { autoRelogin } from "./school";
+import { clearAllSchool } from "./school";
 import { PREVIEW_EXAMS, PREVIEW_GRADES, PREVIEW_TIMETABLE, previewNotices, previewTasks } from "./preview";
 import {
   normalizeExam,
@@ -68,8 +68,6 @@ export interface Store {
 
 export const PREVIEW_KEY = "stu.preview";
 const STALE_MS = 30 * 60_000;
-/** 会自己过期的来源：会话掉了可以用本机密码续回来 */
-const EXPIRABLE = new Set(["jw", "mystu"]);
 /** stop following a sync after this long; the data shown so far stays */
 const SYNC_WATCH_MS = 4 * 60_000;
 const sleep = (ms: number) => new Promise((r) => window.setTimeout(r, ms));
@@ -237,15 +235,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           try {
             const res = await api.sync(how === "force");
             if (!res.demo) await follow();
-            // 教务会话过期时，用本机保存的学校密码自动续一次，再同步一遍；
-            // 没存密码或学校要人工验证，就保持原样提示"重新连接"。
-            const expired = (await api.status())
-              .sources.filter((s) => s.code === 3 && EXPIRABLE.has(s.source))
-              .map((s) => s.source);
-            if (expired.length > 0 && (await autoRelogin(expired))) {
-              await api.sync(true);
-              await follow();
-            }
           } catch (exc) {
             syncError = exc;
           } finally {
@@ -280,6 +269,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     },
     [preview, refresh],
   );
+
+  useEffect(() => {
+    clearAllSchool();
+  }, []);
 
   useEffect(() => {
     if (preview) return;

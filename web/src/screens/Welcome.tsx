@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { IS_NATIVE, api, apiBase, errorText, needsServer, setApiBase, setToken, type BindJob } from "../lib/api";
-import { saveSchool } from "../lib/school";
+import { clearAllSchool } from "../lib/school";
 import { onBack } from "../lib/native";
 import { Icon } from "../components/Icon";
 import { Logo } from "../components/Logo";
@@ -162,14 +162,8 @@ function Account({
         setEditServer(false);
       }
       const res = mode === "login" ? await api.login(email.trim(), pass) : await api.register(email.trim(), pass);
+      clearAllSchool();
       setToken(res.token);
-      // 记下「现在是哪个助手账号」。本机校园凭据按「服务器 + 这个账号」分区，
-      // 少了它就只能退化成服务器级分区，换人用同一台机器时会读到上一份。
-      try {
-        localStorage.setItem("stu.account", email.trim().toLowerCase());
-      } catch {
-        /* 隐私模式 */
-      }
       onDone(mode);
     } catch (exc) {
       setError(errorText(exc));
@@ -298,7 +292,7 @@ function Account({
 /* ------------------------------------------------------------------- bind */
 
 const BIND_ERRORS: Record<string, string> = {
-  consent_required: "请先勾选「本人授权」——不授权，助手不会去读你的 OA 通知。",
+  consent_required: "请先勾选「本人授权」——未授权前，助手不会读取你的学校账号数据。",
   invalid_credentials: "学校统一认证没有通过：学号或密码不对。",
   login_rejected: "学校拒绝了这次登录。可以先在浏览器登录一次学校系统，确认账号正常。",
   captcha_rejected: "验证码不对，再试一次。",
@@ -332,17 +326,18 @@ function bindError(job: BindJob | null, fallback?: string): string {
 function Bind({ onDone, onCancel }: { onDone: () => void; onCancel?: () => void }) {
   const [sid, setSid] = useState("");
   const [pw, setPw] = useState("");
-  const [remember, setRemember] = useState(true);
-  // 本人授权：这一格不勾，服务端连 WebVPN 都不让连（403 consent_required）
+  // 本人授权：这一格不勾，服务端会拒绝发起学校连接（403 consent_required）
   const [agree, setAgree] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [job, setJob] = useState<BindJob | null>(null);
   const [answer, setAnswer] = useState("");
   const poll = useRef<number | null>(null);
-  const pendingCreds = useRef<{ account: string; password: string } | null>(null);
 
-  useEffect(() => () => void (poll.current && window.clearInterval(poll.current)), []);
+  useEffect(() => {
+    clearAllSchool();
+    return () => void (poll.current && window.clearInterval(poll.current));
+  }, []);
 
   const settle = (s: BindJob) => {
     setJob(s);
@@ -351,11 +346,7 @@ function Bind({ onDone, onCancel }: { onDone: () => void; onCancel?: () => void 
       poll.current = null;
       setBusy(false);
       if (s.state === "ok") {
-        // 只在这台设备上留一份，用于教务会话过期时自动重登
-        if (pendingCreds.current) {
-          saveSchool(pendingCreds.current.account, pendingCreds.current.password);
-          pendingCreds.current = null;
-        }
+        clearAllSchool();
         window.setTimeout(onDone, 700);
       }
       if (s.state === "failed") setError(bindError(s));
@@ -402,11 +393,11 @@ function Bind({ onDone, onCancel }: { onDone: () => void; onCancel?: () => void 
     try {
       if (!agree) {
         // 前端先拦一次，后端还会再拦一次（403 consent_required）
-        setError("请先勾选下面的「本人授权」—— 不授权，助手不会去读你的 OA 通知。");
+        setError("请先勾选下面的「本人授权」——未授权前，助手不会读取你的学校账号数据。");
         setBusy(false);
         return;
       }
-      pendingCreds.current = remember ? { account: sid.trim(), password: pw } : null;
+      clearAllSchool();
       await api.consentGrant();
       // 只绑教务与 MySTU：官网消息是公开页面，
       // 不再需要那道登录输入（2026-10-29 起登录通道整体下线）
@@ -445,9 +436,9 @@ function Bind({ onDone, onCancel }: { onDone: () => void; onCancel?: () => void 
       <div className="assure">
         <Icon name="shield" size={18} />
         <p>
-          <b>本人授权使用</b>：这里的账号密码由你本人输入，只用于替你读你自己的教务、MySTU 和学校 OA 通知。
-          勾选记住密码时，密码会加密保存在你自己这一份空间里，用于会话过期后自动重连；随时可在「我」里一键清除。
-          助手不代你提交任何东西，也不保存学校数据的副本到别人的空间。
+          <b>网页版认证说明</b>：受浏览器跨域策略限制，网页版登录时由服务器代为向学校统一认证；你的密码仅在本次连接时经内存使用，
+          不落盘、不入库，浏览器也不会保存密码。成功后仅保留可吊销的学校会话，会话过期时需重新输入。
+          在意服务端中转的同学建议使用纯本地直连学校的安卓 App。
         </p>
       </div>
       <label className="field">
@@ -484,10 +475,7 @@ function Bind({ onDone, onCancel }: { onDone: () => void; onCancel?: () => void 
         </span>
       </label>
 
-      <label className="credbx">
-        <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
-        <span>记住学校密码，会话过期时自动重连（加密存在你自己那份空间，可随时清除）</span>
-      </label>
+      <p className="field__hint">网页版不会在浏览器或服务器保存你的学校密码；后续学校会话过期时，重新输入连接即可。</p>
 
       {job?.challenges.map((ch) => (
         <div key={ch.id} className="challenge">

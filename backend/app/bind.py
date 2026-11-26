@@ -21,11 +21,9 @@ from typing import Any
 from .tenancy import tenant_scope
 
 # Services the App exposes on the bind screen.
-#
-# webvpn 也要绑：OA 通知走 WebVPN 会话，而 WebVPN 登录会要求「数盾动态令牌」，
-# 走的是同一个 challenge 通道（kind=totp），由学生本人在绑定页里现输。
-# 会话与密码都落在租户自己的加密 vault 里，服务重启不用重登。
-BINDABLE = ("jw", "mystu", "webvpn", "repair")
+# 仅保留教务与 MySTU：移除 repair（避免中央 sso.stu.edu.cn CAS Cookie 留存）
+# 与已下线的 webvpn/OA 线路；服务端仅保存校方登录后可吊销会话 Cookie，绝不保存学校密码。
+BINDABLE = ("jw", "mystu")
 
 _LOGIN_SLOTS = threading.BoundedSemaphore(4)
 
@@ -202,57 +200,23 @@ class BindManager:
         return job
 
     def start_webvpn(self, user_id: str) -> BindJob:
-        """只连 WebVPN：学号密码用本租户 keyring 里已经存着的那份，用户只现输动态码。
-
-        为什么要这个专用入口：绑 jw/mystu 时 `_remember_credentials` 已经把学校账号
-        加密存进租户 keyring 了，用户没必要再对着表单重敲一遍学号和密码。
-        他真正必须亲自做的只有一件事——把数盾那六位动态码说出来。
-        """
+        """旧版自动连 WebVPN 入口已停用：服务端不再保存学校密码。"""
         job = BindJob(id=uuid.uuid4().hex[:16], user_id=user_id, services=["webvpn"])
         with self._guard:
             cutoff = time.time() - 3600
             for old in [k for k, j in self._jobs.items() if j.created_at < cutoff]:
                 self._jobs.pop(old, None)
             self._jobs[job.id] = job
-        t = threading.Thread(target=self._run_webvpn, args=(job,), daemon=True)
-        t.start()
+        job._settle(
+            "failed",
+            error={
+                "code": "need_credentials",
+                "detail": {"webvpn": "服务端不再保存学校密码，请手动输入账号密码登录。"},
+            },
+        )
         return job
 
     # ---- worker ---------------------------------------------------------
-
-    def _run_webvpn(self, job: BindJob) -> None:
-        # 这个 worker 必须自己兜住所有异常：线程里抛出去等于把 job 永远扔在
-        # running，界面就只能一直转「连接中…」（1.0.25 就是这么翻的船，
-        # 根因是这里漏了 settings 的导入，NameError 直接把线程炸掉）。
-        from .config import settings
-        from .db import DB
-        from .relogin import stored_accounts
-
-        interaction = None
-        try:
-            db = DB(settings.db_path)
-            with _LOGIN_SLOTS, tenant_scope(job.user_id) as tenant:
-                vault = tenant.vault()
-                accounts: list[tuple[str, str]] = []
-                for svc in ("webvpn", "jw", "mystu"):
-                    accounts += stored_accounts(vault, svc)
-                if not accounts:
-                    job._settle("failed", error={"code": "need_bind_first",
-                                                 "detail": {"webvpn": "这台设备还没有存过学校账号，先绑一次教务或 MySTU。"}})
-                    return
-                user, pw = accounts[0]
-                interaction = _Interaction(job, user, pw)
-                job.phase = "login:webvpn"
-                self._login_one(vault, "webvpn", user, pw, interaction)
-                db.mark_bound(job.user_id, "webvpn", _account_hash(user))
-                _remember_credentials(vault, "webvpn", user, pw)
-            job._settle("ok", result={"bound": ["webvpn"], "errors": {}})
-        except _Cancelled:
-            job._settle("cancelled")
-        except BaseException as exc:  # noqa: BLE001 - 连 NameError 都得落成失败，不能让界面空转
-            job._settle("failed", error={"code": _error_code(exc), "detail": {"webvpn": str(exc)[:120]}})
-        finally:
-            interaction = None
 
     def _run(self, job: BindJob, student_id: str, password: str) -> None:
         from .db import DB
@@ -272,9 +236,6 @@ class BindManager:
                         self._login_one(vault, service, student_id, password, interaction)
                         bound.append(service)
                         db.mark_bound(job.user_id, service, _account_hash(student_id))
-                        # 把学校密码加密存进这个租户自己的 keyring（master.key 包裹），
-                        # 之后会话过期时服务端可以自己重登，不用再问用户。
-                        _remember_credentials(vault, service, student_id, password)
                     except _Cancelled:
                         job._settle("cancelled")
                         return
@@ -295,6 +256,7 @@ class BindManager:
         except Exception as exc:  # noqa: BLE001
             job._settle("failed", error={"code": _error_code(exc)})
         finally:
+            password = ""
             interaction = None  # drop the password reference as soon as possible
 
     @staticmethod
@@ -330,22 +292,6 @@ class BindManager:
             interaction=interaction,
             allow_http_callback=True,
         )
-
-
-def _remember_credentials(vault, service: str, student_id: str, password: str) -> None:
-    """Encrypt the school password into the tenant keyring for silent re-login.
-
-    只在绑定/重连成功时写；文件是 Fernet 加密的 credentials.enc，密钥是同租户的
-    master.key（0600）。会话失效时 app.relogin 用它重登，密码不出租户目录、
-    不进数据库、不进日志。
-    """
-    try:
-        store = vault.key_store
-        if callable(store):
-            store = store()
-        store.set_password(service, student_id.strip(), password)
-    except Exception:  # noqa: BLE001 - 存不进去不影响本次登录
-        pass
 
 
 def _account_hash(student_id: str) -> str:

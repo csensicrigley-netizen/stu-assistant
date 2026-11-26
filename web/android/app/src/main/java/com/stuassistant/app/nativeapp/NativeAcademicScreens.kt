@@ -114,17 +114,7 @@ private fun academicNow(interval: Long = 30_000): AcademicMoment {
 
 private fun academicError(error: Exception): String {
     if (error is CancellationException) throw error
-    val code = (error as? NativeApiError)?.code ?: error.message.orEmpty()
-    return when (code) {
-        "network", "timeout" -> "服务器没有及时响应，检查网络后再试。"
-        "invalid_token", "token_revoked" -> "登录状态已失效，请重新登录。"
-        "not_signed_in" -> "请先登录助手账号后再操作。"
-        "no_timetable" -> "当前还没有可导出的课表，请先同步或手动导入课表。"
-        "too_many_attempts" -> "操作太频繁了，请稍后再试。"
-        "invalid_input" -> "填写的内容格式不对。"
-        "plan_not_found" -> "这条计划已经不在了，刷新一下。"
-        else -> (error as? NativeApiError)?.detail?.ifEmpty { null } ?: error.message ?: "没有成功，请重试。"
-    }
+    return formatLocalError(error)
 }
 
 @Composable
@@ -466,12 +456,6 @@ private fun AcademicMode(store: NativeStore, s: NativeState, onConnect: () -> Un
     }
 }
 
-private fun academicReconnect(s: NativeState): List<String> {
-    val bound = academicStrings(s.user?.optJSONArray("bound"))
-    return s.sources.filter { it.optString("state") == "need_login" && it.optString("source") in bound }
-        .map { AcademicRecords.source(it.optString("source")) }
-}
-
 /** Unified course recipes across all campus palettes × light/dark. */
 private typealias AcademicCourseColors = NativeCourseSwatch
 
@@ -577,39 +561,52 @@ fun NativeTodayScreen(store: NativeStore, s: NativeState, onNavigate: (String) -
         eyebrow = dateLine,
         actions = { AcademicMode(store, s, onConnect) },
     ) {
-        val reconnect = academicReconnect(s)
+        val reconnectSources = run {
+            val bound = s.boundSources.ifEmpty { academicStrings(s.user?.optJSONArray("bound")).toSet() }
+            s.sources.filter { it.optString("state") == "need_login" && it.optString("source") in bound }
+                .map { it.optString("source") }
+        }
+        val reconnect = reconnectSources.map { AcademicRecords.source(it) }
         if (reconnect.isNotEmpty()) NCard {
+            val onlyMed = reconnectSources.all { it == "med" }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 NIconBadge("shield", LocalNativeColors.current.danger, sizeDp = 36, iconDp = 18)
                 Box(Modifier.weight(1f)) {
                     NText("${reconnect.joinToString("、")}的登录已过期，课表和作业暂时停在上次同步。", 14)
                 }
             }
-            NButton("重新连接", onConnect, primary = true, haptic = NativeButtonHaptic.Navigation)
+            NButton(
+                if (onlyMed) "重新连接医学院教务" else "重新连接",
+                { if (onlyMed) onNavigate("medical") else onConnect() },
+                primary = true,
+                haptic = NativeButtonHaptic.Navigation,
+            )
         }
 
         if (waiting) NCard {
             val busy = s.syncing || s.loading
-            NTag(if (busy) "正在从教务读取" else "等待课表数据")
+            NTag(if (busy) "正在本机直连读取" else "尚未连接课表")
             NText(
-                if (busy) "第一次同步通常要半分钟左右" else if (s.error != null) "这次同步没有完成" else "学校系统还没有返回课表",
+                if (busy) "正在直连学校系统读取课表…" else if (s.error != null) "这次同步没有完成" else "还没有课表数据",
                 18,
                 bold = true,
             )
             NText(
-                if (busy) "读完后这里会显示你现在该去的教室。可以先切到别的页面。"
-                else "可能是学校系统在维护（夜间常见），也可能是网络问题。稍后再试一次。",
+                if (busy) "读完后这里会显示你现在该去的教室，全程仅保存在本机。"
+                else "选择任一来源即可在本机离线看课表，校园账号与课表均仅保存在本机。",
                 14,
                 muted = true,
             )
             if (busy) NLoading() else {
-                NButton(
-                    "再同步一次",
-                    { scope.launch { try { store.refresh("force") } catch (e: Exception) { error = academicError(e) } } },
-                    haptic = NativeButtonHaptic.Submit,
-                )
-                NText("医学院的同学：教务系统和主校区不是一套，主同步拿不到课表，走下面这条路。", 13, muted = true)
-                NButton("连医学院教务", { onNavigate("medical") }, primary = true, haptic = NativeButtonHaptic.Navigation)
+                if (s.boundSources.isNotEmpty()) {
+                    NButton(
+                        "再同步一次",
+                        { scope.launch { try { store.refresh("force") } catch (e: Exception) { error = academicError(e) } } },
+                        haptic = NativeButtonHaptic.Submit,
+                    )
+                }
+                NButton("本地连接本部校园账号", onConnect, primary = true, haptic = NativeButtonHaptic.Navigation)
+                NButton("连医学院教务", { onNavigate("medical") }, haptic = NativeButtonHaptic.Navigation)
                 NButton("手动导入课表", { onNavigate("import") }, haptic = NativeButtonHaptic.Navigation)
             }
         } else {
@@ -626,13 +623,13 @@ fun NativeTodayScreen(store: NativeStore, s: NativeState, onNavigate: (String) -
             onOpenWeek = { onNavigate("week") },
             onOpenItems = { onNavigate("items") },
             onAdd = {
-                if (s.preview || s.token == null) onConnect()
+                if (s.preview) onConnect()
                 else openComposer(CalendarComposerDraft("", "", ItemsPriority.NORMAL, now.date, null, null))
             },
         )
 
         NError(error)
-        if (s.sample) AcademicCta("这是示例课表", "连接校园账号后，换成你自己的课表、作业和成绩", "shield", onConnect)
+        if (s.sample) AcademicCta("这是示例课表", "本地直连校园账号或手动导入，换成你的真实课表", "shield", onConnect)
 
         if (blocks.isNotEmpty()) AcademicSection("今天的时间") {
             NCard {

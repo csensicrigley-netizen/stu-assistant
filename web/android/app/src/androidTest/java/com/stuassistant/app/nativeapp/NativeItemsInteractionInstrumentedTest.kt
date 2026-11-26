@@ -573,7 +573,7 @@ class NativeItemsInteractionInstrumentedTest {
         val note = "核对第三组数据"
         launch(now = "2026-11-24T09:42:00+08:00") {
             NativeItemsPage(
-                NativeState(token = "offline-fixture", calendarFocusDate = "2026-11-24"), emptyList(),
+                NativeState(calendarFocusDate = "2026-11-24"), emptyList(),
                 onOpenAiComposer = { handoff.set(it) },
                 onSetRecordDone = { _, _ -> }, onSetCourseDone = { _, _ -> },
             )

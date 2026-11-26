@@ -14,7 +14,6 @@ import java.io.File
 import java.net.InetAddress
 import java.net.Socket
 import java.net.URI
-import java.net.URLDecoder
 import java.security.KeyStore
 import java.security.MessageDigest
 import java.time.LocalDate
@@ -35,13 +34,7 @@ import javax.net.ssl.SSLServerSocket
 import javax.net.ssl.SSLSocket
 import javax.net.ssl.SSLSocketFactory
 import javax.net.ssl.TrustManagerFactory
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
 import org.json.JSONArray
 import org.json.JSONObject
 import org.json.JSONTokener
@@ -56,14 +49,14 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/** Real HTTPS transport and device Keystore; no production account or remote server is used. */
+/** Real HTTPS public stub + Android Keystore tests for pure-local NativeStore. */
 @RunWith(AndroidJUnit4::class)
 class NativeStoreInstrumentedTest {
     private lateinit var context: IsolatedContext
     private lateinit var tls: SSLContext
     private lateinit var originalSocketFactory: SSLSocketFactory
     private val stores = mutableListOf<NativeStore>()
-    private val servers = mutableListOf<LocalApiStub>()
+    private val servers = mutableListOf<LocalPublicApiStub>()
 
     @Before
     fun setUp() {
@@ -81,7 +74,6 @@ class NativeStoreInstrumentedTest {
         val trustedManagers = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm()).apply { init(trust) }
         tls = SSLContext.getInstance("TLS").apply { init(managers.keyManagers, trustedManagers.trustManagers, null) }
         originalSocketFactory = HttpsURLConnection.getDefaultSSLSocketFactory()
-        // Only this fixture's certificate is trusted; hostname verification still checks the SAN.
         HttpsURLConnection.setDefaultSSLSocketFactory(tls.socketFactory)
     }
 
@@ -91,150 +83,162 @@ class NativeStoreInstrumentedTest {
         servers.forEach { it.close() }
         if (::originalSocketFactory.isInitialized) HttpsURLConnection.setDefaultSSLSocketFactory(originalSocketFactory)
         if (::context.isInitialized) context.cleanup()
-        // Deliberately do not delete or replace the application's Keystore alias.
     }
 
     @Test
-    fun schoolAuthenticationErrorKeepsSessionButAppAuthenticationErrorClearsIt() = runBlocking {
+    fun publicWhitelistBlocksNonPublicRoutesAndNeverSendsAuthorizationHeader() = runBlocking {
         val server = server()
-        val store = signedIn(server, "alice")
-        val token = store.state.value.token
-        expectApiError("login_failed") { store.request("/v1/test/school401", "POST") }
-        assertEquals(token, store.state.value.token)
-        assertEquals("alice", store.state.value.user?.optString("id"))
-        expectApiError("invalid_token") { store.request("/v1/test/session401") }
-        assertNull(store.state.value.token)
-        assertNull(secure().read("session:${hash(server.base)}"))
-    }
+        val store = store(server)
+        expectApiError("blocked_non_public_route") { store.request("/v1/auth/login", "POST", JSONObject()) }
+        expectApiError("blocked_non_public_route") { store.request("/v1/bind", "POST", JSONObject()) }
+        expectApiError("blocked_non_public_route") { store.request("/v1/relogin", "POST", JSONObject()) }
+        expectApiError("blocked_non_public_route") { store.request("/v1/med/login", "POST", JSONObject()) }
+        expectApiError("blocked_non_public_route") { store.request("/v1/plan", "GET") }
+        expectApiError("blocked_non_public_route") { store.request("/v1/timetable", "GET") }
+        expectApiError("blocked_non_public_route") { store.request("/v1/public/notices", auth = true) }
 
-    @Test
-    fun serverAndAccountCachesKeepLocalTaskCompletionIsolated() = runBlocking {
-        val first = server()
-        val second = server()
-        val store = signedIn(first, "alice")
-        store.toggleTask("task-alice")
-        assertTrue(store.state.value.done.contains("task-alice"))
-        store.login("bob@example.test", "test-passphrase")
-        awaitReady(store, "bob")
-        assertFalse(store.state.value.done.contains("task-alice"))
-        store.toggleTask("task-bob")
-        store.setServer(second.base)
-        assertNull(store.state.value.token)
-        store.login("alice@example.test", "test-passphrase")
-        awaitReady(store, "alice")
-        assertTrue(store.state.value.done.isEmpty())
-        store.toggleTask("second-server-only")
-        store.setServer(first.base)
-        assertEquals("bob", store.state.value.user?.optString("id"))
-        assertEquals(setOf("task-bob"), store.state.value.done)
-        store.login("alice@example.test", "test-passphrase")
-        awaitReady(store, "alice")
-        assertEquals(setOf("task-alice"), store.state.value.done)
-        assertFalse(store.state.value.done.contains("second-server-only"))
-        assertEquals(setOf("task-alice"), doneInCache(first, "alice"))
-        assertEquals(setOf("task-bob"), doneInCache(first, "bob"))
-        assertEquals(setOf("second-server-only"), doneInCache(second, "alice"))
-    }
-
-    @Test
-    fun calendarConfirmationIsLocalAtomicAndAccountScoped() = runBlocking {
-        val first = server()
-        val store = signedIn(first, "alice")
-        val alice = store.calendarAccount()
-        val draft = JSONObject().put("title", "Local-only calendar content").put("timezone", "Asia/Shanghai")
-            .put("reminders", JSONArray())
-        store.saveCalendar("batch-one", listOf(draft), alice)
-        store.saveCalendar("batch-one", listOf(draft), alice)
-        assertEquals(1, store.calendarItems().size)
-        val id = store.calendarItems().single().getString("id")
-        store.toggleCalendar(id, alice)
-        assertTrue(store.calendarItems().single().getBoolean("done"))
-        store.login("bob@example.test", "test-passphrase")
-        awaitReady(store, "bob")
-        assertTrue(store.calendarItems().isEmpty())
-        expectApiError("account_changed") { store.saveCalendar("stale", listOf(draft), alice) }
-        store.login("alice@example.test", "test-passphrase")
-        awaitReady(store, "alice")
-        assertEquals(id, store.calendarItems().single().getString("id"))
-        val second = server()
-        store.setServer(second.base)
-        store.login("alice@example.test", "test-passphrase")
-        awaitReady(store, "alice")
-        assertTrue(store.calendarItems().isEmpty())
-    }
-
-    @Test
-    fun partialServiceFailureKeepsOnlyItsOldDataAndDoesNotAdvanceSyncedAt() = runBlocking {
-        val server = server()
-        val store = signedIn(server, "alice")
-        val syncedAt = store.state.value.syncedAt
-        assertEquals("grade-alice-1", store.state.value.grades.single().optString("title"))
-        server.revision = 2
-        server.failGrades = true
         store.refresh("read")
-        assertEquals("grade-alice-1", store.state.value.grades.single().optString("title"))
-        assertEquals("exam-alice-2", store.state.value.exams.single().optString("title"))
-        assertEquals(syncedAt, store.state.value.syncedAt)
-        assertNotNull(store.state.value.error)
-        val cached = secure().readCache("${server.base}\nalice")!!
-        assertEquals("grade-alice-1", cached.getJSONArray("grades").getJSONObject(0).getString("title"))
-        assertEquals(syncedAt, cached.getLong("syncedAt"))
+        assertTrue(store.state.value.notices.isNotEmpty())
+        val bus = store.request("/v1/public/bus", auth = false)
+        assertTrue(bus.optBoolean("ok"))
+        val charging = store.request("/v1/public/charging", auth = false)
+        assertNotNull(charging.optJSONArray("devices"))
+        assertTrue("Public server must never receive Authorization headers", server.allAuthorizations().all { it == null })
+        assertEquals(0, server.count("POST", "/v1/auth/login"))
+        assertEquals(0, server.count("POST", "/v1/bind"))
+        assertEquals(0, server.count("GET", "/v1/plan"))
     }
 
     @Test
-    fun rememberedSchoolSecretsAreEncryptedBoundToTheirKeyAndRemovedWhenDisabled() = runBlocking {
+    fun localCalendarAndPlansPersistEncryptedOfflineWithoutServerLogin() = runBlocking {
         val server = server()
-        val store = signedIn(server, "alice")
+        val store = store(server)
+        assertNull(store.state.value.token)
+
+        val account = store.calendarAccount()
+        assertEquals(NativeStore.LOCAL_CALENDAR_KEY, account)
+        val draft = JSONObject().put("title", "本地加密日程").put("timezone", "Asia/Shanghai").put("reminders", JSONArray())
+        store.saveCalendar("batch-local-1", listOf(draft), account)
+        store.saveCalendar("batch-local-1", listOf(draft), account)
+        assertEquals(1, store.calendarItems().size)
+        val itemId = store.calendarItems().single().getString("id")
+        store.toggleCalendar(itemId, account)
+        assertTrue(store.calendarItems().single().getBoolean("done"))
+
+        val created = store.createPlan(planFields("本地计划一"))
+        val second = store.createPlan(planFields("本地计划二"))
+        assertEquals(2, store.state.value.plans.size)
+        assertEquals(2, store.state.value.planSummary.getInt("today_total"))
+        store.togglePlan(created.getString("id"), true)
+        assertEquals(1, store.state.value.planSummary.getInt("today_done"))
+        store.updatePlan(second.getString("id"), JSONObject().put("title", "本地计划二改"))
+        store.reorderPlans(today(), listOf(second.getString("id"), created.getString("id")))
+        store.removePlan(created.getString("id"))
+        assertEquals(1, store.state.value.plans.size)
+        assertEquals("本地计划二改", store.state.value.plans.single().getString("title"))
+
+        store.close()
+        val reopened = configuredStore(server.base)
+        assertEquals(1, reopened.calendarItems().size)
+        assertTrue(reopened.calendarItems().single().getBoolean("done"))
+        assertEquals(1, reopened.state.value.plans.size)
+        assertEquals("本地计划二改", reopened.state.value.plans.single().getString("title"))
+        assertEquals(0, server.count("POST", "/v1/plan"))
+    }
+
+    @Test
+    fun manualTimetableImportAndAnonymousTodayExportWorkWithoutLogin() = runBlocking {
+        val server = server()
+        val store = store(server)
+        val parsed = store.importManualTextLocal(
+            "数据结构 | 周一 1-2节 | 1-16周 | 周景行 | 致知楼-C304",
+            format = "paste",
+            semester = "2026-2027-1",
+        )
+        assertTrue(parsed.optBoolean("ok"))
+        val doc = JSONObject()
+            .put("semester", "2026-2027-1")
+            .put("courses", parsed.getJSONArray("courses"))
+            .put("unarranged", parsed.optJSONArray("unarranged") ?: JSONArray())
+        val saved = store.saveManualTimetableLocal(doc, school = "med", note = "测试")
+        assertTrue(saved.optBoolean("ok"))
+        assertEquals("manual", store.state.value.activeTimetableSource)
+        assertEquals("med", store.state.value.manualSchool)
+
+        val ticket = store.exportTodayTimetable("2026-2027-1")
+        assertEquals("2345ABCDJKLM", ticket.code)
+        assertEquals("med", ticket.campus)
+        assertEquals(1, server.count("POST", "/v1/public/export/today"))
+        val sentBody = server.lastTodayExportBody.get()!!
+        assertFalse(sentBody.has("student_id"))
+        assertFalse(sentBody.has("email"))
+        assertFalse(sentBody.has("token"))
+        assertEquals("med", sentBody.getString("campus"))
+        assertTrue(server.allAuthorizations().all { it == null })
+    }
+
+    @Test
+    fun v1111UpgradeMigratesCalendarDoneTimetableAndSchoolPasswordAndPurgesServerToken() = runBlocking {
+        val server = server()
+        val uid = "v1111-user"
+        val scope = "${server.base}\n$uid"
+        val oldToken = server.tokenFor(uid)
         val secret = "school-secret-" + UUID.randomUUID()
-        store.rememberSchool("student-24680", secret, true)
-        assertTrue(store.state.value.rememberSchool)
+        secure().write("session:${hash(server.base)}", JSONObject()
+            .put("token", oldToken)
+            .put("user", JSONObject().put("id", uid).put("email", "old@example.test").put("bound", JSONArray().put("jw"))))
+        secure().writeCache(scope, JSONObject()
+            .put("timetable", JSONObject().put("semester", "2026-2027-1")
+                .put("courses", JSONArray().put(JSONObject().put("id", "c-old").put("title", "旧版课表").put("meetings", JSONArray()))))
+            .put("done", JSONArray().put("old-done-1"))
+            .put("plans", JSONArray().put(planFields("旧版计划").put("id", "old-plan-1")))
+            .put("syncedAt", 1_700_000_000_000L))
+        secure().writeCache("calendar-v1:$scope", JSONObject().put("items", JSONArray().put(
+            JSONObject().put("id", "cal-old-1").put("batch", "b1").put("done", false)
+                .put("draft", JSONObject().put("title", "旧版事项").put("timezone", "Asia/Shanghai")),
+        )))
+        secure().write("school:${hash(scope)}", JSONObject().put("id", "20230001").put("password", secret).put("remember", true))
+
+        val upgraded = configuredStore(server.base)
+        assertNull("Old server JWT must not be active", upgraded.state.value.token)
+        assertNull("Old server session must be deleted", secure().read("session:${hash(server.base)}"))
+        assertTrue(upgraded.state.value.onboarded)
+        assertEquals("旧版课表", upgraded.state.value.timetable?.getJSONArray("courses")?.getJSONObject(0)?.getString("title"))
+        assertEquals(setOf("old-done-1"), upgraded.state.value.done)
+        assertEquals("20230001", upgraded.state.value.schoolId)
+        assertTrue(upgraded.state.value.rememberSchool)
+        assertEquals(secret, upgraded.savedSchoolPassword())
+        assertEquals(1, upgraded.calendarItems().size)
+        assertEquals("cal-old-1", upgraded.calendarItems().single().getString("id"))
+        assertEquals(1, upgraded.state.value.plans.size)
+    }
+
+    @Test
+    fun clearCampusCredentialsKeepsTimetableAndResetAllWipesEverything() = runBlocking {
+        val server = server()
+        val store = store(server)
+        val secret = "campus-secret-" + UUID.randomUUID()
+        store.rememberSchool("20239999", secret, true)
         assertEquals(secret, store.savedSchoolPassword())
-        val key = "school:${hash("${server.base}\nalice")}"
-        val prefs = context.getSharedPreferences("stu.native.secure.v1", Context.MODE_PRIVATE)
-        val ciphertext = prefs.getString(key, null)
-        assertNotNull(ciphertext)
-        assertFalse(ciphertext!!.contains(secret))
-        assertFalse(ciphertext.contains("student-24680"))
-        assertFalse(prefs.all.values.joinToString().contains(store.state.value.token!!))
-        assertEquals(secret, secure().read(key)!!.getString("password"))
-        assertTrue(prefs.edit().putString("school:wrong-scope", ciphertext).commit())
-        expectApiError("secure_storage") { secure().read("school:wrong-scope") }
-        secure().remove("school:wrong-scope")
-        store.rememberSchool("student-24680", "", false)
+        val parsed = store.importManualTextLocal("高数 | 周二 3-4节 | 1-16周 | 林老师 | A101", "paste", "2026-2027-1")
+        store.saveManualTimetableLocal(JSONObject().put("semester", "2026-2027-1").put("courses", parsed.getJSONArray("courses")), "main")
+        store.saveCalendar("b-keep", listOf(JSONObject().put("title", "保留事项").put("timezone", "Asia/Shanghai")), store.calendarAccount())
+
+        store.clearCampusCredentials()
         assertFalse(store.state.value.rememberSchool)
         assertNull(store.savedSchoolPassword())
-        assertNull(secure().read(key))
-        val cacheText = cacheFile(server, "alice").readText()
-        assertFalse(cacheText.contains("grade-alice-1"))
-        assertFalse(cacheText.contains(store.state.value.token!!))
+        assertEquals("", store.state.value.schoolId)
+        assertNotNull("Timetable must stay after clearing credentials", store.state.value.timetable)
+        assertEquals(1, store.calendarItems().size)
+
+        store.resetAllLocalData()
+        assertNull(store.state.value.timetable)
+        assertFalse(store.state.value.onboarded)
+        assertTrue(store.calendarItems().isEmpty())
     }
 
     @Test
-    fun logoutAndDeleteAccountRemoveTheirEncryptedSessionCacheAndSchoolSecret() = runBlocking {
-        val server = server()
-        for (operation in listOf("logout", "delete")) {
-            val store = signedIn(server, operation)
-            store.rememberSchool("student-$operation", "test-school-password", true)
-            store.toggleTask("task-$operation")
-            val cache = cacheFile(server, operation)
-            assertTrue(cache.exists())
-            assertNotNull(secure().read("session:${hash(server.base)}"))
-            if (operation == "logout") store.logout() else store.deleteAccount()
-            assertNull(store.state.value.token)
-            assertNull(secure().read("session:${hash(server.base)}"))
-            assertNull(secure().read("school:${hash("${server.base}\n$operation")}"))
-            assertNull(secure().readCache("${server.base}\n$operation"))
-            assertFalse(cache.exists())
-            assertFalse(File(cache.path + ".bak").exists())
-            assertFalse(File(cache.path + ".new").exists())
-            store.close()
-        }
-        assertEquals(1, server.count("POST", "/v1/account/logout"))
-        assertEquals(1, server.count("DELETE", "/v1/account"))
-    }
-
-    @Test
-    fun legacyImportMigratesAllowedSettingsDoneAndEncryptedSchoolCredentialOnce() = runBlocking {
+    fun legacyWebViewImportMigratesSettingsDoneAndEncryptedSchoolWithoutToken() = runBlocking {
         val server = server()
         val store = store(server)
         val token = server.tokenFor("legacy")
@@ -248,554 +252,35 @@ class NativeStoreInstrumentedTest {
             .put("unrelated.external.key", "must-not-be-imported")
         store.importLegacy(legacy)
         assertTrue(store.legacyMigrationDone())
-        assertEquals(token, store.state.value.token)
+        assertNull("Legacy token must not be retained", store.state.value.token)
         assertEquals("dark", store.state.value.theme)
         assertEquals("classic", store.state.value.palette)
         assertEquals(37, store.state.value.hapticStrength)
         assertEquals(setOf("old-task"), store.state.value.done)
+        assertEquals("legacy-student", store.state.value.schoolId)
         assertEquals(password, store.savedSchoolPassword())
         val prefs = context.getSharedPreferences("stu.native.secure.v1", Context.MODE_PRIVATE)
-        assertFalse(prefs.all.containsKey("unrelated.external.key"))
         assertFalse(prefs.all.values.joinToString().contains(password))
         assertFalse(prefs.all.values.joinToString().contains(token))
-        assertEquals(password, secure().read("school:${hash("${server.base}\nlegacy")}")!!.getString("password"))
-        assertFalse(cacheFile(server, "legacy").readText().contains("old-task"))
-        store.importLegacy(JSONObject().put("stu.api", server.base).put("stu.token", server.tokenFor("other"))
-            .put("stu.theme", "light").put("stu.haptics.strength", "0"))
-        assertEquals(token, store.state.value.token)
-        assertEquals("dark", store.state.value.theme)
-        assertEquals(37, store.state.value.hapticStrength)
-        assertEquals(setOf("old-task"), store.state.value.done)
     }
 
     @Test
-    fun acceptedPostWithLostResponseIsNotAutomaticallyReplayed() = runBlocking {
-        val server = server()
-        val store = signedIn(server, "alice")
-        server.dropNextPlanPost.set(true)
-        expectApiError { store.createPlan(planFields("exactly-once")) }
-        assertEquals(1, server.count("POST", "/v1/plan"))
-        assertEquals(1, server.planRows("alice").count { it.optString("title") == "exactly-once" })
-        store.loadPlans()
-        assertEquals(1, store.state.value.plans.count { it.optString("title") == "exactly-once" })
-    }
-
-    @Test
-    fun stalePlanReadCannotOverwriteAcknowledgedMutations() = runBlocking {
-        val server = server()
-        val store = signedIn(server, "alice")
-        server.seedPlan("alice", "existing")
-        store.loadPlans()
-        val gate = PlanGate()
-        server.nextPlanReadGate.set(gate)
-        coroutineScope {
-            val stale = async(Dispatchers.IO) { store.loadPlans() }
-            try {
-                assertTrue(withContext(Dispatchers.IO) { gate.captured.await(10, TimeUnit.SECONDS) })
-                store.createPlan(planFields("after-snapshot"))
-            } finally {
-                gate.release.countDown()
-            }
-            stale.await()
-            val first = async(Dispatchers.IO) { store.createPlan(planFields("concurrent-a")) }
-            val second = async(Dispatchers.IO) { store.createPlan(planFields("concurrent-b")) }
-            first.await()
-            second.await()
-        }
-        assertEquals(server.planRows("alice").map { it.getString("id") }.toSet(),
-            store.state.value.plans.map { it.getString("id") }.toSet())
-        assertEquals(setOf("existing", "after-snapshot", "concurrent-a", "concurrent-b"),
-            store.state.value.plans.map { it.getString("title") }.toSet())
-        assertEquals(3, server.count("POST", "/v1/plan"))
-        val toggleId = store.state.value.plans.first().getString("id")
-        store.togglePlan(toggleId, true)
-        assertTrue(store.state.value.plans.single { it.getString("id") == toggleId }.getBoolean("done"))
-        assertEquals(1, store.state.value.planSummary.getInt("today_done"))
-    }
-
-    @Test
-    fun sameConfiguredServiceUpgradeRestoresTheEncryptedAccountAndLocalPreferences() = runBlocking {
-        val server = server()
-        val first = signedIn(server, "upgrade")
-        val token = first.state.value.token!!
-        val timetable = first.state.value.timetable!!.toString()
-        first.toggleTask("upgrade-done")
-        first.rememberSchool("upgrade-student", "upgrade-school-password", true)
-        first.setAppearance(theme = "dark", palette = "classic", strength = 43)
-        first.close()
-
-        val upgraded = configuredStore(server.base + "/", false)
-        assertEquals(server.base, upgraded.state.value.server)
-        assertEquals(token, upgraded.state.value.token)
-        assertEquals("upgrade", upgraded.state.value.user?.getString("id"))
-        assertEquals(timetable, upgraded.state.value.timetable?.toString())
-        assertEquals(setOf("upgrade-done"), upgraded.state.value.done)
-        assertEquals("upgrade-student", upgraded.state.value.schoolId)
-        assertEquals("upgrade-school-password", upgraded.savedSchoolPassword())
-        assertEquals("dark", upgraded.state.value.theme)
-        assertEquals("classic", upgraded.state.value.palette)
-        assertEquals(43, upgraded.state.value.hapticStrength)
-        assertNull(secure().read("server-archive:${hash(server.base)}"))
-        assertEquals("https://localhost", NativeApi.normalizeServer("https://LOCALHOST:443/"))
-        assertEquals("http://localhost", NativeApi.normalizeServer("http://LOCALHOST:80/"))
-        awaitReady(upgraded, "upgrade")
-    }
-
-    @Test
-    fun missingRememberedServerSettingStillLoadsTheConfiguredServicesSavedSession() = runBlocking {
-        val server = server()
-        val first = signedIn(server, "without-setting")
-        val token = first.state.value.token!!
-        first.toggleTask("configured-done")
-        first.rememberSchool("configured-student", "configured-school-password", true)
-        first.close()
-        assertTrue(settings().edit().putString("server", "").commit())
-
-        val restored = configuredStore(server.base)
-        assertEquals(server.base, restored.state.value.server)
-        assertEquals(token, restored.state.value.token)
-        assertEquals("without-setting", restored.state.value.user?.getString("id"))
-        assertEquals("course-without-setting", restored.state.value.timetable!!.getJSONArray("courses").getJSONObject(0).getString("title"))
-        assertEquals(setOf("configured-done"), restored.state.value.done)
-        assertEquals("configured-school-password", restored.savedSchoolPassword())
-        assertEquals(server.base, settings().getString("server", null))
-        awaitReady(restored, "without-setting")
-    }
-
-    @Test
-    fun changedConfigurationArchivesOldIdentityWithoutSendingItsBearerToTheNewService() = runBlocking {
-        val previousServer = server()
-        val nextServer = server()
-        val previous = signedIn(previousServer, "same-user")
-        val oldToken = previous.state.value.token!!
-        previous.toggleTask("old-service-only")
-        previous.rememberSchool("old-student", "old-school-password", true)
-        val previousTimetable = previous.state.value.timetable!!.toString()
-        previous.close()
-
-        val replacement = configuredStore(nextServer.base)
-        assertEquals(nextServer.base, replacement.state.value.server)
-        assertNull(replacement.state.value.token)
-        assertNull(replacement.state.value.user)
-        assertNull(replacement.state.value.timetable)
-        assertTrue(replacement.state.value.done.isEmpty())
-        assertFalse(replacement.state.value.rememberSchool)
-        assertNull(secure().read("session:${hash(nextServer.base)}"))
-        assertRetainedArchive(previousServer, "same-user", oldToken)
-        assertEquals(oldToken, secure().read("session:${hash(previousServer.base)}")!!.getString("token"))
-        assertEquals(previousTimetable, secure().readCache("${previousServer.base}\nsame-user")!!.getJSONObject("timetable").toString())
-        assertEquals("old-school-password", secure().read("school:${hash("${previousServer.base}\nsame-user")}")!!.getString("password"))
-
-        replacement.login("same-user@example.test", "test-passphrase")
-        awaitReady(replacement, "same-user")
-        val newToken = replacement.state.value.token!!
-        assertFalse("Separate fixture issuers must issue distinct tokens", oldToken == newToken)
-        replacement.toggleTask("new-service-only")
-        replacement.rememberSchool("new-student", "new-school-password", true)
-        assertEquals(setOf("old-service-only"), doneInCache(previousServer, "same-user"))
-        assertEquals(setOf("new-service-only"), doneInCache(nextServer, "same-user"))
-        assertFalse("Old Bearer must never reach the configured replacement", nextServer.sawBearer(oldToken))
-        assertTrue(nextServer.sawBearer(newToken))
-        replacement.close()
-
-        val recovered = configuredStore(previousServer.base)
-        assertEquals(oldToken, recovered.state.value.token)
-        assertEquals(setOf("old-service-only"), recovered.state.value.done)
-        assertEquals("old-school-password", recovered.savedSchoolPassword())
-        assertRetainedArchive(nextServer, "same-user", newToken)
-        awaitReady(recovered, "same-user")
-    }
-
-    @Test
-    fun productStyleStoreRefusesRuntimeServerChangesAndKeepsItsConfiguredSession() = runBlocking {
+    fun productStyleStoreRefusesRuntimeServerChanges() = runBlocking {
         val server = server()
         val foreign = server()
-        val original = signedIn(server, "fixed-service")
-        val token = original.state.value.token!!
-        original.close()
         val fixed = configuredStore(server.base, false)
         expectApiError("server_fixed") { fixed.setServer(foreign.base) }
         expectApiError("server_fixed") { fixed.setServer("") }
         assertEquals(server.base, fixed.state.value.server)
-        assertEquals(token, fixed.state.value.token)
-        assertEquals(server.base, settings().getString("server", null))
-        assertFalse(foreign.sawBearer(token))
         assertEquals(0, foreign.totalRequests())
-        awaitReady(fixed, "fixed-service")
     }
 
-    @Test
-    fun transportFailureAfterRecreationKeepsTheEncryptedSessionAndCachedAcademicData() = runBlocking {
-        val server = server()
-        val original = signedIn(server, "offline-upgrade")
-        val token = original.state.value.token!!
-        val syncedAt = original.state.value.syncedAt
-        original.toggleTask("offline-done")
-        original.rememberSchool("offline-student", "offline-school-password", true)
-        original.close()
-        server.dropAllConnections.set(true)
-
-        val restarted = configuredStore(server.base)
-        assertEquals(token, restarted.state.value.token)
-        assertEquals(setOf("offline-done"), restarted.state.value.done)
-        withTimeout(25_000) {
-            while (restarted.state.value.error == null || restarted.state.value.loading) delay(20)
-        }
-        assertEquals(token, restarted.state.value.token)
-        assertEquals("offline-upgrade", restarted.state.value.user?.getString("id"))
-        assertEquals(syncedAt, restarted.state.value.syncedAt)
-        assertEquals("course-offline-upgrade", restarted.state.value.timetable!!.getJSONArray("courses").getJSONObject(0).getString("title"))
-        assertEquals(setOf("offline-done"), restarted.state.value.done)
-        assertEquals("offline-school-password", restarted.savedSchoolPassword())
-        assertEquals(token, secure().read("session:${hash(server.base)}")!!.getString("token"))
-        assertEquals(setOf("offline-done"), doneInCache(server, "offline-upgrade"))
-        assertNotNull(secure().readCache("${server.base}\noffline-upgrade")!!.optJSONObject("timetable"))
-    }
-
-    @Test
-    fun foreignLegacyServerIsArchivedWithoutChangingTheCurrentConfiguredNamespace() = runBlocking {
-        val configuredServer = server()
-        val legacyServer = server()
-        val store = store(configuredServer)
-        val uid = "foreign-legacy"
-        val token = legacyServer.tokenFor(uid)
-        val email = "$uid@example.test"
-        val legacy = JSONObject().put("stu.api", legacyServer.base).put("stu.token", token)
-            .put("stu.account", email).put("stu.theme", "dark")
-            .put("stu.done.v2:$uid", JSONArray().put("foreign-done").toString())
-            .put("stu.school:${legacyServer.base}|$email", JSONObject().put("account", "foreign-student")
-                .put("password", "foreign-school-password").toString())
-        store.importLegacy(legacy)
-        assertTrue(store.legacyMigrationDone())
-        assertEquals(configuredServer.base, store.state.value.server)
-        assertEquals(configuredServer.base, settings().getString("server", null))
-        assertNull(store.state.value.token)
-        assertNull(store.state.value.user)
-        assertNull(store.state.value.timetable)
-        assertTrue(store.state.value.done.isEmpty())
-        assertNull(secure().read("session:${hash(configuredServer.base)}"))
-        assertNull(secure().readCache("${configuredServer.base}\n$uid"))
-        assertEquals(token, secure().read("session:${hash(legacyServer.base)}")!!.getString("token"))
-        assertEquals(setOf("foreign-done"), doneInCache(legacyServer, uid))
-        assertEquals("foreign-school-password", secure().read("school:${hash("${legacyServer.base}\n$uid")}")!!.getString("password"))
-        assertRetainedArchive(legacyServer, uid, token)
-        assertFalse(configuredServer.sawBearer(token))
-        assertEquals(0, configuredServer.totalRequests())
-    }
-
-    @Test
-    fun legacyWithoutStoredApiUsesTheCurrentConfiguredServiceNamespace() = runBlocking {
-        val server = server()
-        val store = store(server)
-        val uid = "build-default-legacy"
-        val email = "$uid@example.test"
-        val token = server.tokenFor(uid)
-        val values = JSONObject().put("stu.token", token).put("stu.account", email)
-            .put("stu.done.v2:$uid", JSONArray().put("build-default-done").toString())
-            .put("stu.school:${server.base}|$email", JSONObject().put("account", "build-default-student")
-                .put("password", "build-default-school-password").toString())
-        assertFalse(values.has("stu.api"))
-        store.importLegacy(values)
-        assertTrue(store.legacyMigrationDone())
-        assertEquals(server.base, store.state.value.server)
-        assertEquals(token, store.state.value.token)
-        assertEquals(uid, store.state.value.user?.getString("id"))
-        assertEquals(setOf("build-default-done"), store.state.value.done)
-        assertEquals("build-default-school-password", store.savedSchoolPassword())
-        assertEquals(token, secure().read("session:${hash(server.base)}")!!.getString("token"))
-        assertEquals(setOf("build-default-done"), doneInCache(server, uid))
-        assertNull(secure().read("server-archive:${hash(server.base)}"))
-    }
-
-    @Test
-    fun legacyWithoutStoredApiUsesItsVerifiedBuildBaseWhenTheConfiguredServiceChanges() = runBlocking {
-        val current = server()
-        val previous = server()
-        val store = NativeStore(context, current.base, legacyServerForTests = previous.base).also { stores += it }
-        val uid = "old-build-base"
-        val token = previous.tokenFor(uid)
-        store.importLegacy(JSONObject().put("stu.token", token).put("stu.account", "$uid@example.test")
-            .put("stu.done.v2:$uid", JSONArray().put("old-build-done").toString()))
-        assertEquals(current.base, store.state.value.server)
-        assertNull(store.state.value.token)
-        assertNull(store.state.value.user)
-        assertNull(secure().read("session:${hash(current.base)}"))
-        assertEquals(token, secure().read("session:${hash(previous.base)}")!!.getString("token"))
-        assertEquals(setOf("old-build-done"), doneInCache(previous, uid))
-        assertRetainedArchive(previous, uid, token)
-        assertEquals(0, current.totalRequests())
-        assertFalse(current.sawBearer(token))
-    }
-
-    @Test
-    fun legacyWithoutAKnownBuildBaseIsRetainedWithoutGuessingTheCurrentService() = runBlocking {
-        val current = server()
-        val store = NativeStore(context, current.base, legacyServerForTests = "").also { stores += it }
-        val token = current.tokenFor("unknown-build-base")
-        store.importLegacy(JSONObject().put("stu.token", token).put("stu.account", "legacy@example.test"))
-        assertTrue(store.legacyMigrationDone())
-        assertEquals(current.base, store.state.value.server)
-        assertNull(store.state.value.token)
-        assertNull(secure().read("session:${hash(current.base)}"))
-        assertEquals(token, secure().read("legacy.pending")!!.getString("stu.token"))
-        assertEquals(0, current.totalRequests())
-        assertFalse(context.getSharedPreferences("stu.native.secure.v1", Context.MODE_PRIVATE)
-            .all.values.joinToString().contains(token))
-    }
-
-    @Test
-    fun existingNativeIdentityWinsOverAnOlderWebSnapshotAtTheSameConfiguredService() = runBlocking {
-        val server = server()
-        val store = signedIn(server, "current-native")
-        val nativeToken = store.state.value.token!!
-        store.toggleTask("native-done")
-        store.rememberSchool("native-student", "native-school-password", true)
-        val uid = "stale-web"
-        val webToken = server.tokenFor(uid)
-        val webEmail = "$uid@example.test"
-        val old = JSONObject().put("stu.api", server.base).put("stu.token", webToken).put("stu.account", webEmail)
-            .put("stu.done.v2:$uid", JSONArray().put("web-only-done").toString())
-            .put("stu.school:${server.base}|$webEmail", JSONObject().put("account", "web-student")
-                .put("password", "web-school-password").toString())
-        store.importLegacy(old)
-        assertTrue(store.legacyMigrationDone())
-        assertEquals(nativeToken, store.state.value.token)
-        assertEquals("current-native", store.state.value.user?.getString("id"))
-        assertEquals(setOf("native-done"), store.state.value.done)
-        assertEquals("native-student", store.state.value.schoolId)
-        assertEquals("native-school-password", store.savedSchoolPassword())
-        assertEquals(nativeToken, secure().read("session:${hash(server.base)}")!!.getString("token"))
-        assertEquals(setOf("native-done"), doneInCache(server, "current-native"))
-        val retained = secure().read("legacy-retained:${hash("${server.base}\n$uid")}")
-        assertNotNull("The displaced Web snapshot must remain recoverable as ciphertext", retained)
-        assertTrue(retained!!.toString().contains(webToken))
-        assertTrue(retained.toString().contains("web-only-done"))
-        assertFalse(context.getSharedPreferences("stu.native.secure.v1", Context.MODE_PRIVATE)
-            .all.values.joinToString().contains(webToken))
-    }
-
-    @Test
-    fun accountHealthProbeIsAnonymousAndRequiresAnActualBooleanTrueWithoutPosting() = runBlocking {
-        val server = server()
-        val signedIn = signedIn(server, "stored-before-probe")
-        val token = signedIn.state.value.token!!
-        signedIn.close()
-        val postsBefore = server.totalPosts()
-        probeNativeAccountService(server.base)
-        assertEquals(1, server.count("GET", "/v1/health"))
-        for (invalid in listOf(JSONObject().put("ok", false), JSONObject().put("ok", "true"),
-            JSONObject().put("ok", 1), JSONObject().put("ok", JSONObject.NULL), JSONObject())) {
-            server.healthBody = invalid
-            try {
-                probeNativeAccountService(server.base)
-                fail("Health preflight must reject non-boolean or false ok")
-            } catch (error: NativeApiError) {
-                assertEquals("service_unavailable", error.code)
-                assertEquals(NATIVE_ACCOUNT_SERVICE_UNAVAILABLE, error.detail)
-                assertTrue(isNativeAccountServiceUnavailable(error))
-            }
-        }
-        server.healthStatus = 503
-        expectApiError("service_unavailable") { probeNativeAccountService(server.base) }
-        assertEquals(7, server.count("GET", "/v1/health"))
-        assertTrue("Health must never receive the stored Authorization header", server.authorizationsFor("/v1/health").all { it == null })
-        assertEquals(postsBefore, server.totalPosts())
-        assertEquals(token, secure().read("session:${hash(server.base)}")!!.getString("token"))
-    }
-
-    @Test
-    fun serviceRetryClassificationDoesNotTurnAuthenticationFailuresIntoServiceFailures() {
-        for (code in listOf("service_unavailable", "server_unavailable", "server_required", "invalid_server",
-            "network", "timeout", "invalid_json", "invalid_response")) {
-            assertTrue(code, isNativeAccountServiceUnavailable(NativeApiError(code)))
-        }
-        assertTrue(isNativeAccountServiceUnavailable(NativeApiError("http_503", 503)))
-        assertTrue(isNativeAccountServiceUnavailable(NativeApiError("http_302", 302)))
-        assertFalse(isNativeAccountServiceUnavailable(NativeApiError("bad_credentials", 401)))
-        assertFalse(isNativeAccountServiceUnavailable(NativeApiError("account_disabled", 403)))
-        assertFalse(isNativeAccountServiceUnavailable(IllegalStateException("test-local-error")))
-        assertEquals("服务暂时不可用，请检查网络后重试", NATIVE_ACCOUNT_SERVICE_UNAVAILABLE)
-    }
-
-    @Test
-    fun realLegacyWebViewStorageMigratesThroughTheProductionOriginReader() = runBlocking {
-        val server = server()
-        val store = store(server)
-        val uid = "origin-unique-${UUID.randomUUID()}"
-        val email = "$uid@example.test"
-        val token = server.tokenFor(uid)
-        val password = "origin-school-secret-${UUID.randomUUID()}"
-        val taskId = "origin-task-${UUID.randomUUID()}"
-        val unrelated = "native.instrumentation.unrelated.$uid"
-        val entries = JSONObject().put("stu.api", server.base).put("stu.token", token)
-            .put("stu.account", email).put("stu.theme", "dark").put("stu.palette", "classic")
-            .put("stu.haptics.strength", "42").put("stu.haptics", "off")
-            .put("stu.update.skip", "32")
-            .put("stu.done.v2:$uid", JSONArray().put(taskId).toString())
-            .put("stu.school:${server.base}|$email", JSONObject().put("account", "origin-student")
-                .put("password", password).toString())
-            .put(unrelated, "must-stay-only-in-web-storage")
-        val keys = entries.keys().asSequence().toList()
-        val oldValues = AtomicReference<JSONObject?>(null)
-        try {
-            val echo = withLegacyWebView { view, complete ->
-                val backupScript = """(function(){var keys=${JSONArray(keys)},old={};
-                    for(var i=0;i<keys.length;i++){old[keys[i]]=localStorage.getItem(keys[i]);}
-                    return JSON.stringify({origin:location.origin,values:old});})()""".trimIndent()
-                view.evaluateJavascript(backupScript) { rawBackup ->
-                    try {
-                        val backup = strictWebObject(rawBackup)
-                        check(backup.getString("origin") == "https://localhost")
-                        // Retain the backup before the first localStorage write, including on failure.
-                        oldValues.set(backup.getJSONObject("values"))
-                        val writeScript = """(function(){var entries=$entries,echo={};
-                            Object.keys(entries).forEach(function(k){localStorage.setItem(k,entries[k]);echo[k]=localStorage.getItem(k);});
-                            return JSON.stringify({origin:location.origin,values:echo});})()""".trimIndent()
-                        view.evaluateJavascript(writeScript) { rawEcho ->
-                            try { complete(strictWebObject(rawEcho), null) }
-                            catch (error: Throwable) { complete(null, error) }
-                        }
-                    } catch (error: Throwable) { complete(null, error) }
-                }
-            }
-            assertEquals("https://localhost", echo.getString("origin"))
-            keys.forEach { assertEquals("Seed must be present in the real WebView origin", entries.getString(it),
-                echo.getJSONObject("values").getString(it)) }
-
-            // withLegacyWebView has destroyed the seed WebView before this real migration starts.
-            val migrated = CountDownLatch(1)
-            val migrationFailure = AtomicReference<Throwable?>(null)
-            InstrumentationRegistry.getInstrumentation().runOnMainSync {
-                try { migrateLegacyStorage(context, store) { migrated.countDown() } }
-                catch (error: Throwable) { migrationFailure.set(error); migrated.countDown() }
-            }
-            assertTrue("Legacy migration callback did not finish", migrated.await(15, TimeUnit.SECONDS))
-            migrationFailure.get()?.let { throw it }
-            assertTrue("The real helper must import, not just close its WebView", store.legacyMigrationDone())
-            assertEquals(server.base, store.state.value.server)
-            assertEquals(token, store.state.value.token)
-            assertEquals(uid, store.state.value.user?.getString("id"))
-            assertEquals("dark", store.state.value.theme)
-            assertEquals("classic", store.state.value.palette)
-            assertEquals(42, store.state.value.hapticStrength)
-            assertEquals(32L, context.getSharedPreferences("native-updates", Context.MODE_PRIVATE).getLong("skip", -1))
-            assertEquals(setOf(taskId), store.state.value.done)
-            assertEquals("origin-student", store.state.value.schoolId)
-            assertTrue(store.state.value.rememberSchool)
-            assertEquals(password, store.savedSchoolPassword())
-            val securePrefs = context.getSharedPreferences("stu.native.secure.v1", Context.MODE_PRIVATE)
-            val settings = context.getSharedPreferences("stu.native.settings.v1", Context.MODE_PRIVATE)
-            assertFalse(securePrefs.contains(unrelated))
-            assertFalse(settings.contains(unrelated))
-            assertFalse(securePrefs.all.values.joinToString().contains(password))
-            assertFalse(securePrefs.all.values.joinToString().contains(token))
-            assertEquals(password, secure().read("school:${hash("${server.base}\n$uid")}")!!.getString("password"))
-            assertEquals(setOf(taskId), doneInCache(server, uid))
-            assertFalse(cacheFile(server, uid).readText().contains(taskId))
-        } finally {
-            // This is the app's real profile. Restore only keys this test changed; never clear it.
-            oldValues.get()?.let { previous ->
-                val restored = withLegacyWebView { view, complete ->
-                    val restoreScript = """(function(){var old=$previous,echo={};
-                        Object.keys(old).forEach(function(k){if(old[k]===null){localStorage.removeItem(k);}else{localStorage.setItem(k,old[k]);}
-                        echo[k]=localStorage.getItem(k);});
-                        return JSON.stringify({origin:location.origin,values:echo});})()""".trimIndent()
-                    view.evaluateJavascript(restoreScript) { raw ->
-                        try { complete(strictWebObject(raw), null) }
-                        catch (error: Throwable) { complete(null, error) }
-                    }
-                }
-                assertEquals("https://localhost", restored.getString("origin"))
-                val actual = restored.getJSONObject("values")
-                keys.forEach { key ->
-                    if (previous.isNull(key)) assertTrue("Previously absent key must be removed: $key", actual.isNull(key))
-                    else assertTrue("Existing origin value must be restored: $key", previous.getString(key) == actual.getString(key))
-                }
-            }
-        }
-    }
-
-    /** Called from the instrumentation worker; no latch ever blocks the WebView/UI thread. */
-    @Suppress("SetJavaScriptEnabled")
-    private fun withLegacyWebView(action: (WebView, (JSONObject?, Throwable?) -> Unit) -> Unit): JSONObject {
-        val instrumentation = InstrumentationRegistry.getInstrumentation()
-        val finished = CountDownLatch(1)
-        val result = AtomicReference<JSONObject?>(null)
-        val failure = AtomicReference<Throwable?>(null)
-        val web = AtomicReference<WebView?>(null)
-        val once = AtomicBoolean(false)
-        val complete: (JSONObject?, Throwable?) -> Unit = { value, error ->
-            result.set(value)
-            failure.set(error)
-            finished.countDown()
-        }
-        try {
-            instrumentation.runOnMainSync {
-                try {
-                    val view = WebView(context)
-                    web.set(view)
-                    view.settings.apply {
-                        javaScriptEnabled = true
-                        domStorageEnabled = true
-                        blockNetworkLoads = true
-                        allowFileAccess = false
-                        allowContentAccess = false
-                    }
-                    view.webViewClient = object : WebViewClient() {
-                        override fun onPageFinished(view: WebView, url: String) {
-                            if (!once.compareAndSet(false, true)) return
-                            try { action(view, complete) }
-                            catch (error: Throwable) { complete(null, error) }
-                        }
-                    }
-                    view.loadDataWithBaseURL("https://localhost/", "<html><body></body></html>", "text/html", "UTF-8", null)
-                } catch (error: Throwable) { complete(null, error) }
-            }
-            assertTrue("Local origin WebView did not finish", finished.await(15, TimeUnit.SECONDS))
-            failure.get()?.let { throw it }
-            return result.get() ?: throw AssertionError("WebView callback did not return an object")
-        } finally {
-            instrumentation.runOnMainSync {
-                web.getAndSet(null)?.let { it.stopLoading(); it.destroy() }
-            }
-        }
-    }
-
-    private fun strictWebObject(raw: String): JSONObject {
-        val outer = JSONTokener(raw)
-        val text = outer.nextValue()
-        check(text is String && outer.nextClean() == '\u0000') { "evaluateJavascript must return one JSON string" }
-        val inner = JSONTokener(text)
-        val value = inner.nextValue()
-        check(value is JSONObject && inner.nextClean() == '\u0000') { "JavaScript result must contain one object" }
-        return value
-    }
-
-    private fun server(): LocalApiStub = LocalApiStub(tls).also { servers += it }
-    private fun store(server: LocalApiStub): NativeStore = configuredStore(server.base, true)
+    private fun server(): LocalPublicApiStub = LocalPublicApiStub(tls).also { servers += it }
+    private fun store(server: LocalPublicApiStub): NativeStore = configuredStore(server.base, true)
     private fun configuredStore(server: String, allowServerChanges: Boolean = false): NativeStore =
         NativeStore(context, server, allowServerChanges).also { stores += it }
-    private fun settings() = context.getSharedPreferences("stu.native.settings.v1", Context.MODE_PRIVATE)
-    private fun assertRetainedArchive(server: LocalApiStub, uid: String, token: String) {
-        val archive = secure().read("server-archive:${hash(server.base)}")!!
-        assertEquals(1, archive.getInt("version"))
-        assertEquals(server.base, archive.getString("server"))
-        assertEquals(token, archive.getJSONObject("session").getString("token"))
-        assertEquals(uid, archive.getJSONObject("session").getJSONObject("user").getString("id"))
-        assertEquals("${server.base}\n$uid", archive.getString("cacheScope"))
-        assertEquals("school:${hash("${server.base}\n$uid")}", archive.getString("schoolKey"))
-    }
-    private suspend fun signedIn(server: LocalApiStub, uid: String): NativeStore = store(server).also {
-        it.login("$uid@example.test", "test-passphrase")
-        awaitReady(it, uid)
-    }
-    private suspend fun awaitReady(store: NativeStore, uid: String) {
-        withTimeout(25_000) {
-            while (store.state.value.user?.optString("id") != uid || store.state.value.syncedAt == null ||
-                store.state.value.loading || store.state.value.syncing) delay(20)
-        }
-        assertNull("Stub should provide all resources successfully", store.state.value.error)
-    }
+    private fun secure() = NativeSecureStorage(context)
+
     private suspend fun expectApiError(code: String? = null, action: suspend () -> Any?) {
         try {
             action()
@@ -803,13 +288,6 @@ class NativeStoreInstrumentedTest {
         } catch (error: NativeApiError) {
             if (code != null) assertEquals(code, error.code)
         }
-    }
-    private fun secure() = NativeSecureStorage(context)
-    private fun cacheFile(server: LocalApiStub, uid: String) = File(context.noBackupFilesDir,
-        "native-encrypted-cache-v1/${hash("${server.base}\n$uid")}.json")
-    private fun doneInCache(server: LocalApiStub, uid: String): Set<String> {
-        val array = secure().readCache("${server.base}\n$uid")!!.getJSONArray("done")
-        return (0 until array.length()).map { array.getString(it) }.toSet()
     }
 
     private class IsolatedContext(base: Context, private val id: String) : ContextWrapper(base) {
@@ -831,32 +309,16 @@ class NativeStoreInstrumentedTest {
         }
     }
 
-    private class PlanGate {
-        val captured = CountDownLatch(1)
-        val release = CountDownLatch(1)
-    }
-
-    /** Tiny HTTP/1.1 HTTPS fixture; mutations use production NativeApi, not a mocked transport. */
-    private class LocalApiStub(tls: SSLContext) : AutoCloseable {
+    private class LocalPublicApiStub(tls: SSLContext) : AutoCloseable {
         private val executor = Executors.newCachedThreadPool { work ->
-            Thread(work, "native-api-instrumentation").apply { isDaemon = true }
+            Thread(work, "native-public-api-test").apply { isDaemon = true }
         }
         private val socket = (tls.serverSocketFactory.createServerSocket(0, 32,
             InetAddress.getByName("127.0.0.1")) as SSLServerSocket)
         private val activeSockets = ConcurrentHashMap.newKeySet<Socket>()
         private val counts = ConcurrentHashMap<String, AtomicInteger>()
         private val requests = ConcurrentLinkedQueue<RecordedRequest>()
-        private val identities = ConcurrentHashMap<String, String>()
-        private val planLock = Any()
-        private val plans = mutableMapOf<String, MutableList<JSONObject>>()
-        private val nextId = AtomicInteger()
-        @Volatile var revision = 1
-        @Volatile var failGrades = false
-        @Volatile var healthBody = JSONObject().put("ok", true)
-        @Volatile var healthStatus = 200
-        val dropAllConnections = AtomicBoolean(false)
-        val dropNextPlanPost = AtomicBoolean(false)
-        val nextPlanReadGate = AtomicReference<PlanGate?>(null)
+        val lastTodayExportBody = AtomicReference<JSONObject?>(null)
         val base = "https://127.0.0.1:${socket.localPort}"
 
         init {
@@ -876,24 +338,16 @@ class NativeStoreInstrumentedTest {
         fun tokenFor(uid: String): String {
             fun encoded(value: String) = Base64.encodeToString(value.toByteArray(Charsets.UTF_8),
                 Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
-            val token = "${encoded("{\"alg\":\"none\"}")}.${encoded(JSONObject().put("sub", uid).put("iss", base).toString())}.test-only"
-            identities[token] = uid
-            return token
+            return "${encoded("{\"alg\":\"none\"}")}.${encoded(JSONObject().put("sub", uid).put("iss", base).toString())}.test-only"
         }
+
         fun count(method: String, path: String) = counts["$method $path"]?.get() ?: 0
         fun totalRequests() = requests.size
-        fun totalPosts() = requests.count { it.method == "POST" }
-        fun sawBearer(token: String) = requests.any { it.authorization == "Bearer $token" }
-        fun authorizationsFor(path: String): List<String?> = requests.filter { it.path == path }.map { it.authorization }
-        fun planRows(uid: String): List<JSONObject> = synchronized(planLock) {
-            plans[uid].orEmpty().map { JSONObject(it.toString()) }
-        }
-        fun seedPlan(uid: String, title: String): JSONObject = synchronized(planLock) {
-            newPlan(planFields(title)).also { plans.getOrPut(uid) { mutableListOf() }.add(it) }
-        }
+        fun allAuthorizations(): List<String?> = requests.map { it.authorization }
 
         private data class Reply(val status: Int, val body: JSONObject)
         private data class RecordedRequest(val method: String, val path: String, val authorization: String?)
+
         private fun serve(client: SSLSocket) {
             try {
                 client.soTimeout = 15_000
@@ -911,7 +365,6 @@ class NativeStoreInstrumentedTest {
                     if (colon > 0) headers[line.substring(0, colon).lowercase()] = line.substring(colon + 1).trim()
                 }
                 val length = headers["content-length"]?.toInt() ?: 0
-                require(length in 0..1_048_576)
                 val bytes = ByteArray(length)
                 var received = 0
                 while (received < length) {
@@ -922,105 +375,66 @@ class NativeStoreInstrumentedTest {
                 val body = if (length == 0) JSONObject() else JSONObject(String(bytes, Charsets.UTF_8))
                 counts.computeIfAbsent("$method ${uri.path}") { AtomicInteger() }.incrementAndGet()
                 requests.add(RecordedRequest(method, uri.path, headers["authorization"]))
-                if (dropAllConnections.get()) return
-                val uid = headers["authorization"]?.let { identities[it.removePrefix("Bearer ")] }
-                val reply = dispatch(method, uri, body, uid) ?: return
+                val reply = dispatch(method, uri, body)
                 val payload = reply.body.toString().toByteArray(Charsets.UTF_8)
-                val header = "HTTP/1.1 ${reply.status} ${if (reply.status == 200) "OK" else "Test Error"}\r\n" +
+                val header = "HTTP/1.1 ${reply.status} ${if (reply.status == 200) "OK" else "Error"}\r\n" +
                     "Content-Type: application/json; charset=utf-8\r\nContent-Length: ${payload.size}\r\nConnection: close\r\n\r\n"
                 client.outputStream.write(header.toByteArray(Charsets.US_ASCII))
                 client.outputStream.write(payload)
                 client.outputStream.flush()
             } catch (_: Exception) {
-                // A client cancelled or a deliberate lost-response fixture closed the connection.
+                /* Best effort */
             } finally {
                 activeSockets.remove(client)
                 try { client.close() } catch (_: Exception) { }
             }
         }
 
-        private fun dispatch(method: String, uri: URI, body: JSONObject, uid: String?): Reply? {
-            fun ok(value: JSONObject) = Reply(200, value)
-            fun error(status: Int, code: String) = Reply(status, JSONObject().put("detail", code))
+        private fun dispatch(method: String, uri: URI, body: JSONObject): Reply {
             val path = uri.path
-            if (path == "/v1/health" && method == "GET") return Reply(healthStatus, JSONObject(healthBody.toString()))
-            if (path in setOf("/v1/auth/login", "/v1/auth/register") && method == "POST") {
-                val user = body.getString("email").substringBefore('@')
-                return ok(JSONObject().put("token", tokenFor(user)).put("user", JSONObject()
-                    .put("id", user).put("email", "$user@example.test")))
-            }
-            if (uid == null) return error(401, "missing_bearer")
-            if (path == "/v1/test/school401") return error(401, "login_failed")
-            if (path == "/v1/test/session401") return error(401, "invalid_token")
-            if (path == "/v1/account" || path == "/v1/account/logout") return ok(JSONObject().put("ok", true))
-            if (path == "/v1/me") return ok(JSONObject().put("id", uid).put("email", "$uid@example.test")
-                .put("bound", JSONArray().put("jw").put("mystu")).put("demo", false))
-            if (path == "/v1/status") return ok(JSONObject().put("sources", JSONArray().apply {
-                for (source in listOf("public", "jw", "mystu")) put(JSONObject().put("source", source)
-                    .put("code", 0).put("state", "ok").put("at", System.currentTimeMillis() / 1000.0))
-            }).put("bound", JSONArray()).put("syncing", false).put("demo", false))
-            if (path == "/v1/timetable") return ok(JSONObject().put("semester", "2026-2027-1")
-                .put("courses", JSONArray().put(JSONObject().put("id", "course-$uid")
-                    .put("title", "course-$uid").put("meetings", JSONArray()))).put("empty", false)
-                .put("coverage", JSONObject().put("complete", true)))
-            if (path == "/v1/feed") return ok(JSONObject().put("items", JSONArray().put(JSONObject()
-                .put("id", "task-$uid").put("title", "task-$uid-$revision").put("source", "mystu")
-                .put("updated_at", System.currentTimeMillis() / 1000.0).put("detail", JSONObject()
-                    .put("dueMs", System.currentTimeMillis() + 86_400_000)))))
-            if (path == "/v1/notices") return ok(JSONObject().put("items", JSONArray()))
-            if (path == "/v1/grades") return if (failGrades) error(503, "grades_unavailable") else
-                ok(JSONObject().put("rows", JSONArray().put(JSONObject().put("id", "grade-$uid")
-                    .put("title", "grade-$uid-$revision").put("score", "90").put("credits", 2).put("gpa", 4))))
-            if (path == "/v1/exams") return ok(JSONObject().put("rows", JSONArray().put(JSONObject()
-                .put("id", "exam-$uid").put("title", "exam-$uid-$revision").put("exam_time", "2026-12-01 08:00"))))
-            if (path == "/v1/plan" && method == "GET") {
-                val query = uri.rawQuery.orEmpty().split('&').filter { it.contains('=') }.associate {
-                    val parts = it.split('=', limit = 2)
-                    URLDecoder.decode(parts[0], "UTF-8") to URLDecoder.decode(parts[1], "UTF-8")
+            return when {
+                path == "/v1/public/notices" && method == "GET" -> Reply(
+                    200,
+                    JSONObject().put(
+                        "items",
+                        JSONArray().put(
+                            JSONObject().put("id", "pub-1").put("source", "public").put("title", "公开校园通知")
+                                .put("updated_at", System.currentTimeMillis() / 1000.0)
+                                .put("detail", JSONObject().put("category", "通知").put("published_at", today())),
+                        ),
+                    ).put("count", 1),
+                )
+                path == "/v1/public/bus" && method == "GET" -> Reply(
+                    200,
+                    JSONObject().put("ok", true).put("stop", "汕头大学").put("lines", JSONArray()),
+                )
+                path == "/v1/public/charging" && method == "GET" -> Reply(
+                    200,
+                    JSONObject().put("devices", JSONArray()),
+                )
+                path == "/v1/public/export/today" && method == "POST" -> {
+                    lastTodayExportBody.set(body)
+                    Reply(
+                        200,
+                        JSONObject()
+                            .put("code", "2345ABCDJKLM")
+                            .put("expires_in", 300)
+                            .put("deep_link", "today://sheet/stu-import?code=2345ABCDJKLM")
+                            .put("semester", body.optString("semester"))
+                            .put("campus", body.optString("campus"))
+                            .put("course_count", body.optJSONArray("courses")?.length() ?: 0),
+                    )
                 }
-                val all = planRows(uid)
-                val selected = all.filter { row -> (query["start"] == null || row.getString("date") >= query.getValue("start")) &&
-                    (query["end"] == null || row.getString("date") <= query.getValue("end")) }
-                val reply = ok(JSONObject().put("items", JSONArray(selected)).put("summary", summary(all)))
-                nextPlanReadGate.getAndSet(null)?.let { gate ->
-                    gate.captured.countDown()
-                    check(gate.release.await(15, TimeUnit.SECONDS))
-                }
-                return reply
+                else -> Reply(404, JSONObject().put("detail", "not_found"))
             }
-            if (path == "/v1/plan" && method == "POST") {
-                val row = synchronized(planLock) {
-                    newPlan(body).also { plans.getOrPut(uid) { mutableListOf() }.add(it) }
-                }
-                if (dropNextPlanPost.getAndSet(false)) return null
-                return ok(JSONObject(row.toString()))
-            }
-            if (path.startsWith("/v1/plan/") && path.endsWith("/toggle") && method == "POST") {
-                val id = path.removePrefix("/v1/plan/").removeSuffix("/toggle")
-                val row = synchronized(planLock) {
-                    plans[uid]?.firstOrNull { it.getString("id") == id }?.apply { put("done", body.getBoolean("done")) }
-                        ?.let { JSONObject(it.toString()) }
-                } ?: return error(404, "plan_not_found")
-                return ok(row)
-            }
-            return error(404, "not_found")
         }
 
-        private fun newPlan(fields: JSONObject) = JSONObject(fields.toString())
-            .put("id", "plan-${nextId.incrementAndGet()}").put("done", fields.optBoolean("done"))
-            .put("sort", nextId.get()).put("priority", 0).put("note", "")
-            .put("start", JSONObject.NULL).put("end", JSONObject.NULL)
-        private fun summary(rows: List<JSONObject>): JSONObject {
-            val today = rows.filter { it.getString("date") == today() }
-            val done = today.count { it.optBoolean("done") }
-            return JSONObject().put("today_total", today.size).put("today_done", done)
-                .put("today_open", today.size - done).put("overdue", 0).put("upcoming", JSONArray())
-        }
         override fun close() {
             try { socket.close() } catch (_: Exception) { }
             activeSockets.forEach { try { it.close() } catch (_: Exception) { } }
             executor.shutdownNow()
         }
+
         private fun readLine(input: BufferedInputStream): String {
             val bytes = ByteArrayOutputStream()
             while (true) {

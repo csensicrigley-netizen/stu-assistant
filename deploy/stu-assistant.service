@@ -28,6 +28,8 @@ RestrictSUIDSGID=yes
 RestrictNamespaces=yes
 LockPersonality=yes
 UMask=0077
+# 禁止进程崩溃时转储核心内存（防止临时口令或会话凭据落盘）
+LimitCORE=0
 
 [Install]
 WantedBy=multi-user.target

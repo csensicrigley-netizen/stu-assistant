@@ -93,7 +93,7 @@ def collect(vault, limit: int = 40) -> dict:
         return {"ok": False, "reason": "no_session"}
 
     headers = {"User-Agent": UA, "Accept": "application/json"}
-    with httpx.Client(timeout=TIMEOUT, verify=False, follow_redirects=True, cookies=cookies, headers=headers) as client:
+    with httpx.Client(timeout=TIMEOUT, verify=True, follow_redirects=True, cookies=cookies, headers=headers) as client:
         check = client.get(f"{API}/user/validate", params={"ver": "1.1"})
         if check.status_code != 200:
             return {"ok": False, "reason": "login_expired" if check.status_code in (401, 403) else f"validate_{check.status_code}"}

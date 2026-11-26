@@ -5,7 +5,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
@@ -21,7 +20,11 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
 
-private val importSchools=listOf(Triple("main","主校区","教务系统可自动同步"),Triple("med","医学院","教务系统不同，需手动录入"),Triple("other","其他","自行录入"))
+private val importSchools=listOf(
+    Triple("main","主校区","教务系统支持本机自动同步，也可手动覆写"),
+    Triple("med","医学院","支持医学院本机同步或离线手动录入"),
+    Triple("other","其他","完全离线自行录入"),
+)
 private val importMethods=listOf("paste" to "粘贴文字","csv" to "CSV 表格","manual" to "一条一条加")
 private data class ImportDraft(val id:String=UUID.randomUUID().toString(),val title:String,val days:List<Int>,val periods:List<Int>,val from:Int,val to:Int,val teacher:String,val location:String)
 private fun importRuns(values:List<Int>):String {
@@ -31,7 +34,7 @@ private fun importRuns(values:List<Int>):String {
 }
 private fun importLine(d:ImportDraft)=listOf(d.title,d.days.joinToString(","){"${AcademicClock.weekdayText(it)} ${importRuns(d.periods)}节"},if(d.from==d.to)"${d.from}周"else"${d.from}-${d.to}周",d.teacher,d.location).joinToString(" | ")
 
-/** Explicit snake_case serialization is shared with the JS import contract. */
+/** Explicit snake_case serialization shared with the local importer and AcademicTimetable. */
 internal fun nativeImportDocument(doc:AcademicTimetableDoc):JSONObject = JSONObject().put("semester",doc.semester).put("checked_at",JSONObject.NULL).put("status",if(doc.unarranged.isEmpty())"ok"else"partial").put("pending",JSONArray()).put("coverage",JSONObject().put("kind","theory").put("weeks","all").put("complete",true).put("source","manual"))
     .put("unarranged",JSONArray(doc.unarranged.map {JSONObject().put("id",it.id).put("title",it.title).put("class_name",it.className).put("teachers",JSONArray(it.teachers))}))
     .put("courses",JSONArray(doc.courses.map {course-> JSONObject().put("id",course.id).put("title",course.title).put("course_code",course.code).put("class_name",course.className).put("teacher",course.teacher).put("teachers",JSONArray(if(course.teacher.isBlank())emptyList<String>()else listOf(course.teacher))).put("meetings",JSONArray(course.meetings.map {m->JSONObject().put("id",m.id).put("course_id",course.id).put("title",m.title.ifEmpty { course.title }).put("class_name",m.className.ifEmpty { course.className }).put("weekday",m.weekday).put("weeks",JSONArray(m.weeks)).put("periods",JSONArray(m.periods)).put("teacher",m.teacher).put("location",m.location).put("raw_time",m.rawTime).put("notes",m.notes).put("online_info",m.onlineInfo)}))}))
@@ -49,54 +52,109 @@ internal fun nativeImportDocument(doc:AcademicTimetableDoc):JSONObject = JSONObj
     var doc by remember {mutableStateOf<AcademicTimetableDoc?>(null)}
     var busy by remember {mutableStateOf<String?>(null)}
     var problem by remember {mutableStateOf<String?>(null)}
-    var existing by remember {mutableStateOf<String?>(null)}
     var template by remember {mutableStateOf("")}
     var savedAt by remember {mutableStateOf(semester)}
+    val existing = if (s.manualSemester == semester) s.manualSchool else null
+
     fun go(next:Int){problem=null;step=next}
+
     suspend fun parse(format:String,body:String) {
         busy="parse";problem=null
         try {
-            val result=store.request("/v1/timetable/import/parse","POST",JSONObject().put("text",body).put("format",format).put("semester",semester))
+            val result = withContext(Dispatchers.Default) {
+                if (format == "csv") store.importManualCsvLocal(body, semester)
+                else store.importManualTextLocal(body, format = format, semester = semester)
+            }
             raw=result
-            doc=AcademicTimetable.normalize(JSONObject().put("semester",result.optString("semester").ifBlank{semester}).put("status","ok").put("courses",result.optJSONArray("courses")?:JSONArray()).put("unarranged",result.optJSONArray("unarranged")?:JSONArray()).put("pending",JSONArray()).put("coverage",JSONObject().put("complete",true)))
+            doc=AcademicTimetable.normalize(
+                JSONObject()
+                    .put("semester",result.optString("semester").ifBlank{semester})
+                    .put("status","ok")
+                    .put("courses",result.optJSONArray("courses")?:JSONArray())
+                    .put("unarranged",result.optJSONArray("unarranged")?:JSONArray())
+                    .put("pending",JSONArray())
+                    .put("coverage",JSONObject().put("complete",true)),
+            )
             go(2)
-        }catch(e:CancellationException){throw e}catch(e:NativeApiError){problem=if(e.code in listOf("not_signed_in","preview"))"请先返回「我的」登录助手账号，再导入保存课表。"else"服务器没有回应，检查一下网络再试一次。"}catch(_:Exception){problem="服务器没有回应，检查一下网络再试一次。"}finally{busy=null}
+        } catch(e:CancellationException){throw e}
+        catch(_:Exception){problem="本地解析失败，请检查课表格式后再试一次。"}
+        finally{busy=null}
     }
+
     val file=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) {uri->if(uri!=null)scope.launch {
-        try {val body=withContext(Dispatchers.IO){context.contentResolver.openInputStream(uri)?.bufferedReader(Charsets.UTF_8)?.use{it.readText()}?:error("file")};text=body;method="csv";parse("csv",body)}
-        catch(e:CancellationException){throw e}catch(_:Exception){problem="文件没有读出来，请选择 CSV UTF-8 文本再试一次。"}
+        try {
+            val body=withContext(Dispatchers.IO){context.contentResolver.openInputStream(uri)?.bufferedReader(Charsets.UTF_8)?.use{it.readText()}?:error("file")}
+            text=body;method="csv";parse("csv",body)
+        } catch(e:CancellationException){throw e}
+        catch(_:Exception){problem="文件没有读出来，请选择 CSV UTF-8 文本再试一次。"}
     }}
+
     val saveTemplate=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) {uri->if(uri!=null)scope.launch {
         try {withContext(Dispatchers.IO){context.contentResolver.openOutputStream(uri)?.use{it.write(template.toByteArray(Charsets.UTF_8))}?:error("file")}}
-        catch(e:CancellationException){throw e}catch(_:Exception){problem="模板没下载下来，检查一下网络再试一次。"}
+        catch(e:CancellationException){throw e}
+        catch(_:Exception){problem="模板未能保存到本机，请重新选择保存位置。"}
     }}
-    LaunchedEffect(store,semester) {try {val result=store.request("/v1/timetable/manual?semester=$semester");if(result.optJSONObject("doc")!=null)existing=result.optString("school")}catch(e:CancellationException){throw e}catch(_:Exception){}}
+
     BackHandler {onNavigate("me")}
-    NPage("导入课表","手动录入 · $semester",actions={NButton("‹ 我的",{onNavigate("me")},haptic=NativeButtonHaptic.Navigation)}) {
-        NText("医学院的教务系统和主校区不是一套，没法自动同步，只能自己录。录完和自动同步的课表一样显示。",14,muted=true)
-        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {listOf("选校区","录入","核对","完成").forEachIndexed {i,label->NText("${if(i<step)"✓"else i+1} $label",13,bold=i==step,muted=i!=step,maxLines=1,softWrap=false,tabularNums=true)}}
+    NPage("导入课表","纯本地离线 · $semester",actions={NButton("‹ 我的",{onNavigate("me")},haptic=NativeButtonHaptic.Navigation)}) {
+        NText("全部在手机本地离线解析并加密保存，不会上传服务器。录完后和自动同步的课表共用同一套页面和作息时间。",14,muted=true)
+        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {
+            listOf("选校区","录入","核对","完成").forEachIndexed {i,label->
+                NText("${if(i<step)"✓"else i+1} $label",13,bold=i==step,muted=i!=step,maxLines=1,softWrap=false,tabularNums=true)
+            }
+        }
         when(step) {
             0->{
-                importSchools.forEach {(id,name,hint)->NCard {NRow(name,hint,if(existing==id)"这个学期已录过"else"",onClick={school=id;go(1)});if(id=="med")NText("医学院教务系统和主校区不同，需要你自己录入；录完之后和自动同步的课表一样显示。",14,muted=true)}}
-                if(existing!=null)NText("这个学期已经有一份手动课表（${importSchools.firstOrNull{it.first==existing}?.second?:existing}）。再导入会整份覆盖，不会留两份。",14,muted=true)
+                importSchools.forEach {(id,name,hint)->
+                    NCard {
+                        NRow(name,hint,if(existing==id)"这个学期已录过"else"",onClick={school=id;go(1)})
+                        if(id=="med") NText("医学院同学也可选择手动录入；录完后与自动同步课表完全一致。",14,muted=true)
+                    }
+                }
+                if(existing!=null) {
+                    NCard {
+                        NText("这个学期本机已经有一份手动课表（${importSchools.firstOrNull{it.first==existing}?.second?:existing}）。再导入会整份覆盖。",14,muted=true)
+                        NButton(
+                            label = if (busy == "clear") "正在清除…" else "清除手动课表",
+                            onClick = {
+                                scope.launch {
+                                    busy = "clear"; problem = null
+                                    try { store.clearManualTimetableLocal() }
+                                    catch (e: CancellationException) { throw e }
+                                    catch (_: Exception) { problem = "未能清除手动课表，请重试。" }
+                                    finally { busy = null }
+                                }
+                            },
+                            enabled = busy == null,
+                            haptic = NativeButtonHaptic.Destructive,
+                        )
+                    }
+                }
             }
             1->{
                 NButton("‹ 换校区",{go(0)},haptic=NativeButtonHaptic.Navigation)
                 NChips(importMethods,method,{method=it})
                 when(method) {
-                    "paste"->{NField("把课表粘在这里",text,{text=it},multiline=true,placeholder="前端工程实践 | 周四 6-9节 | 1-16周 | 沈清扬 | 实验楼-数字媒体室508\n高等数学 | 周一 1-2节,周三 3-4节 | 1-16周 | 林致远 | 明理楼-A201",minHeight=190);NText("一行一门课，竖线或制表符分隔。从 Excel 直接复制也行。",14,muted=true);ImportHowTo()}
+                    "paste"->{
+                        NField("把课表粘在这里",text,{text=it},multiline=true,placeholder="前端工程实践 | 周四 6-9节 | 1-16周 | 沈清扬 | 实验楼-数字媒体室508\n高等数学 | 周一 1-2节,周三 3-4节 | 1-16周 | 林致远 | 明理楼-A201",minHeight=190)
+                        NText("一行一门课，竖线或制表符分隔。从 Excel 直接复制也行。",14,muted=true)
+                        ImportHowTo()
+                    }
                     "csv"->NCard {
-                        NText("Excel 里按「课程名称 / 星期 / 节次 / 周次 / 教师 / 地点」六列填，存成 CSV UTF-8 再选进来。先下模板最省事。",14,muted=true)
+                        NText("Excel 里按「课程名称 / 星期 / 节次 / 周次 / 教师 / 地点」六列填，存成 CSV UTF-8 再选进来。先在本机生成模板最省事。",14,muted=true)
                         FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-                            NButton("下载模板",{scope.launch {try {template=store.requestText("/v1/timetable/import/template");saveTemplate.launch("课表模板-$semester.csv")}catch(e:CancellationException){throw e}catch(_:Exception){problem="模板没下载下来，检查一下网络再试一次。"}}},busy==null,haptic=NativeButtonHaptic.Utility)
+                            NButton("生成模板",{
+                                template = store.csvTemplateLocal()
+                                saveTemplate.launch("课表模板-$semester.csv")
+                            },busy==null,haptic=NativeButtonHaptic.Utility)
                             NButton("选择文件",{file.launch(arrayOf("text/csv","text/comma-separated-values","text/x-csv","text/plain","application/csv","application/vnd.ms-excel"))},busy==null,haptic=NativeButtonHaptic.Utility)
                         }
-                        if(text.isNotEmpty())NText("已读到 ${text.lines().count{it.isNotBlank()}} 行，点下面「解析」看看对不对。",14,muted=true)
+                        if(text.isNotEmpty())NText("已读到 ${text.lines().count{it.isNotBlank()}} 行，点下面「本地解析」看看对不对。",14,muted=true)
                     }
                     "manual"->ImportManual(busy!=null) {drafts->scope.launch {parse("paste",drafts.joinToString("\n",transform=::importLine))}}
                 }
                 NError(problem)
-                if(method!="manual")NButton(if(busy=="parse")"正在解析…"else"解析",{scope.launch{parse(if(method=="csv")"csv"else"paste",text)}},busy==null&&text.isNotBlank(),true,Modifier.fillMaxWidth(),haptic=NativeButtonHaptic.Submit)
+                if(method!="manual")NButton(if(busy=="parse")"正在解析…"else"本地解析",{scope.launch{parse(if(method=="csv")"csv"else"paste",text)}},busy==null&&text.isNotBlank(),true,Modifier.fillMaxWidth(),haptic=NativeButtonHaptic.Submit)
             }
             2->{
                 NButton("‹ 返回修改",{go(1)},busy==null,haptic=NativeButtonHaptic.Navigation)
@@ -115,19 +173,29 @@ internal fun nativeImportDocument(doc:AcademicTimetableDoc):JSONObject = JSONObj
                 if(courses.isNotEmpty())ImportPreviewGrid(courses)
                 val unarranged=doc?.unarranged.orEmpty()
                 if(unarranged.isNotEmpty())NCard {NText("没排时间的课（${unarranged.size} 门）",16,true);unarranged.forEach{NText(it.title,14)};NText("这些会挂在课表页「需要留意」里，不会画进格子。",14,muted=true)}
-                NField("备注（自己看，可留空）",note,{note=it.take(200)})
+                NField("备注（仅本机保存，可留空）",note,{note=it.take(200)})
                 NError(problem)
-                NButton(if(busy=="save")"正在导入…"else if(errors.isNotEmpty())"先导入读懂的 ${courses.size} 门"else"确认导入",{scope.launch {
+                NButton(if(busy=="save")"正在保存到本机…"else if(errors.isNotEmpty())"先导入读懂的 ${courses.size} 门"else"确认保存到本机",{scope.launch {
                     busy="save";problem=null
-                    try {val res=store.request("/v1/timetable/import/save","POST",JSONObject().put("doc",nativeImportDocument(doc!!)).put("school",school).put("note",note));if(res.optBoolean("ok")){savedAt=res.optString("semester",semester);go(3);store.reloadAfterMutation()}else{raw=JSONObject(raw.toString()).put("errors",res.optJSONArray("errors")?:JSONArray().put("导入没有成功，再试一次"));problem="这份课表没通过服务端校验，看看下面红字。"}}
-                    catch(e:CancellationException){throw e}catch(_:Exception){problem="导入没有送出去，检查一下网络再试一次。"}finally{busy=null}
+                    try {
+                        val res=store.saveManualTimetableLocal(nativeImportDocument(doc!!),school,note)
+                        if(res.optBoolean("ok")){
+                            savedAt=res.optString("semester",semester)
+                            go(3)
+                        } else {
+                            raw=JSONObject(raw.toString()).put("errors",res.optJSONArray("errors")?:JSONArray().put("导入没有成功，再试一次"))
+                            problem="这份课表没通过本地校验，看看下面红字。"
+                        }
+                    } catch(e:CancellationException){throw e}
+                    catch(_:Exception){problem="保存到本机加密存储失败，请重试。"}
+                    finally{busy=null}
                 }},courses.isNotEmpty()&&busy==null,true,Modifier.fillMaxWidth(),haptic=NativeButtonHaptic.Submit)
                 if(courses.isEmpty())NText("一门课都没解析出来，先回去改一下。每一行至少要有课程名和「周几 第几节」。",14,muted=true)
                 else if(errors.isNotEmpty())NText("也可以先导进去，回头把那几行改好再导入一次 —— 同一学期是整份覆盖，不会留两份。",14,muted=true)
             }
-            3->{NCard {NText("✓ 课表已经存好了",18,true);NText("$savedAt · ${importSchools.firstOrNull{it.first==school}?.second.orEmpty()} · ${doc?.courses?.size?:0} 门课。从这一秒起它和自动同步的课表走同一套页面、同一套作息时间，不用再做什么。",14,muted=true)};NButton("去看课表 →",{onNavigate("week")},primary=true,modifier=Modifier.fillMaxWidth(),haptic=NativeButtonHaptic.Navigation);NText("录错了随时回来重录：同一学期再导入一次就是整份覆盖，不会留两份。",14,muted=true)}
+            3->{NCard {NText("✓ 课表已经加密存到本机",18,true);NText("$savedAt · ${importSchools.firstOrNull{it.first==school}?.second.orEmpty()} · ${doc?.courses?.size?:0} 门课。从这一秒起它和自动同步的课表走同一套页面、同一套作息时间，全程不上传服务器。",14,muted=true)};NButton("去看课表 →",{onNavigate("week")},primary=true,modifier=Modifier.fillMaxWidth(),haptic=NativeButtonHaptic.Navigation);NText("录错了随时回来重录：同一学期再导入一次就是整份覆盖，不会留两份。",14,muted=true)}
         }
-        NText("节次时刻按教务处作息表算：13 节、5 个大节，第二、四、五大节各 155 分钟，晚课 19:20 开始。录进去的课只存在你自己的账号里。",14,muted=true)
+        NText("节次时刻按教务处作息表算：13 节、5 个大节，第二、四、五大节各 155 分钟，晚课 19:20 开始。录进去的课仅加密存在这台手机里。",14,muted=true)
     }
 }
 

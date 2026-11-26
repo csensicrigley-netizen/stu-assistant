@@ -235,11 +235,13 @@ export function MedBindScreen() {
               className="input"
               type="password"
               autoComplete="current-password"
-              placeholder="医学院教务系统的密码，不是统一认证那个"
+              placeholder={mode === "sso" ? "学校统一认证密码" : "医学院教务本地密码"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
-            <p className="field__hint">只用这一次换会话凭证，用完就丢，不保存。</p>
+            <p className="field__hint">
+              网页版由服务器经内存代为换取会话凭证，密码不落盘、不入库；在意服务端中转可使用安卓端纯本地直连。
+            </p>
           </div>
 
           <div className="row-actions">

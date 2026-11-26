@@ -54,6 +54,52 @@ def _ensure_private_dirs(home: Path, key: Path) -> None:
             fh.write(Fernet.generate_key())
 
 
+def _reject_symlink(path: Path) -> bool:
+    try:
+        return path.is_symlink()
+    except OSError:
+        return True
+
+
+class SessionOnlyKeyStore:
+    """KeyStore adapter for stu-mcp Vault that NEVER persists user passwords.
+
+    stu-mcp's Vault stores its symmetric session-encryption key via KeyStore
+    under service ``stu-mcp.session-key``. Returning the tenant's own 0600
+    ``master.key`` directly (while still reading any legacy session key from an
+    existing ``credentials.enc`` read-only) keeps session cookie encryption
+    intact while guaranteeing ``credentials.enc`` is never created or written,
+    and no school password or TOTP seed can ever be stored or retrieved.
+    """
+
+    _SESSION_KEY_SERVICE = "stu-mcp.session-key"
+
+    def __init__(self, home: Path, key_file: Path) -> None:
+        self.home = Path(home)
+        self.key_file = Path(key_file)
+
+    def get_password(self, service: str, username: str) -> str | None:
+        if service != self._SESSION_KEY_SERVICE:
+            return None
+        legacy = self.home / "credentials.enc"
+        if legacy.is_file() and not _reject_symlink(legacy):
+            try:
+                from stu_mcp.credentials import FileKeyStore
+
+                existing = FileKeyStore(self.home, self.key_file).get_password(service, username)
+                if existing:
+                    return existing
+            except Exception:  # noqa: BLE001 - fall back to tenant master.key
+                pass
+        return self.key_file.read_text(encoding="ascii").strip()
+
+    def set_password(self, service: str, username: str, password: str) -> None:
+        raise PermissionError("server_password_persistence_disabled")
+
+    def delete_password(self, service: str, username: str) -> None:
+        return None
+
+
 @dataclass(frozen=True)
 class Tenant:
     user_id: str
@@ -68,10 +114,49 @@ class Tenant:
         return Runtime(self.home)
 
     def vault(self):
-        from stu_mcp.credentials import FileKeyStore
         from stu_mcp.vault import Vault
 
-        return Vault(self.runtime(), store=FileKeyStore(self.home, self.key))
+        return Vault(self.runtime(), store=SessionOnlyKeyStore(self.home, self.key))
+
+    def purge_webvpn_auto(self) -> bool:
+        """Remove any legacy WebVPN auto-login / TOTP seed files for this tenant."""
+        removed = False
+        marker = self.home / "webvpn-auto.json"
+        if marker.exists() and not _reject_symlink(marker):
+            try:
+                marker.unlink()
+                removed = True
+            except OSError:
+                pass
+        legacy = self.home / "credentials.enc"
+        if legacy.is_file() and not _reject_symlink(legacy) and self.key.is_file():
+            try:
+                import json
+                from cryptography.fernet import Fernet
+
+                cipher = Fernet(self.key.read_bytes().strip())
+                data = json.loads(cipher.decrypt(legacy.read_bytes()).decode("utf-8"))
+                entries = data.get("entries") if isinstance(data, dict) else None
+                if isinstance(entries, dict):
+                    non_session = [k for k in list(entries) if k != SessionOnlyKeyStore._SESSION_KEY_SERVICE]
+                    if non_session:
+                        for k in non_session:
+                            entries.pop(k, None)
+                        removed = True
+                        if not entries:
+                            legacy.unlink(missing_ok=True)
+                        else:
+                            payload = json.dumps({"version": 1, "entries": entries}, ensure_ascii=False).encode("utf-8")
+                            encrypted = cipher.encrypt(payload)
+                            tmp = self.home / ".credentials-clean.tmp"
+                            fd = os.open(str(tmp), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+                            with os.fdopen(fd, "wb") as fh:
+                                fh.write(encrypted)
+                                fh.flush()
+                            os.replace(tmp, legacy)
+            except Exception:  # noqa: BLE001
+                pass
+        return removed
 
     def session_exists(self, service: str) -> bool:
         """stu-mcp 落盘的会话有 .enc（现版本，加密）和 .bin（旧版本）两种后缀，

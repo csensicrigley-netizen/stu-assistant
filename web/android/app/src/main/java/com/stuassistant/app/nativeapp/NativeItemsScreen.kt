@@ -133,7 +133,7 @@ fun NativeCalendarItemsScreen(
     onConnect: () -> Unit,
     route: String = "items",
 ) {
-    var records by remember(s.server, s.user?.optString("id"), s.preview) {
+    var records by remember(s.preview) {
         mutableStateOf(
             if (s.preview) {
                 ItemsDrafts.samplePreviewRecords(s.calendarFocusDate ?: AcademicClock.moment().date)
@@ -142,14 +142,14 @@ fun NativeCalendarItemsScreen(
             },
         )
     }
-    var error by remember(s.server, s.user?.optString("id")) { mutableStateOf<String?>(null) }
-    var pendingWrites by remember(s.server, s.user?.optString("id")) { mutableIntStateOf(0) }
-    var busyPlans by remember(s.server, s.user?.optString("id")) { mutableStateOf<Set<String>>(emptySet()) }
+    var error by remember(s.preview) { mutableStateOf<String?>(null) }
+    var pendingWrites by remember(s.preview) { mutableIntStateOf(0) }
+    var busyPlans by remember(s.preview) { mutableStateOf<Set<String>>(emptySet()) }
     val scope = rememberCoroutineScope()
     val openAiComposer = LocalCalendarComposer.current
 
-    LaunchedEffect(s.server, s.user?.optString("id"), s.calendarRevision, s.preview, s.token, pendingWrites == 0) {
-        if (!s.preview && s.token != null && pendingWrites == 0) {
+    LaunchedEffect(s.calendarRevision, s.preview, pendingWrites == 0) {
+        if (!s.preview && pendingWrites == 0) {
             try {
                 val loaded = store.calendarItems()
                 if (pendingWrites == 0) records = loaded
@@ -160,12 +160,12 @@ fun NativeCalendarItemsScreen(
             }
         }
     }
-    LaunchedEffect(s.token) {
-        if (!s.preview && s.token != null) runCatching { store.loadPlans() }
+    LaunchedEffect(s.preview) {
+        if (!s.preview) runCatching { store.loadPlans() }
     }
 
     fun persistCalendar(write: suspend (String) -> Unit) {
-        if (s.preview || s.token == null) return
+        if (s.preview) return
         if (pendingWrites == 0) error = null
         pendingWrites++
         try {
@@ -182,13 +182,13 @@ fun NativeCalendarItemsScreen(
         }
     }
 
-    key(s.server, s.user?.optString("id"), s.preview) {
+    key(s.preview) {
         NativeItemsPage(
             s = s,
             records = records,
             initialRoute = route,
             error = error,
-            onOpenAiComposer = { draft -> if (s.preview || s.token == null) onConnect() else openAiComposer(draft) },
+            onOpenAiComposer = { draft -> if (s.preview) onConnect() else openAiComposer(draft) },
             onSetRecordDone = { id, done ->
                 records = records.map { r ->
                     if (r.optString("id") == id) JSONObject(r.toString()).put("done", done) else r
@@ -1308,7 +1308,7 @@ internal fun NativeItemsPage(
                 manualEndMin = quickManualEnd,
                 manualAllDay = quickManualAllDay,
                 tokenOff = quickTokenOff,
-                canUseOnlineAi = !s.preview && s.token != null && onOpenAiComposer != null,
+                canUseOnlineAi = !s.preview && onOpenAiComposer != null,
                 doc = doc,
                 exams = exams,
                 allItems = models,

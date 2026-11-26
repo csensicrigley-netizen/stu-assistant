@@ -72,13 +72,15 @@ fun NativeCampusScreen(
     val active = campusForeground()
     val now = campusNow(active)
     val currentIdx = sectionOrder.indexOf(section).coerceAtLeast(0)
+    var syncError by remember { mutableStateOf<String?>(null) }
     fun selectSection(next: String) {
         if (next != section) {
             section = next
             onSectionChange(next)
         }
     }
-    NPage("校园", "", actions = { CampusModePill(store, s, onConnect) }) {
+    NPage("校园", "", actions = { CampusModePill(store, s, onConnect) { syncError = it } }) {
+        NError(syncError)
         val c = LocalNativeColors.current
         val tick = nSelectionFeedback()
         val tabs = listOf("home" to "常用", "notices" to "通知", "life" to "生活", "calendar" to "校历")
@@ -417,7 +419,12 @@ private fun campusNow(active: Boolean): AcademicMoment {
 }
 
 @Composable
-private fun CampusModePill(store: NativeStore, s: NativeState, onConnect: () -> Unit) {
+private fun CampusModePill(
+    store: NativeStore,
+    s: NativeState,
+    onConnect: () -> Unit,
+    onError: (String?) -> Unit = {},
+) {
     val scope = rememberCoroutineScope()
     val busy = s.loading || s.syncing
     val label = when {
@@ -432,12 +439,13 @@ private fun CampusModePill(store: NativeStore, s: NativeState, onConnect: () -> 
         onClick = {
             if (s.sample) onConnect()
             else scope.launch {
+                onError(null)
                 try {
                     store.refresh("sync")
                 } catch (cancel: CancellationException) {
                     throw cancel
-                } catch (_: Exception) {
-                    /* The store publishes the refresh error. */
+                } catch (err: Exception) {
+                    onError(formatLocalError(err))
                 }
             }
         },
@@ -715,7 +723,7 @@ private suspend fun campusFetchCharging(store: NativeStore, server: String): Lis
     var answered = false
     val rows = try {
         if (server.isBlank()) emptyList() else {
-            val response = store.request("/v1/charging", auth = false)
+            val response = store.request("/v1/public/charging", auth = false)
             answered = true
             academicObjects(response.optJSONArray("devices"))
         }
@@ -778,7 +786,7 @@ private fun CampusLife(store: NativeStore, s: NativeState, now: AcademicMoment, 
 
     var charging by remember { mutableStateOf<List<CampusCharge>>(emptyList()) }
     var place by rememberSaveable { mutableStateOf<String?>(null) }
-    LaunchedEffect(store, s.server, s.token, active) {
+    LaunchedEffect(store, s.server, active) {
         if (!active) return@LaunchedEffect
         while (true) {
             charging = campusFetchCharging(store, s.server)
@@ -1151,11 +1159,11 @@ private fun CampusBusBoard(
     val c = LocalNativeColors.current
     var data by remember { mutableStateOf<JSONObject?>(null) }
     var error by remember { mutableStateOf(false) }
-    LaunchedEffect(store, s.server, s.token, active) {
+    LaunchedEffect(store, s.server, active) {
         if (!active) return@LaunchedEffect
         while (true) {
             try {
-                data = store.request("/v1/bus")
+                data = store.request("/v1/public/bus", auth = false)
                 error = false
             } catch (cancel: CancellationException) {
                 throw cancel

@@ -78,46 +78,12 @@ def sync_user(uid: str, sources: list[str] | None = None, *, force: bool = False
         run_id = db.start_run(uid, source)
         try:
             with tenant_scope(uid) as tenant:
-                # public 源也要 vault：OA 通知走的是租户自己的 WebVPN 会话
                 vault = tenant.vault()
                 result = collect(vault, source)
-                # 学校会话过期很频繁；绑定时密码已经加密存在租户自己的 keyring 里，
-                # 这里直接用它重登一次再读，用户不用再去点"重新连接"。
-                service = SESSION_FOR.get(source, source)
-                if result.code == CODE_NEED_INPUT and vault is not None:
-                    from .relogin import relogin
-
-                    if relogin(vault, service):
-                        result = collect(vault, source)
-                        if result.code == CODE_OK:
-                            result.detail = f"{result.detail}（已自动重登）"
         except Exception as exc:  # noqa: BLE001 - never let one source kill the sweep
-            # 会话过期有时是抛异常而不是返回码：也走一次"静默重登 + 重试"，
-            # 免得用户看到一屏红字。
-            healed = None
-            if source in SESSION_FOR:
-                service = SESSION_FOR.get(source, source)
-                try:
-                    # 只进一层 scope，复用同一个 vault。
-                    # 原来这里套了两层 tenant_scope，靠"外层已经拿住槽位"的注释
-                    # 来解释——但锁本身没变可重入，第二次进直接自己等自己，
-                    # 线程永久卡死、槽位不释放（审查报告第 06 项）。
-                    with tenant_scope(uid) as tenant:
-                        from .relogin import relogin
-
-                        vault = tenant.vault()
-                        if relogin(vault, service):
-                            healed = collect(vault, source)
-                            if healed.code == CODE_OK:
-                                healed.detail = f"{healed.detail}（已自动重登）"
-                except Exception:  # noqa: BLE001
-                    healed = None
-            if healed is None or healed.code != CODE_OK:
-                db.finish_run(run_id, 1, type(exc).__name__)
-                report.append({"source": source, "code": 1, "detail": type(exc).__name__})
-                continue
-            result = healed
-
+            db.finish_run(run_id, 1, type(exc).__name__)
+            report.append({"source": source, "code": 1, "detail": type(exc).__name__})
+            continue
         finally:
             _SLOTS[source].release()
 

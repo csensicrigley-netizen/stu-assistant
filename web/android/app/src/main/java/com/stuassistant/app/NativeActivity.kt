@@ -62,7 +62,7 @@ class NativeActivity:ComponentActivity() {
         migrateLegacyStorage(this,store) {ready=true;refresh("read")}
     }
     private fun refresh(how:String) {
-        if(store.state.value.token==null||store.state.value.preview)return
+        if(store.state.value.preview)return
         work.launch {try{store.refresh(how)}catch(e:CancellationException){throw e}catch(_:Exception){}}
     }
     override fun onResume() {super.onResume();resumeEpoch++;if(ready)refresh("auto")}
@@ -129,20 +129,18 @@ class NativeActivity:ComponentActivity() {
     )
     var route by rememberSaveable {mutableStateOf("today")}
     var calendarOpen by rememberSaveable {mutableStateOf(false)}
-    var calendarDraft by key(s.server, s.user?.optString("id"), s.preview) {
+    var calendarDraft by key(s.preview) {
         rememberSaveable { mutableStateOf<CalendarComposerDraft?>(null) }
     }
     var campusView by rememberSaveable {mutableStateOf("home")}
     var connect by rememberSaveable {mutableStateOf(false)}
     var gateStart by rememberSaveable {mutableStateOf("hello")}
     var gateCancelable by rememberSaveable {mutableStateOf(false)}
-    val needsWelcome=s.token==null&&!s.preview
-    // The onboarding flow owns its lifetime across account login and school binding.
-    // Receiving the app token must not unmount the gate before its Bind step.
+    val needsWelcome=!s.onboarded&&!s.preview
     LaunchedEffect(ready,needsWelcome) {
-        if(ready&&needsWelcome&&!connect){gateStart=if(s.error?.contains("登录已过期")==true)"account"else"hello";gateCancelable=false;connect=true}
+        if(ready&&needsWelcome&&!connect){gateStart="hello";gateCancelable=false;connect=true}
     }
-    val onConnect:()->Unit={gateStart=if(s.token!=null&&!s.preview)"bind"else"account";gateCancelable=true;connect=true}
+    val onConnect:()->Unit={gateStart="bind";gateCancelable=true;connect=true}
     val navigate:(String)->Unit={if(it.startsWith("campus:"))campusView=it.substringAfter(':');route=it}
     val openCalendarComposer: (CalendarComposerDraft) -> Unit = { draft ->
         calendarDraft = draft
@@ -153,7 +151,7 @@ class NativeActivity:ComponentActivity() {
     val combined=rememberCombinedBackdrop(base,page)
     val sheets=remember {NativeSheetController()}
     val barSuppressor = remember { NativeBottomBarSuppressor() }
-    val itemsViewState = key(s.server, s.user?.optString("id"), s.preview) {
+    val itemsViewState = key(s.preview) {
         rememberSaveableStateHolder()
     }
     val density=LocalDensity.current
@@ -198,7 +196,18 @@ class NativeActivity:ComponentActivity() {
                 Box(Modifier.fillMaxSize().layerBackdrop(page).nativeSheetBackground(sheets)
                     .then(if(calendarOpen) Modifier.clearAndSetSemantics {} else Modifier)) {
                     if(!ready) Box(Modifier.fillMaxSize(),contentAlignment=Alignment.Center){NativeLogo(80)}
-                    else if(needsWelcome||connect) NativeWelcomeScreen(store,s,start=gateStart,onDone={connect=false;store.reloadAfterMutation()},onCancel=if(gateCancelable){{connect=false}}else null)
+                    else if(needsWelcome||connect) NativeWelcomeScreen(
+                        store = store,
+                        s = s,
+                        start = gateStart,
+                        onDone = { connect = false; store.completeOnboarding(); store.reloadAfterMutation() },
+                        onCancel = if (gateCancelable) ({ connect = false }) else ({ store.completeOnboarding(); connect = false }),
+                        onNavigate = { target ->
+                            store.completeOnboarding()
+                            connect = false
+                            navigate(target)
+                        },
+                    )
                     else NativePageTransition(NativePageRoute(route,campusView),reduced) { snapshot ->
                         when {
                             snapshot.route=="today"->NativeTodayScreen(store,s,navigate,onConnect)
@@ -207,7 +216,7 @@ class NativeActivity:ComponentActivity() {
                                 NativeCalendarItemsScreen(store, s, onConnect, route = snapshot.route)
                             }
                             snapshot.route.startsWith("campus")->NativeCampusScreen(store,s,snapshot.campusView,onConnect,{campusView=it})
-                            snapshot.route=="me"->NativeMeScreen(store,s,onConnect,{connect=false;route="today"},navigate)
+                            snapshot.route=="me"->NativeMeScreen(store,s,onConnect,{gateStart="hello";gateCancelable=false;connect=false;route="today"},navigate)
                             snapshot.route=="medical"->NativeMedicalScreen(store,s,navigate)
                             snapshot.route=="import"->NativeImportScreen(store,s,navigate)
                             else->NativeTodayScreen(store,s,navigate,onConnect)
@@ -219,7 +228,8 @@ class NativeActivity:ComponentActivity() {
                 if(showBottomNavigation) {
                     val current=if(route=="import"||route=="medical")"me"else route.substringBefore(':')
                     val urgent=s.tasks.map(AcademicRecords::task).count {it.id !in s.done&&AcademicRecords.bucket(it) in listOf("today","overdue")}
-                    val reconnect=s.sources.count {it.optString("state")=="need_login"&&it.optString("source") in academicStrings(s.user?.optJSONArray("bound"))}
+                    val boundSet=s.boundSources.ifEmpty { academicStrings(s.user?.optJSONArray("bound")).toSet() }
+                    val reconnect=s.sources.count {it.optString("state")=="need_login"&&it.optString("source") in boundSet}
                     val tabs=listOf(GlassNavigationTab("today","今天"),GlassNavigationTab("week","课表"),GlassNavigationTab("items","事项",urgent),GlassNavigationTab("campus","校园"),GlassNavigationTab("me","我的",reconnect))
                     val navRetract by animateFloatAsState(
                         targetValue = if (retractBottomNavigation) 1f else 0f,
@@ -250,7 +260,7 @@ class NativeActivity:ComponentActivity() {
                 if(ready) NativeUpdatePrompt(store,combined,Modifier.align(Alignment.BottomCenter).padding(start=12.dp,end=12.dp,bottom=(104+bottom).dp).nativeSheetBackground(sheets))
                 NativeHomeAnnouncement(store,ready&&!needsWelcome&&!connect&&route=="today"&&!ime&&!calendarOpen,sheets.entries.isEmpty())
                 NativeSheetHost(sheets,combined)
-                AnimatedVisibility(calendarOpen&&s.token!=null&&!s.preview, enter=slideInVertically(tween(420)){ -it/12 }+fadeIn(tween(220)), exit=slideOutVertically(tween(260)){ -it/12 }+fadeOut(tween(220))) {
+                AnimatedVisibility(calendarOpen&&!s.preview, enter=slideInVertically(tween(420)){ -it/12 }+fadeIn(tween(220)), exit=slideOutVertically(tween(260)){ -it/12 }+fadeOut(tween(220))) {
                     CompositionLocalProvider(LocalNativeBackdrop provides base) {
                         key(calendarDraft) {
                             NativeCalendarComposer(store, s, inputBackdrop = combined, initialDraft = calendarDraft) {

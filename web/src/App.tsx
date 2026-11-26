@@ -19,6 +19,7 @@ import { UpdateBanner } from "./components/UpdateBanner";
 import { AnnouncementPopup } from "./components/AnnouncementPopup";
 import { useTheme } from "./lib/useTheme";
 import { AUTH_LOST, getToken, setToken } from "./lib/api";
+import { clearAllSchool } from "./lib/school";
 import { pageVariants } from "./lib/motion";
 import { initNative, onBack } from "./lib/native";
 import { captureFromTodayFlag, isFromToday } from "./lib/today-export";
@@ -100,6 +101,7 @@ export default function App() {
   // the server rejected our token (expired, or the account was deleted)
   useEffect(() => {
     const onLost = () => {
+      clearAllSchool();
       setToken(null);
       setPreviewFlag(false);
       setEpoch((n) => n + 1);

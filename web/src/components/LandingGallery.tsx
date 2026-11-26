@@ -1190,12 +1190,12 @@ export function LandingGallery({
               {...revealProps}
             >
               <div className="ld-fcard__copy">
-                <h3 className="ld-fcard__title">隐私只属于你，全程只读绝不代办</h3>
+                <h3 className="ld-fcard__title">数据边界清晰，全程只读不代办</h3>
                 <p className="ld-fcard__body">
-                  绑定时仅由你本人一次性通过学校统一身份认证，成功后只保留可随时吊销的加密会话，不保存校园网明文密码。助手严格保持只读，绝不替你向学校系统提交任何写操作。
+                  安卓 App 免注册直连学校，学号、密码、会话与课表仅加密存于本机；网页版受浏览器跨域策略限制由服务器代为认证，密码仅内存过手不落盘、不入库，浏览器也不保存密码。两端均只读，不向学校提交写操作。
                 </p>
                 <p className="ld-fcard__meta">
-                  本人授权 · 只读不代办 · 随时一键清除账号与缓存
+                  安卓纯本地直连 · 网页版密码不落盘 · 在意中转可用安卓端或自托管后端
                 </p>
               </div>
 
@@ -1210,24 +1210,24 @@ export function LandingGallery({
                         <Icon name="shield" size={18} />
                       </span>
                       <div className="ld-prev-row__text">
-                        <b>本人授权一次性认证</b>
-                        <small>连接时直通学校统一认证，只存加密会话，密码绝不落盘。</small>
+                        <b>安卓 App 纯本地直连</b>
+                        <small>学号、密码、会话与课表仅加密存于本机，服务器仅提供公开通知、公交、充电桩与版本检查。</small>
                       </div>
                     </div>
-                    <span className="ld-prev-tag ld-prev-tag--strong">本人授权</span>
+                    <span className="ld-prev-tag ld-prev-tag--strong">本机直连</span>
                   </div>
 
                   <div className="ld-prev-row ld-prev-row--card">
                     <div className="ld-prev-row__main">
                       <span className="ld-prev-row__icon" aria-hidden="true">
-                        <Icon name="check" size={18} />
+                        <Icon name="link" size={18} />
                       </span>
                       <div className="ld-prev-row__text">
-                        <b>只读不代办</b>
-                        <small>不签到 · 不交作业 · 不选课 · 不缴费，勾选仅记在本机。</small>
+                        <b>网页版密码仅内存过手</b>
+                        <small>受跨域限制由服务端代为认证，不落盘不入库，成功后仅留可吊销会话，浏览器不存密码。</small>
                       </div>
                     </div>
-                    <span className="ld-prev-tag">只读边界</span>
+                    <span className="ld-prev-tag">不存密码</span>
                   </div>
 
                   <div className="ld-prev-row ld-prev-row--card">
@@ -1236,11 +1236,11 @@ export function LandingGallery({
                         <Icon name="trash" size={18} />
                       </span>
                       <div className="ld-prev-row__text">
-                        <b>一键清除</b>
-                        <small>随时解绑或注销账号，立即清空服务器上的会话令牌与同步缓存。</small>
+                        <b>只读不代办 · 随时清除</b>
+                        <small>不签到、不交作业、不缴费；可随时清除本机数据，或在网页版注销并清空缓存。</small>
                       </div>
                     </div>
-                    <span className="ld-prev-tag">即时销毁</span>
+                    <span className="ld-prev-tag">只读边界</span>
                   </div>
                 </div>
               </div>
@@ -1260,7 +1260,7 @@ export function LandingGallery({
               装进手机，或直接在浏览器开始。
             </h2>
             <p className="ld-section__lead">
-              Android 安装包与全平台网页版共用同一套极简界面与账号同步；iPhone 与桌面浏览器打开即用。
+              安卓 App 纯本地直连学校、免注册即用；iPhone 与桌面浏览器可直接访问网页版或先看示例。
             </p>
           </motion.div>
 
@@ -1271,7 +1271,7 @@ export function LandingGallery({
                 <div className="ld-fcard__copy">
                   <h3 className="ld-fcard__title">Android 客户端与全平台网页版</h3>
                   <p className="ld-fcard__body">
-                    安卓手机可直接安装独立客户端，获得状态栏沉浸适配与离线秒开体验；iOS、iPadOS 与电脑浏览器直接访问网页版，也可免登录先看示例课表。
+                    安卓手机安装原生客户端后，直接由手机连接学校并加密保存在本机，无需注册助手账号；iOS、iPadOS 与电脑浏览器可直接访问网页版，或免登录先看示例课表。
                   </p>
                 </div>
 
@@ -1282,11 +1282,11 @@ export function LandingGallery({
                         <Icon name="monitor" size={17} />
                       </span>
                       <div className="ld-prev-row__text">
-                        <b>跨设备同账号同步 · v{versionName}</b>
-                        <small>Android 原生包 · Safari / Chrome 添加到主屏幕</small>
+                        <b>安卓纯本地直连 · 网页版跨端可用 · v{versionName}</b>
+                        <small>Android 原生客户端 · Safari / Chrome 添加到主屏幕</small>
                       </div>
                     </div>
-                    <span className="ld-prev-tag">免费无广告</span>
+                    <span className="ld-prev-tag">开源免费</span>
                   </div>
                 </div>
               </div>

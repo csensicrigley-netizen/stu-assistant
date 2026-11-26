@@ -92,13 +92,15 @@ def _why(exc: Exception) -> str:
 # --------------------------------------------------------------------------
 
 OA_DAILY_LIMIT = 10
+PUBLIC_NOTICE_LIMIT = 100
 
 
 def collect_notices(vault, *, limit: int = OA_DAILY_LIMIT, include_oa: bool = True) -> CollectResult:
     from stu_mcp.features.notices.adapter import NoticeAdapter
 
+    max_cap = OA_DAILY_LIMIT if include_oa else PUBLIC_NOTICE_LIMIT
     try:
-        cap = max(1, min(int(limit), OA_DAILY_LIMIT))
+        cap = max(1, min(int(limit), max_cap))
     except (TypeError, ValueError):
         cap = OA_DAILY_LIMIT
     adapter = NoticeAdapter()
@@ -374,11 +376,18 @@ def collect_mystu(vault, *, limit: int = 30) -> CollectResult:
 # （会把 A 的会话结果喂给 B，也会让"会话过期"这件事在用户之间串味）。
 # 只有匿名兜底读取（vault 为 None）才进共享缓存。
 _PUBLIC_TTL = 900
+_PUBLIC_STALE_TTL = 86400
 _public_cache: tuple[float, CollectResult] | None = None
 _public_lock = threading.Lock()
 
 
-def collect_public_shared(vault=None, **kw) -> CollectResult:
+def public_cache_timestamp() -> float | None:
+    """Timestamp of the last successful shared public notice fetch, if cached."""
+    hit = _public_cache
+    return hit[0] if hit is not None else None
+
+
+def collect_public_shared(vault=None, *, limit: int | None = None, **kw) -> CollectResult:
     """学校官网公开栏目（2026-10-29 起只做这个）。
 
     按爸爸的要求，OA 通知整块下线：不再读 OA、不再需要 WebVPN 会话、
@@ -387,15 +396,32 @@ def collect_public_shared(vault=None, **kw) -> CollectResult:
     """
     global _public_cache
 
+    try:
+        cap = OA_DAILY_LIMIT if limit is None else max(1, min(int(limit), PUBLIC_NOTICE_LIMIT))
+    except (TypeError, ValueError):
+        cap = OA_DAILY_LIMIT
+
+    def _slice(res: CollectResult) -> CollectResult:
+        return CollectResult(
+            res.source,
+            res.code,
+            res.detail,
+            {k: (list(v)[:cap] if k == "notice" else list(v)) for k, v in res.kind_records.items()},
+        )
+
     with _public_lock:  # concurrent users wait for one read, then share it
-        if _public_cache and time.time() - _public_cache[0] < _PUBLIC_TTL:
-            cached = _public_cache[1]
-            return CollectResult(cached.source, cached.code, cached.detail,
-                                 {k: list(v) for k, v in cached.kind_records.items()})
-        result = collect_notices(None, include_oa=False, **kw)
+        now_ts = time.time()
+        if _public_cache and now_ts - _public_cache[0] < _PUBLIC_TTL:
+            return _slice(_public_cache[1])
+        # Always warm the shared cache up to PUBLIC_NOTICE_LIMIT so both
+        # /v1/public/notices (up to 100) and per-user sync (cap 10) share one fetch.
+        result = collect_notices(None, include_oa=False, limit=PUBLIC_NOTICE_LIMIT, **kw)
         if result.code == CODE_OK:
             _public_cache = (time.time(), result)
-        return result
+            return _slice(result)
+        if _public_cache and now_ts - _public_cache[0] < _PUBLIC_STALE_TTL:
+            return _slice(_public_cache[1])
+        return _slice(result)
 
 
 COLLECTORS = {

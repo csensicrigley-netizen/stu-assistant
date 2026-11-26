@@ -43,3 +43,11 @@ register_limiter = SlidingLimiter(limit=600, window_seconds=3600)
 bind_limiter = SlidingLimiter(limit=6, window_seconds=3600)
 today_export_limiter = SlidingLimiter(limit=20, window_seconds=300)
 today_claim_limiter = SlidingLimiter(limit=30, window_seconds=300)
+
+# Unauthenticated public endpoints (per-IP). Campus NAT puts many students
+# behind one exit address, so read limits are generous while export ticket
+# creation stays tighter to prevent anonymous database flooding.
+public_notices_limiter = SlidingLimiter(limit=180, window_seconds=300)
+public_bus_limiter = SlidingLimiter(limit=180, window_seconds=300)
+public_charging_limiter = SlidingLimiter(limit=180, window_seconds=300)
+public_today_export_limiter = SlidingLimiter(limit=30, window_seconds=300)

@@ -1,5 +1,5 @@
 #!/bin/bash
-# 每日备份：SQLite 在线快照（WAL 安全）+ 租户目录 + 保留 14 天 + 异地到入口机
+# 每日备份：仅备份业务 SQLite 在线快照（WAL 安全），不备份 tenants/ 会话与密钥目录 + 保留 14 天 + 异地到入口机
 set -euo pipefail
 DEST=/var/backups/stu-assistant
 STAMP=$(date +%Y%m%d-%H%M%S)
@@ -28,12 +28,11 @@ print(f"integrity: {ok} tables: {tables}")
 PY
 
 gzip -f "$DEST/app-$STAMP.db"
-tar -C /var/lib/stu-assistant -czf "$DEST/tenants-$STAMP.tar.gz" tenants
-chmod 600 "$DEST"/*
+chmod 600 "$DEST/app-$STAMP.db.gz"
 
-# 只留最近 14 天
+# 只留最近 14 天业务库快照；立刻清除历史遗留的 tenants 归档（严禁把会话/密钥打包进备份）
 find "$DEST" -name "app-*.db.gz" -mtime +14 -delete
-find "$DEST" -name "tenants-*.tar.gz" -mtime +14 -delete
+rm -f "$DEST"/tenants-*.tar.gz
 
 # 异地一份到入口机（失败只记 syslog，不否定本地备份的成功）
 rsync -az --delete \

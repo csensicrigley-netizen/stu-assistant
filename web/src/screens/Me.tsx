@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "motion/react";
 import { IS_NATIVE, api, apiBase, getToken, setToken, type TodayExportTicket } from "../lib/api";
 import { openTodayDeepLink, todayExportErrorText } from "../lib/today-export";
 import { TodayExportSheet } from "../components/TodayExportSheet";
-import { clearAllSchool, clearSchool, readSchool } from "../lib/school";
+import { clearAllSchool } from "../lib/school";
 import {
   APP_VERSION_NAME,
   apkHref,
@@ -52,8 +52,11 @@ export function MeScreen({ onSignOut }: { onSignOut: () => void }) {
   const { connect, go, exitPreview } = useShell();
   const { pref, choose } = useTheme();
   const { palette, choose: choosePalette } = usePalette();
-  const [remembered, setRemembered] = useState(() => readSchool() !== null);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    clearAllSchool();
+  }, []);
   const [msg, setMsg] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [exportingToday, setExportingToday] = useState(false);
@@ -219,25 +222,10 @@ export function MeScreen({ onSignOut }: { onSignOut: () => void }) {
                 </span>
                 <span className="download__text">
                   <b>重新连接校园账号</b>
-                  <small>教务或 MySTU 掉线时，重新登录一次就能接着读。</small>
+                  <small>网页版不保存学校密码；教务或 MySTU 会话过期时，重新登录一次就能继续同步。</small>
                 </span>
                 <Icon name="arrow-right" size={18} />
               </button>
-            )}
-            {remembered && (
-              <div className="creds">
-                <span className="creds__text">已在这台设备记住学校密码，教务过期会自动重连。</span>
-                <button
-                  type="button"
-                  className="link-btn"
-                  onClick={() => {
-                    clearSchool();
-                    setRemembered(false);
-                  }}
-                >
-                  清除
-                </button>
-              </div>
             )}
             <TimetableSourceActions onGo={go} />
             {canExportToday && (
@@ -331,8 +319,10 @@ export function MeScreen({ onSignOut }: { onSignOut: () => void }) {
                 <Icon name="monitor" size={20} />
               </span>
               <span className="download__text">
-                <b>下载安卓安装包</b>
-                <small>和网页版用同一个账号。iPhone 可以在 Safari 里“添加到主屏幕”。</small>
+                <b>下载安卓安装包（v{APP_VERSION_NAME}）</b>
+                <small>
+                  纯本地直连学校，无需注册助手账号；学号、密码、会话与课表仅加密保存在手机本机。iPhone 可在 Safari 里「添加到主屏幕」使用网页版。
+                </small>
               </span>
               <Icon name="arrow-right" size={18} />
             </a>
@@ -357,8 +347,19 @@ export function MeScreen({ onSignOut }: { onSignOut: () => void }) {
           <li className="privacy-row">
             <Icon name="shield" size={18} />
             <span>
-              <b>学校密码只用一次</b>
-              <small>连接时交给学校统一认证，成功后只保留可吊销的加密会话，密码不保存。</small>
+              <b>安卓 App：纯本地直连学校</b>
+              <small>
+                安卓端免注册登录，直接由手机连接学校系统；学号、密码、会话与课表仅经 Android Keystore 加密存于本机，服务器仅提供公开通知、公交、充电桩与版本检查。
+              </small>
+            </span>
+          </li>
+          <li className="privacy-row">
+            <Icon name="link" size={18} />
+            <span>
+              <b>网页版：服务器代为认证，不存密码</b>
+              <small>
+                受浏览器跨域策略限制，网页版登录时由服务器代为向学校认证；密码仅内存过手，不落盘、不入库，浏览器本地也不保存学校密码，成功后仅保留可吊销会话。在意服务端中转的同学建议使用安卓 App 或自行部署开源后端。
+              </small>
             </span>
           </li>
           <li className="privacy-row">
@@ -372,7 +373,7 @@ export function MeScreen({ onSignOut }: { onSignOut: () => void }) {
             <Icon name="trash" size={18} />
             <span>
               <b>随时删除</b>
-              <small>删除账号会清空服务器上你的会话和缓存数据。</small>
+              <small>网页版删除账号会清空服务器上的会话和缓存数据；退出登录同时清理浏览器遗留凭据。</small>
             </span>
           </li>
         </ul>

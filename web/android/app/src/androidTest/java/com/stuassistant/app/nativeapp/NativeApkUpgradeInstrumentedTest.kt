@@ -52,13 +52,15 @@ class NativeApkUpgradeInstrumentedTest {
             store = NativeStore(context, configuredServerForTests = SERVER)
             val restored = store.state.value
             val schoolSecret = store.savedSchoolPassword()
+            val oldSessionAfterUpgrade = NativeSecureStorage(context).read("session:${hash(SERVER)}")
             // Restoration is synchronous. Cancel automatic loopback refresh immediately.
             store.close()
             store = null
             assertEquals(SERVER, restored.server)
-            assertEquals(TOKEN, restored.token)
-            assertEquals(user().toString(), restored.user?.toString())
-            assertEquals(timetable().toString(), restored.timetable?.toString())
+            org.junit.Assert.assertNull("Obsolete server token must be purged on pure-local upgrade", restored.token)
+            org.junit.Assert.assertNull("Obsolete encrypted server session must be deleted", oldSessionAfterUpgrade)
+            assertEquals(timetable().getJSONArray("courses").getJSONObject(0).getString("title"),
+                restored.timetable?.getJSONArray("courses")?.getJSONObject(0)?.getString("title"))
             assertEquals(setOf(DONE), restored.done)
             assertEquals(STUDENT, restored.schoolId)
             assertTrue(restored.rememberSchool)
