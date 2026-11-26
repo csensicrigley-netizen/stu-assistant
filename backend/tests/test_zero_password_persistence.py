@@ -442,10 +442,10 @@ def test_deploy_configs_hardened_and_lf_only():
     assert "LimitCORE=0" in service_text
 
 
-def test_latest_version_metadata_updated_to_1_2_0():
+def test_latest_version_metadata_updated_to_1_2_1():
     meta = json.loads((APP_DIR / "latest_version.json").read_text(encoding="utf-8"))
     assert meta["channel"] == "product"
-    assert meta["versionName"] == "1.2.0"
-    assert meta["versionCode"] == 68
-    assert meta["releasedAt"] == "2026-11-26T23:35:00+08:00"
+    assert meta["versionName"] == "1.2.1"
+    assert meta["versionCode"] == 69
+    assert meta["releasedAt"] == "2026-11-27T00:30:00+08:00"
     assert isinstance(meta["notes"], list) and len(meta["notes"]) >= 2

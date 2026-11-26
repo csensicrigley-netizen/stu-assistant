@@ -36,9 +36,9 @@ test('school credential storage never writes plaintext passwords and purges lega
   assert.equal(h.storage.has('stu.school:local|anon'), false);
 });
 
-test('web product version constants match v1.2.0 / 68', () => {
+test('web product version constants match v1.2.1 / 69', () => {
   const h = harness();
   const version = h.load('version.ts');
-  assert.equal(version.APP_VERSION_NAME, '1.2.0');
-  assert.equal(version.APP_VERSION_CODE, 68);
+  assert.equal(version.APP_VERSION_NAME, '1.2.1');
+  assert.equal(version.APP_VERSION_CODE, 69);
 });

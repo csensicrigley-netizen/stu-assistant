@@ -1,14 +1,14 @@
 {
   "channel": "product",
-  "versionName": "1.2.0",
-  "versionCode": 68,
+  "versionName": "1.2.1",
+  "versionCode": 69,
   "apk": "/download/stu-assistant.apk",
   "notes": [
-    "安卓端升级为纯本地直连架构：免注册登录，手机直接连接学校教务、MySTU 与医学院教务，不再经过本站账号中转",
-    "学校凭据、课表、成绩、考试与个人计划仅通过系统 Keystore 加密存于本机，支持一键清除凭据或重置本机数据",
-    "安卓端仅向服务器请求公开校园通知、公交、充电桩、版本公告与匿名一次性 today 课表中转码；网页端同步取消服务端学校密码落盘"
+    "升级 Android 端 Capacitor 运行时至 8.6.0，同步包含底层兼容性与稳定性维护",
+    "升级网页端构建与动效依赖（Vite 8.3.5、Motion 14.13.0、Capacitor 8.6.0）及后端依赖约束（pypdf、soupsieve、opentelemetry-api、platformdirs）",
+    "延续 1.2.0 纯本地直连架构与服务端零密码落盘加固，隐私边界与核心功能保持一致"
   ],
   "mandatory": false,
-  "releasedAt": "2026-11-26T23:35:00+08:00",
+  "releasedAt": "2026-11-27T00:30:00+08:00",
   "minSupported": "1.0.0"
 }

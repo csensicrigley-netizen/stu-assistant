@@ -23,7 +23,7 @@
 
 ## 项目简介与当前版本
 
-当前产品版本为 **`1.2.0`（`versionCode 68`）**，以 [`web/android/app/build.gradle`](web/android/app/build.gradle)、[`web/src/lib/version.ts`](web/src/lib/version.ts) 与 [`backend/app/latest_version.json`](backend/app/latest_version.json) 为准（仓库通过 `python deploy/sync-version.py` 校验三端版本号一致）。
+当前产品版本为 **`1.2.1`（`versionCode 69`）**，以 [`web/android/app/build.gradle`](web/android/app/build.gradle)、[`web/src/lib/version.ts`](web/src/lib/version.ts) 与 [`backend/app/latest_version.json`](backend/app/latest_version.json) 为准（仓库通过 `python deploy/sync-version.py` 校验三端版本号一致）。
 
 仓库包含三个部分：
 
@@ -133,8 +133,8 @@ flowchart LR
 | `GET` | `/v1/public/notices` | 获取学校官网公开栏目通知（如 `?limit=30`） | 无个人身份参数；服务端仅读全局公开缓存 |
 | `GET` | `/v1/public/bus` | 获取桑浦山校区公交线路与官方查询口径 | 无个人身份参数 |
 | `GET` | `/v1/public/charging` | 获取已核验校内充电桩设备及空闲端口状态 | 无个人身份参数 |
-| `GET` | `/v1/announcements` | 获取首页公开图文公告（如 `?platform=android&version_code=68`） | 仅携带平台与构建版本号；若公告配置了站内图片，另按公开路径 `GET /v1/announcements/assets/<filename>` 或 HTTPS 图片地址加载图片 |
-| `GET` | `/v1/meta/version` | 检查当前版本是否有新版本更新说明（如 `?name=1.2.0&code=68`） | 仅携带应用版本号与 `versionCode`；点击更新时交由系统浏览器下载 APK |
+| `GET` | `/v1/announcements` | 获取首页公开图文公告（如 `?platform=android&version_code=69`） | 仅携带平台与构建版本号；若公告配置了站内图片，另按公开路径 `GET /v1/announcements/assets/<filename>` 或 HTTPS 图片地址加载图片 |
+| `GET` | `/v1/meta/version` | 检查当前版本是否有新版本更新说明（如 `?name=1.2.1&code=69`） | 仅携带应用版本号与 `versionCode`；点击更新时交由系统浏览器下载 APK |
 | `POST` | `/v1/public/export/today` | **仅在用户主动点击「导入到 today」时触发**，生成 12 位一次性导入码 | 客户端先通过 `sanitizeTimetableForTodayExport` 剥离学号、姓名、邮箱、Cookie 等字段，仅上传白名单课表结构；服务端校验体积 `<= 128 KB`、课程 `<= 80`、每课节次 `<= 30` 并再次剥离非白名单字段，短码经 SHA-256 哈希存库，有效期 300 秒，被 `POST /v1/export/today/claim` 消费一次即失效 |
 
 #### 本机加密存储与数据清理
