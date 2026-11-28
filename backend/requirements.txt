@@ -6,5 +6,5 @@
 # of the tree to the versions this release was tested with.
 fastapi==0.162.0
 uvicorn==0.54.0
-pydantic==2.14.1
+pydantic==2.14.4
 cryptography==50.0.2

@@ -33,7 +33,7 @@ packaging==26.3
 pillow==12.3.0
 platformdirs==4.14.3
 pycparser==3.12
-pydantic==2.14.1
+pydantic==2.14.4
 pydantic_core==2.50.1
 PyJWT==2.15.1
 PyOTP==2.10.0
